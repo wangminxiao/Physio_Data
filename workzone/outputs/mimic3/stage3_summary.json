@@ -1,0 +1,36 @@
+{
+  "total_attempted": 5,
+  "ok": 0,
+  "skipped": 5,
+  "errors": 0,
+  "total_time_sec": 37.5,
+  "output_dir": "/opt/localdata100tb/physio_data/mimic3",
+  "errors_detail": [],
+  "skips_detail": [
+    {
+      "subject_id": 154,
+      "status": "SKIP",
+      "reason": "no start time"
+    },
+    {
+      "subject_id": 222,
+      "status": "SKIP",
+      "reason": "no start time"
+    },
+    {
+      "subject_id": 188,
+      "status": "SKIP",
+      "reason": "no start time"
+    },
+    {
+      "subject_id": 406,
+      "status": "SKIP",
+      "reason": "no start time"
+    },
+    {
+      "subject_id": 518,
+      "status": "SKIP",
+      "reason": "no start time"
+    }
+  ]
+}
