@@ -40,6 +40,9 @@ pip install numpy scipy wfdb
 # Preprocessing
 pip install polars pyarrow pandas
 
+# Config parsing
+pip install pyyaml
+
 # Visualization (for Step 0c demo alignment plots)
 pip install matplotlib
 
