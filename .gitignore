@@ -9,6 +9,8 @@ eval_review_*.html
 # Workzone: large outputs stay on server
 workzone/logs/*.log
 !workzone/logs/*.summary.txt
+workzone/outputs/**/*.parquet
+workzone/outputs/**/*.csv
 
 # Python
 __pycache__/
