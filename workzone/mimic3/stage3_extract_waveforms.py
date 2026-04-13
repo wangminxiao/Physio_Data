@@ -13,7 +13,7 @@ Run:  python workzone/mimic3/stage3_extract_waveforms.py [--workers 8] [--limit 
 Output: /opt/localdata100tb/physio_data/mimic3/{SUBJECT}_{HADM}/
 
 Depends on:
-  - stage1 output: record_inventory_filtered.parquet
+  - stage2b output: record_inventory_final.parquet (waveform + EHR cross-checked)
   - stage2 output: labs_filtered.parquet, vitals_filtered.parquet, normalization_stats.json
 """
 import os
@@ -318,9 +318,13 @@ def main():
     log.info(f"Stage 3: Extract waveforms -> {PROCESSED_ROOT}")
     os.makedirs(PROCESSED_ROOT, exist_ok=True)
 
-    # Load inventory
-    inventory = pd.read_parquet(OUT_DIR_OUTPUTS / "record_inventory_filtered.parquet")
-    log.info(f"Loaded inventory: {len(inventory)} patients")
+    # Load inventory (cross-checked: waveform + EHR confirmed)
+    inv_path = OUT_DIR_OUTPUTS / "record_inventory_final.parquet"
+    if not inv_path.exists():
+        log.error("record_inventory_final.parquet not found. Run stage2b_cross_check.py first!")
+        sys.exit(1)
+    inventory = pd.read_parquet(inv_path)
+    log.info(f"Loaded inventory: {len(inventory)} patients (waveform + EHR confirmed)")
 
     if args.limit:
         inventory = inventory.head(args.limit)
