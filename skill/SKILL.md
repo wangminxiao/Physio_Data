@@ -47,6 +47,13 @@ optimized for deep learning training. Works with any combination of:
 All channels share dim 0. Segment index `i` = same time window across all channels.
 Channel naming: `{SIGNAL}{RATE}` (e.g. PLETH40, II120, ABP125, EEG256).
 
+**Standard channels for physiological waveform pretraining:**
+- **PLETH40**: PPG at 40 Hz (1200 samples/seg) -- primary photoplethysmography channel
+- **II120** (or **I120**): ECG Lead II (or I) at 120 Hz (3600 samples/seg) -- primary ECG channel
+
+These two are the minimum required. Higher-rate or additional channels (II500, ABP125)
+are optional and dataset-specific. Keep storage lean -- only extract what training needs.
+
 **Event array** (structured dtype):
 ```python
 np.dtype([

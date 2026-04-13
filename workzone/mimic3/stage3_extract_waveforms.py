@@ -300,25 +300,22 @@ def process_patient(row, labs_df, vitals_df, admissions_df):
             return {"subject_id": subject_id, "hadm_id": hadm_id,
                     "status": "SKIP", "reason": "missing channel data"}
 
-        # 4. Resample
+        # 4. Resample: PLETH->40Hz, II->120Hz only (no II500)
         pleth40 = resample_signal(pleth_raw, SOURCE_FS, 40)
         ii120 = resample_signal(ii_raw, SOURCE_FS, 120)
-        ii500 = resample_signal(ii_raw, SOURCE_FS, 500)
 
         # 5. Segment into 30s windows
         pleth40_seg = segment_signal(pleth40, 40)
         ii120_seg = segment_signal(ii120, 120)
-        ii500_seg = segment_signal(ii500, 500)
 
-        if pleth40_seg is None or ii120_seg is None or ii500_seg is None:
+        if pleth40_seg is None or ii120_seg is None:
             return {"subject_id": subject_id, "hadm_id": hadm_id,
                     "status": "SKIP", "reason": "too short after resampling"}
 
         # Use minimum segment count across channels
-        n_seg = min(pleth40_seg.shape[0], ii120_seg.shape[0], ii500_seg.shape[0])
+        n_seg = min(pleth40_seg.shape[0], ii120_seg.shape[0])
         pleth40_seg = pleth40_seg[:n_seg]
         ii120_seg = ii120_seg[:n_seg]
-        ii500_seg = ii500_seg[:n_seg]
 
         # 6. Build time_ms array
         start_ms = int(wav_start.timestamp() * 1000)
@@ -337,7 +334,7 @@ def process_patient(row, labs_df, vitals_df, admissions_df):
         pleth_nan = np.isnan(pleth40_seg.astype(np.float32)).mean()
         ii_nan = np.isnan(ii120_seg.astype(np.float32)).mean()
 
-        channels = {"PLETH40": pleth40_seg, "II120": ii120_seg, "II500": ii500_seg}
+        channels = {"PLETH40": pleth40_seg, "II120": ii120_seg}
 
         save_patient(
             out_dir=out_dir,
