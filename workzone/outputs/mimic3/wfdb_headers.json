@@ -1,0 +1,433 @@
+{
+  "headers": [
+    {
+      "record": "p00/p000020/3544749_0001",
+      "status": "OK",
+      "record_name": "3544749_0001",
+      "n_sig": 4,
+      "sig_name": [
+        "II",
+        "AVF",
+        "ABP",
+        "PAP"
+      ],
+      "fs": 125,
+      "sig_len": 3811,
+      "units": [
+        "mV",
+        "mV",
+        "mmHg",
+        "mmHg"
+      ],
+      "fmt": [
+        "80",
+        "80",
+        "80",
+        "80"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3544749_0001 4 125 3811 17:48:00.230",
+        "3544749_0001.dat 80 1/mV 8 0 -72 4808 0 II",
+        "3544749_0001.dat 80 1/mV 8 0 -72 -14144 0 AVF"
+      ]
+    },
+    {
+      "record": "p00/p000020/3544749_0002",
+      "status": "OK",
+      "record_name": "3544749_0002",
+      "n_sig": 4,
+      "sig_name": [
+        "II",
+        "AVF",
+        "ABP",
+        "PAP"
+      ],
+      "fs": 125,
+      "sig_len": 124,
+      "units": [
+        "mV",
+        "mV",
+        "mmHg",
+        "mmHg"
+      ],
+      "fmt": [
+        "80",
+        "80",
+        "80",
+        "80"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3544749_0002 4 125 124 17:48:30.714",
+        "3544749_0002.dat 80 1/mV 8 0 16 215 0 II",
+        "3544749_0002.dat 80 1/mV 8 0 16 960 0 AVF"
+      ]
+    },
+    {
+      "record": "p00/p000020/3544749_0003",
+      "status": "OK",
+      "record_name": "3544749_0003",
+      "n_sig": 4,
+      "sig_name": [
+        "II",
+        "AVF",
+        "ABP",
+        "PAP"
+      ],
+      "fs": 125,
+      "sig_len": 8,
+      "units": [
+        "mV",
+        "mV",
+        "mmHg",
+        "mmHg"
+      ],
+      "fmt": [
+        "80",
+        "80",
+        "80",
+        "80"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3544749_0003 4 125 8 17:48:31.706",
+        "3544749_0003.dat 80 43/mV 8 0 -4 -39 0 II",
+        "3544749_0003.dat 80 1/mV 8 0 16 64 0 AVF"
+      ]
+    },
+    {
+      "record": "p00/p000030/3524877_0001",
+      "status": "OK",
+      "record_name": "3524877_0001",
+      "n_sig": 2,
+      "sig_name": [
+        "II",
+        "V"
+      ],
+      "fs": 125,
+      "sig_len": 450000,
+      "units": [
+        "mV",
+        "mV"
+      ],
+      "fmt": [
+        "80",
+        "80"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3524877_0001 2 125 450000 12:22:07.132",
+        "3524877_0001.dat 80 23/mV 8 0 -72 -26051 0 II",
+        "3524877_0001.dat 80 82/mV 8 0 2 15998 0 V"
+      ]
+    },
+    {
+      "record": "p01/p010013/3609176_0001",
+      "status": "OK",
+      "record_name": "3609176_0001",
+      "n_sig": 1,
+      "sig_name": [
+        "II"
+      ],
+      "fs": 125,
+      "sig_len": 48703,
+      "units": [
+        "mV"
+      ],
+      "fmt": [
+        "80"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3609176_0001 1 125 48703 23:37:26.450",
+        "3609176_0001.dat 80 40/mV 8 0 0 -4224 0 II",
+        ""
+      ]
+    },
+    {
+      "record": "p01/p010013/3609176_0002",
+      "status": "OK",
+      "record_name": "3609176_0002",
+      "n_sig": 1,
+      "sig_name": [
+        "II"
+      ],
+      "fs": 125,
+      "sig_len": 384,
+      "units": [
+        "mV"
+      ],
+      "fmt": [
+        "80"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3609176_0002 1 125 384 23:43:56.075",
+        "3609176_0002.dat 80 11/mV 8 0 10 -309 0 II",
+        ""
+      ]
+    },
+    {
+      "record": "p01/p010023/3247161_0001",
+      "status": "OK",
+      "record_name": "3247161_0001",
+      "n_sig": 7,
+      "sig_name": [
+        "ABP",
+        "RESP",
+        "PLETH",
+        "PLETH L",
+        "II",
+        "V",
+        "AVR"
+      ],
+      "fs": 125,
+      "sig_len": 125,
+      "units": [
+        "mmHg",
+        "pm",
+        "NU",
+        "NU",
+        "mV",
+        "mV",
+        "mV"
+      ],
+      "fmt": [
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16"
+      ],
+      "comments": [
+        "Final alignment uncertain"
+      ],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3247161_0001 7 125 125 15:42:27.976",
+        "3247161_0001.dat 16 5.11333(76)/mmHg 10 512 -32768 -32768 0 ABP",
+        "3247161_0001.dat 16 1023(0)/pm 10 512 -32768 -32768 0 RESP"
+      ]
+    },
+    {
+      "record": "p00/p000020/3544749_layout",
+      "status": "OK",
+      "record_name": "3544749_layout",
+      "n_sig": 4,
+      "sig_name": [
+        "II",
+        "AVF",
+        "ABP",
+        "PAP"
+      ],
+      "fs": 125,
+      "sig_len": 0,
+      "units": [
+        "mV",
+        "mV",
+        "mmHg",
+        "mmHg"
+      ],
+      "fmt": [
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3544749_layout 4 125 0 17:47:59.486",
+        "~ 0 43/mV 14 0 -8192 0 0 II",
+        "~ 0 50/mV 14 0 -8192 0 0 AVF"
+      ]
+    },
+    {
+      "record": "p00/p000030/3524877_layout",
+      "status": "OK",
+      "record_name": "3524877_layout",
+      "n_sig": 2,
+      "sig_name": [
+        "II",
+        "V"
+      ],
+      "fs": 125,
+      "sig_len": 0,
+      "units": [
+        "mV",
+        "mV"
+      ],
+      "fmt": [
+        "0",
+        "0"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "3524877_layout 2 125 0 12:22:07.132",
+        "~ 0 23/mV 8 0 -128 0 0 II",
+        "~ 0 82/mV 8 0 -128 0 0 V"
+      ]
+    },
+    {
+      "record": "p00/p000020/p000020-2183-04-28-17-47",
+      "status": "ERROR",
+      "error": "'MultiRecord' object has no attribute 'units'",
+      "traceback": "Traceback (most recent call last):\n  File \"/labs/hulab/mxwang/Physio_Data/workzone/mimic3/step0b_read_wfdb.py\", line 71, in <module>\n    \"units\": h.units,\nAttributeError: 'MultiRecord' object has no attribute 'units'\n",
+      "raw_header_first_3_lines": [
+        "p000020-2183-04-28-17-47/10 4 125 9862593 17:47:59.486 28/04/2183",
+        "3544749_layout 0",
+        "~ 93"
+      ]
+    },
+    {
+      "record": "p00/p000030/p000030-2172-10-16-12-22",
+      "status": "ERROR",
+      "error": "'MultiRecord' object has no attribute 'units'",
+      "traceback": "Traceback (most recent call last):\n  File \"/labs/hulab/mxwang/Physio_Data/workzone/mimic3/step0b_read_wfdb.py\", line 71, in <module>\n    \"units\": h.units,\nAttributeError: 'MultiRecord' object has no attribute 'units'\n",
+      "raw_header_first_3_lines": [
+        "p000030-2172-10-16-12-22/2 2 125 450000 12:22:07.132 16/10/2172",
+        "3524877_layout 0",
+        "3524877_0001 450000"
+      ]
+    },
+    {
+      "record": "p00/p000020/p000020-2183-04-28-17-47n",
+      "status": "OK",
+      "record_name": "p000020-2183-04-28-17-47n",
+      "n_sig": 15,
+      "sig_name": [
+        "HR",
+        "ABPSys",
+        "ABPDias",
+        "ABPMean",
+        "PAPSys",
+        "PAPDias",
+        "PAPMean",
+        "CVP",
+        "PULSE",
+        "RESP",
+        "SpO2",
+        "NBPSys",
+        "NBPDias",
+        "NBPMean",
+        "CO"
+      ],
+      "fs": 0.0166666666667,
+      "sig_len": 1315,
+      "units": [
+        "bpm",
+        "mmHg",
+        "mmHg",
+        "mmHg",
+        "mmHg",
+        "mmHg",
+        "mmHg",
+        "mmHg",
+        "bpm",
+        "pm",
+        "%",
+        "mmHg",
+        "mmHg",
+        "mmHg",
+        "Lpm"
+      ],
+      "fmt": [
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16",
+        "16"
+      ],
+      "comments": [],
+      "seg_name": null,
+      "seg_len": null,
+      "raw_header_first_3_lines": [
+        "p000020-2183-04-28-17-47n 15 0.0166666666667/125 1315 17:47:59.486 28/04/2183",
+        "3544749n.dat 16 10/bpm 16 0 986 -15343 0 HR",
+        "3544749n.dat 16 10/mmHg 16 0 1157 -6771 0 ABPSys"
+      ]
+    }
+  ],
+  "channels_seen": {
+    "II": 9,
+    "ABP": 5,
+    "AVF": 4,
+    "PAP": 4,
+    "V": 3,
+    "RESP": 2,
+    "PLETH": 1,
+    "PLETH L": 1,
+    "AVR": 1,
+    "HR": 1,
+    "ABPSys": 1,
+    "ABPDias": 1,
+    "ABPMean": 1,
+    "PAPSys": 1,
+    "PAPDias": 1,
+    "PAPMean": 1,
+    "CVP": 1,
+    "PULSE": 1,
+    "SpO2": 1,
+    "NBPSys": 1,
+    "NBPDias": 1,
+    "NBPMean": 1,
+    "CO": 1
+  },
+  "rdrecord_test": {
+    "sig_name": [
+      "II",
+      "AVF",
+      "ABP",
+      "PAP"
+    ],
+    "fs": 125,
+    "n_sig": 4,
+    "sig_len": 3811,
+    "units": [
+      "mV",
+      "mV",
+      "mmHg",
+      "mmHg"
+    ],
+    "p_signal_shape": [
+      3811,
+      4
+    ],
+    "d_signal_shape": null,
+    "fmt": [
+      "80",
+      "80",
+      "80",
+      "80"
+    ]
+  }
+}
