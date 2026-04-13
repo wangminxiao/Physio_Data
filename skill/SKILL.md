@@ -147,6 +147,10 @@ Before running any heavy processing, check what you're working with:
 - GPU availability (for later training, not preprocessing)
 - Job scheduler (SLURM/PBS) -- may need `sbatch` instead of direct `python`
 
+**Shared clusters: never use more than half of total resources.** Research servers are
+shared. Cap `--workers` at 50% of total cores, even if the machine looks idle. Other
+users' jobs may start at any time.
+
 ### Steps 1-5: Extraction Pipeline
 
 The pipeline has a critical ordering constraint: **check EHR availability BEFORE
