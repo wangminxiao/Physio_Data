@@ -4,6 +4,9 @@
   "total_hours": 414604.4,
   "total_ehr_events": 1160197,
   "n_train": 3578,
+  "n_val": 766,
   "n_test": 766,
+  "n_unique_subjects": 5110,
+  "n_subjects_with_multi_admissions": 0,
   "failed_patients": {}
 }
