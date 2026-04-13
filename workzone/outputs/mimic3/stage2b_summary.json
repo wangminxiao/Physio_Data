@@ -1,0 +1,11 @@
+{
+  "waveform_patients": 6987,
+  "with_labs": 6977,
+  "with_vitals": 6028,
+  "with_both": 6019,
+  "with_no_ehr": 1,
+  "after_filter": 6977,
+  "dropped": 10,
+  "min_lab_events": 1,
+  "min_total_ehr": 3
+}
