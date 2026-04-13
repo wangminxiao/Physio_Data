@@ -33,7 +33,9 @@ with open(REPO_ROOT / "workzone" / "configs" / "server_paths.yaml") as f:
 PROCESSED_ROOT = cfg["mimic3"]["output_dir"]
 
 SPLIT_SEED = 42
-TEST_FRACTION = 0.2
+TRAIN_FRACTION = 0.7
+VAL_FRACTION = 0.15
+TEST_FRACTION = 0.15
 
 EHR_EVENT_DTYPE = np.dtype([
     ('time_ms', 'int64'),
@@ -170,38 +172,50 @@ def main():
     unique_subjects = sorted(subject_to_dirs.keys())
     rng.shuffle(unique_subjects)
 
-    n_test_subjects = int(len(unique_subjects) * TEST_FRACTION)
-    test_subjects = set(unique_subjects[:n_test_subjects])
-    train_subjects = set(unique_subjects[n_test_subjects:])
+    n_test = int(len(unique_subjects) * TEST_FRACTION)
+    n_val = int(len(unique_subjects) * VAL_FRACTION)
+    test_subjects = set(unique_subjects[:n_test])
+    val_subjects = set(unique_subjects[n_test:n_test + n_val])
+    train_subjects = set(unique_subjects[n_test + n_val:])
 
     # Map back to dirs
     train_ids = set()
+    val_ids = set()
     test_ids = set()
     for sid in train_subjects:
         train_ids.update(subject_to_dirs[sid])
+    for sid in val_subjects:
+        val_ids.update(subject_to_dirs[sid])
     for sid in test_subjects:
         test_ids.update(subject_to_dirs[sid])
 
-    # Verify no subject overlap
+    # Verify no subject overlap between any pair
     train_sids = {int(d.split("_")[0]) for d in train_ids}
+    val_sids = {int(d.split("_")[0]) for d in val_ids}
     test_sids = {int(d.split("_")[0]) for d in test_ids}
-    overlap = train_sids & test_sids
-    assert len(overlap) == 0, f"Subject overlap in splits: {overlap}"
+    assert len(train_sids & val_sids) == 0, f"Subject overlap train/val: {train_sids & val_sids}"
+    assert len(train_sids & test_sids) == 0, f"Subject overlap train/test: {train_sids & test_sids}"
+    assert len(val_sids & test_sids) == 0, f"Subject overlap val/test: {val_sids & test_sids}"
 
     n_multi = sum(1 for dirs in subject_to_dirs.values() if len(dirs) > 1)
     log.info(f"  Unique subjects: {len(unique_subjects)} ({n_multi} with multiple admissions)")
-    log.info(f"  Split by subject: train={len(train_subjects)} subjects, test={len(test_subjects)} subjects")
-    log.info(f"  -> train={len(train_ids)} dirs, test={len(test_ids)} dirs")
+    log.info(f"  Split by subject: train={len(train_subjects)}, val={len(val_subjects)}, test={len(test_subjects)}")
+    log.info(f"  -> train={len(train_ids)} dirs, val={len(val_ids)} dirs, test={len(test_ids)} dirs")
 
     splits = {
         "train": sorted(train_ids),
+        "val": sorted(val_ids),
         "test": sorted(test_ids),
         "seed": SPLIT_SEED,
+        "train_fraction": TRAIN_FRACTION,
+        "val_fraction": VAL_FRACTION,
         "test_fraction": TEST_FRACTION,
         "n_unique_subjects": len(unique_subjects),
         "n_train_subjects": len(train_subjects),
+        "n_val_subjects": len(val_subjects),
         "n_test_subjects": len(test_subjects),
         "n_train_dirs": len(train_ids),
+        "n_val_dirs": len(val_ids),
         "n_test_dirs": len(test_ids),
         "n_subjects_with_multi_admissions": n_multi,
     }
@@ -212,19 +226,18 @@ def main():
     log.info(f"Pretrain splits: {splits_path}")
 
     # Also save downstream splits in UNIPHY_Plus format
+    def build_split_list(dir_set):
+        return [
+            [os.path.join(PROCESSED_ROOT, pid), e.get("subject_id", int(pid.split("_")[0])),
+             0, e["n_segments"], -1, 0]
+            for e in valid_entries if e["dir"] in dir_set
+            for pid in [e["dir"]]
+        ]
+
     downstream = {
-        "train_control_list": [
-            [os.path.join(PROCESSED_ROOT, pid), e.get("subject_id", int(pid.split("_")[0])),
-             0, e["n_segments"], -1, 0]
-            for e in valid_entries if e["dir"] in train_ids
-            for pid in [e["dir"]]
-        ],
-        "test_control_list": [
-            [os.path.join(PROCESSED_ROOT, pid), e.get("subject_id", int(pid.split("_")[0])),
-             0, e["n_segments"], -1, 0]
-            for e in valid_entries if e["dir"] in test_ids
-            for pid in [e["dir"]]
-        ],
+        "train_control_list": build_split_list(train_ids),
+        "val_control_list": build_split_list(val_ids),
+        "test_control_list": build_split_list(test_ids),
     }
 
     ds_path = os.path.join(PROCESSED_ROOT, "downstream_splits.json")

@@ -212,7 +212,8 @@ Signal extraction is per-patient independent -- parallelize with multiprocessing
 
 **Critical: split by subject, not by admission.** One subject may have multiple
 admissions/encounters. All admissions from the same subject must be in the same
-train/test set. Splitting by directory (admission-level) causes data leakage.
+train/val/test set. Splitting by directory (admission-level) causes data leakage.
+Use train/val/test (70/15/15) not just train/test.
 
 **Inline assertions in save function:**
 ```python
