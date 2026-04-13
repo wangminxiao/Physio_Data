@@ -3,7 +3,7 @@
   "n_failed": 0,
   "total_hours": 414604.4,
   "total_ehr_events": 1160197,
-  "n_train": 4088,
-  "n_test": 1022,
+  "n_train": 3578,
+  "n_test": 766,
   "failed_patients": {}
 }
