@@ -36,10 +36,8 @@ with open(REPO_ROOT / "workzone" / "configs" / "server_paths.yaml") as f:
 EHR_ROOT = cfg["mimic3"]["raw_ehr_dir"]
 PROCESSED_ROOT = cfg["mimic3"]["output_dir"]
 
-# Sepsis cohort source
-SEPSIS_DATA = "/home/mxwan/workspace/MedicalGYM/data/sepsis"
-SEPSIS_RL_CSV = os.path.join(SEPSIS_DATA, "sepsis_rl_dataset.csv")
-SEPSIS_RAW_CSV = os.path.join(SEPSIS_DATA, "sepsis_raw_noagg_noimpute.csv")
+# Sepsis patient list (extracted from MedicalGYM, committed to repo -- 456 KB)
+SEPSIS_PATIENT_LIST = os.path.join(REPO_ROOT, "workzone", "mimic3", "sepsis_patient_list.csv")
 
 # EHR event dtype
 EHR_EVENT_DTYPE = np.dtype([
@@ -69,37 +67,18 @@ TEST_FRACTION = 0.15
 
 
 def load_sepsis_cohort():
-    """Load sepsis cohort and extract per-patient info."""
-    log.info(f"Loading sepsis cohort from {SEPSIS_RL_CSV}")
+    """Load sepsis patient list (icustayid + onset + mortality)."""
+    log.info(f"Loading sepsis patient list from {SEPSIS_PATIENT_LIST}")
 
-    # Use the RL dataset (already filtered)
-    df = pd.read_csv(SEPSIS_RL_CSV)
-
-    # Clean column names (they have 'm: ', 'o: ', 'a: ', 'r: ' prefixes)
-    df.columns = [c.strip() for c in df.columns]
-    col_map = {}
-    for c in df.columns:
-        if ': ' in c:
-            prefix, name = c.split(': ', 1)
-            col_map[c] = name.strip()
-        else:
-            col_map[c] = c.strip()
-    df = df.rename(columns=col_map)
-
-    # Per-patient summary
-    patients = df.groupby("icustayid").agg(
-        onset_time=("presumed_onset", "first"),
-        n_timesteps=("timestep", "max"),
-        mortality=("reward", "last"),  # terminal reward: +1 survived, -1 died
-    ).reset_index()
-
-    # Convert mortality to binary label: 1 = died, 0 = survived
-    patients["died"] = (patients["mortality"] < 0).astype(int)
+    patients = pd.read_csv(SEPSIS_PATIENT_LIST)
+    patients["icustayid"] = patients["icustayid"].astype(float).astype(int)
+    patients["onset_time"] = patients["presumed_onset"].astype(float)
+    patients["died"] = (patients["mortality_reward"].astype(float) < 0).astype(int)
 
     log.info(f"  Sepsis cohort: {len(patients)} patients")
     log.info(f"  Mortality: {patients['died'].sum()} died ({patients['died'].mean()*100:.1f}%)")
 
-    return patients, df
+    return patients
 
 
 def map_icustay_to_hadm(sepsis_patients):
@@ -122,79 +101,37 @@ def map_icustay_to_hadm(sepsis_patients):
     return mapped
 
 
-def compute_sofa_from_raw(raw_df, icustayid):
-    """Compute SOFA component scores from raw sepsis data for one patient.
+def compute_sofa_from_ehr_events(patient_dir):
+    """Compute SOFA scores from existing ehr_events.npy (uses Creatinine from var_id 5).
 
-    SOFA components (simplified, from available variables):
-      Resp:   paO2/FiO2 ratio
-      Coag:   Platelets
-      Liver:  Bilirubin
-      Cardio: MeanBP + vasopressors
-      CNS:    GCS (not in raw, skip)
-      Renal:  Creatinine + urine output
+    Only computes renal SOFA from creatinine (var_id 5) since that's what we have
+    in the base EHR events. Full SOFA requires Bilirubin, Platelets, PaO2/FiO2,
+    MAP + vasopressors -- which need additional EHR variables to be added first.
+
+    For now: returns partial SOFA (renal only) as a starting point.
+    TODO: Add Bilirubin, Platelets, etc. via stage3b, then compute full SOFA.
     """
-    pat = raw_df[raw_df["icustayid"] == icustayid].copy()
-    if len(pat) == 0:
+    ehr_path = os.path.join(patient_dir, "ehr_events.npy")
+    if not os.path.exists(ehr_path):
+        return []
+
+    events = np.load(ehr_path)
+    if len(events) == 0:
         return []
 
     sofa_events = []
-    for _, row in pat.iterrows():
-        charttime_ms = int(row["charttime"] * 1000)  # Unix seconds -> ms
 
-        # Respiratory: PaO2/FiO2
-        sofa_resp = 0
-        if pd.notna(row.get("paO2")) and pd.notna(row.get("FiO2_1")) and row["FiO2_1"] > 0:
-            pf = row["paO2"] / row["FiO2_1"]
-            if pf < 100: sofa_resp = 4
-            elif pf < 200: sofa_resp = 3
-            elif pf < 300: sofa_resp = 2
-            elif pf < 400: sofa_resp = 1
-
-        # Coagulation: Platelets
-        sofa_coag = 0
-        if pd.notna(row.get("Platelets_count")):
-            p = row["Platelets_count"]
-            if p < 20: sofa_coag = 4
-            elif p < 50: sofa_coag = 3
-            elif p < 100: sofa_coag = 2
-            elif p < 150: sofa_coag = 1
-
-        # Liver: Bilirubin
-        sofa_liver = 0
-        if pd.notna(row.get("Total_bili")):
-            b = row["Total_bili"]
-            if b >= 12: sofa_liver = 4
-            elif b >= 6: sofa_liver = 3
-            elif b >= 2: sofa_liver = 2
-            elif b >= 1.2: sofa_liver = 1
-
-        # Cardiovascular: MAP + vasopressors
-        sofa_cardio = 0
-        vaso = row.get("vaso_rate_max", 0) or 0
-        mbp = row.get("MeanBP", None)
-        if vaso > 0.1: sofa_cardio = 4
-        elif vaso > 0: sofa_cardio = 3
-        elif pd.notna(mbp) and mbp < 70: sofa_cardio = 1
-
-        # Renal: Creatinine
+    # Creatinine = var_id 5
+    cr_events = events[events['var_id'] == 5]
+    for ev in cr_events:
+        cr = ev['value']
         sofa_renal = 0
-        if pd.notna(row.get("Creatinine")):
-            cr = row["Creatinine"]
-            if cr >= 5: sofa_renal = 4
-            elif cr >= 3.5: sofa_renal = 3
-            elif cr >= 2: sofa_renal = 2
-            elif cr >= 1.2: sofa_renal = 1
+        if cr >= 5: sofa_renal = 4
+        elif cr >= 3.5: sofa_renal = 3
+        elif cr >= 2: sofa_renal = 2
+        elif cr >= 1.2: sofa_renal = 1
 
-        sofa_total = sofa_resp + sofa_coag + sofa_liver + sofa_cardio + sofa_renal
-
-        # Only add events when we have at least some non-zero data
-        if any(pd.notna(row.get(v)) for v in ["paO2", "Platelets_count", "Total_bili", "Creatinine"]):
-            sofa_events.append((charttime_ms, SEPSIS_VAR_IDS["sofa_total"], float(sofa_total)))
-            sofa_events.append((charttime_ms, SEPSIS_VAR_IDS["sofa_resp"], float(sofa_resp)))
-            sofa_events.append((charttime_ms, SEPSIS_VAR_IDS["sofa_coag"], float(sofa_coag)))
-            sofa_events.append((charttime_ms, SEPSIS_VAR_IDS["sofa_liver"], float(sofa_liver)))
-            sofa_events.append((charttime_ms, SEPSIS_VAR_IDS["sofa_cardio"], float(sofa_cardio)))
-            sofa_events.append((charttime_ms, SEPSIS_VAR_IDS["sofa_renal"], float(sofa_renal)))
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_renal"], float(sofa_renal)))
 
     return sofa_events
 
@@ -366,7 +303,7 @@ def main():
     t0 = time.time()
 
     # 1. Load sepsis cohort
-    sepsis_patients, raw_df = load_sepsis_cohort()
+    sepsis_patients = load_sepsis_cohort()
 
     # 2. Map icustayid -> SUBJECT_ID_HADM_ID
     mapped = map_icustay_to_hadm(sepsis_patients)
@@ -420,7 +357,7 @@ def main():
     n_events_added = 0
     for i, (_, row) in enumerate(matched.iterrows()):
         patient_dir = os.path.join(PROCESSED_ROOT, row["patient_id"])
-        sofa_events = compute_sofa_from_raw(raw_df, row["icustayid"])
+        sofa_events = compute_sofa_from_ehr_events(patient_dir)
         n = add_sepsis_events_to_patient(patient_dir, row["onset_time"], sofa_events)
         n_events_added += n
         if (i + 1) % 200 == 0:
