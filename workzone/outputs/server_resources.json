@@ -1,0 +1,54 @@
+{
+  "host": "bedanalysis.priv.bmi.emory.edu",
+  "cpu": {
+    "cores": 48,
+    "load_1m": 2.14,
+    "load_5m": 1.63,
+    "load_15m": 1.41
+  },
+  "memory": {
+    "total_gb": 251.6,
+    "available_gb": 130.7,
+    "used_pct": 48.0
+  },
+  "disk": {
+    "/": {
+      "total_gb": 233.8,
+      "free_gb": 22.4,
+      "used_pct": 90.4
+    },
+    "/opt/localdata100tb": {
+      "total_gb": 119998.2,
+      "free_gb": 61929.6,
+      "used_pct": 48.4
+    },
+    "/labs/hulab": {
+      "total_gb": 179994.6,
+      "free_gb": 2070.3,
+      "used_pct": 98.8
+    }
+  },
+  "gpu": {
+    "available": true,
+    "count": 1,
+    "gpus": [
+      {
+        "name": "NVIDIA A2",
+        "memory_total_mb": 15356,
+        "memory_used_mb": 0,
+        "memory_free_mb": 14965,
+        "utilization_pct": 0
+      }
+    ]
+  },
+  "jobs": {
+    "user": "mwang80",
+    "python_processes": 15
+  },
+  "scheduler": {
+    "type": "none"
+  },
+  "recommendation": {
+    "recommended_workers": 24
+  }
+}
