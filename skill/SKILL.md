@@ -293,10 +293,11 @@ This is fast because:
 - **C-contiguous float16 for signals.** This guarantees zero-copy `reshape(-1)`.
 - **Signal + event co-existence.** Don't process signals without events or vice versa.
 - **Extract EHR broadly, filter narrowly.** The main pipeline should extract ALL available
-  EHR variables, not just a narrow set. Cross-check should only verify the patient has
-  SOME EHR overlap. Task-specific variable requirements (e.g., "need SOFA components")
-  belong in post-stages, not in the main pipeline filter. Filtering too aggressively in
-  the main pipeline loses patients that are valid for other downstream tasks.
+  EHR variables, not just a narrow set. Task-specific variable requirements belong in
+  post-stages. If the main pipeline filtered too aggressively, the post-stage can
+  **extract missing patients** on demand -- run waveform extraction only for patients
+  in the task cohort that were dropped by the main pipeline. This avoids re-running
+  the full pipeline just to recover a few hundred patients.
 - **Admission-level linkage.** One patient may have multiple hospital visits. Match signal
   recording time to the correct admission/encounter, then filter events by that admission ID.
   Output directory should be `{patient_id}_{admission_id}/`, not just `{patient_id}/`.

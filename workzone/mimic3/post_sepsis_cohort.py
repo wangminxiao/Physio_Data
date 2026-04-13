@@ -253,6 +253,114 @@ def add_sepsis_events_to_patient(patient_dir, onset_time_sec, sofa_events):
     return len(new_events)
 
 
+def extract_missing_patients(missing_df, labs_df, vitals_df, admissions_df):
+    """Extract waveforms for sepsis patients that were dropped by stage 2b.
+
+    These patients have waveform data but were filtered out because they didn't
+    meet the main pipeline's EHR variable coverage threshold. We extract them
+    now because they're needed for the sepsis task.
+    """
+    import sys
+    sys.path.insert(0, str(REPO_ROOT))
+    # Import extraction functions from stage3
+    from workzone.mimic3.stage3_extract_waveforms import (
+        get_master_start_time, read_wfdb_segments, resample_signal,
+        segment_signal, build_ehr_events, save_patient,
+        SOURCE_FS, SEGMENT_DUR_SEC, WAVEFORM_DTYPE, TIME_DTYPE,
+    )
+
+    WAV_ROOT = cfg["mimic3"]["raw_waveform_dir"]
+
+    log.info(f"\n=== Extracting {len(missing_df)} missing sepsis patients ===")
+
+    results = []
+    for i, (_, row) in enumerate(missing_df.iterrows()):
+        subject_id = int(row["SUBJECT_ID"])
+        hadm_id = int(row["HADM_ID"])
+        patient_id = f"{subject_id}_{hadm_id}"
+
+        # Find waveform directory
+        patient_dir_prefix = f"p{str(subject_id).zfill(6)[:3]}"
+        patient_dir_name = f"p{str(subject_id).zfill(6)}"
+        patient_path = os.path.join(WAV_ROOT, patient_dir_prefix, patient_dir_name)
+
+        if not os.path.isdir(patient_path):
+            results.append({"patient_id": patient_id, "status": "SKIP", "reason": "no waveform dir"})
+            continue
+
+        try:
+            # Get recording time
+            wav_start, wav_duration = get_master_start_time(patient_path)
+            if wav_start is None or wav_duration is None or wav_duration < 300:
+                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "no/short recording"})
+                continue
+
+            # Read waveforms
+            pleth_raw = read_wfdb_segments(patient_path, "PLETH")
+            ii_raw = read_wfdb_segments(patient_path, "II")
+            if pleth_raw is None or ii_raw is None:
+                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "missing PLETH or II"})
+                continue
+
+            # Resample + segment
+            pleth40 = resample_signal(pleth_raw, SOURCE_FS, 40)
+            ii120 = resample_signal(ii_raw, SOURCE_FS, 120)
+            pleth40_seg = segment_signal(pleth40, 40)
+            ii120_seg = segment_signal(ii120, 120)
+            if pleth40_seg is None or ii120_seg is None:
+                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "too short"})
+                continue
+
+            n_seg = min(pleth40_seg.shape[0], ii120_seg.shape[0])
+            pleth40_seg = pleth40_seg[:n_seg]
+            ii120_seg = ii120_seg[:n_seg]
+
+            start_ms = int(wav_start.timestamp() * 1000)
+            time_ms = np.array(
+                [start_ms + i * SEGMENT_DUR_SEC * 1000 for i in range(n_seg)],
+                dtype=TIME_DTYPE,
+            )
+
+            # Build EHR events (filtered by HADM_ID)
+            patient_labs = labs_df[labs_df["SUBJECT_ID"] == subject_id]
+            patient_vitals = vitals_df[vitals_df["SUBJECT_ID"] == subject_id]
+            ehr_events = build_ehr_events(subject_id, hadm_id, time_ms, patient_labs, patient_vitals)
+
+            out_dir = os.path.join(PROCESSED_ROOT, patient_id)
+            channels = {"PLETH40": pleth40_seg, "II120": ii120_seg}
+
+            save_patient(
+                out_dir=out_dir,
+                channels=channels,
+                time_ms=time_ms,
+                ehr_events=ehr_events,
+                meta_extra={
+                    "patient_id": patient_id,
+                    "subject_id": subject_id,
+                    "hadm_id": hadm_id,
+                    "source_dataset": "mimic3",
+                    "source_path": patient_path,
+                    "recording_start_ms": int(start_ms),
+                    "total_duration_hours": round(n_seg * SEGMENT_DUR_SEC / 3600, 2),
+                    "added_by": "post_sepsis_cohort",
+                },
+            )
+            results.append({"patient_id": patient_id, "status": "OK", "n_segments": n_seg})
+
+        except Exception as e:
+            results.append({"patient_id": patient_id, "status": "ERROR", "reason": str(e)})
+
+        if (i + 1) % 100 == 0:
+            n_ok = sum(1 for r in results if r["status"] == "OK")
+            log.info(f"  [{i+1}/{len(missing_df)}] OK={n_ok}")
+
+    n_ok = sum(1 for r in results if r["status"] == "OK")
+    n_skip = sum(1 for r in results if r["status"] == "SKIP")
+    n_err = sum(1 for r in results if r["status"] == "ERROR")
+    log.info(f"  Extraction done: OK={n_ok}, SKIP={n_skip}, ERR={n_err}")
+    return results
+
+
 def main():
     log.info("Post-stage: Sepsis cohort adaptation")
     t0 = time.time()
@@ -263,14 +371,45 @@ def main():
     # 2. Map icustayid -> SUBJECT_ID_HADM_ID
     mapped = map_icustay_to_hadm(sepsis_patients)
 
-    # 3. Intersect with our processed patients
+    # 3. Check overlap and find missing patients
     processed_dirs = set(os.listdir(PROCESSED_ROOT))
-    matched = mapped[mapped["patient_id"].isin(processed_dirs)]
+    already_processed = mapped[mapped["patient_id"].isin(processed_dirs)]
+    missing = mapped[~mapped["patient_id"].isin(processed_dirs)]
+
     log.info(f"\n=== Cohort Overlap ===")
     log.info(f"  Sepsis cohort (mapped): {len(mapped)}")
-    log.info(f"  Our processed patients: {len(processed_dirs)}")
-    log.info(f"  Overlap: {len(matched)} patients")
-    log.info(f"  Mortality in overlap: {matched['died'].sum()} ({matched['died'].mean()*100:.1f}%)")
+    log.info(f"  Already processed:      {len(already_processed)}")
+    log.info(f"  Missing (need extract):  {len(missing)}")
+
+    # 4. Extract missing patients (waveforms + EHR)
+    if len(missing) > 0:
+        log.info("Loading EHR data for missing patient extraction...")
+        OUT_DIR_OUTPUTS = REPO_ROOT / "workzone" / "outputs" / "mimic3"
+        labs_df = pd.read_parquet(OUT_DIR_OUTPUTS / "labs_filtered.parquet")
+        vitals_df = pd.read_parquet(OUT_DIR_OUTPUTS / "vitals_filtered.parquet")
+        for df in [labs_df, vitals_df]:
+            if "charttime_dt" not in df.columns:
+                df["charttime_dt"] = pd.to_datetime(df["CHARTTIME"])
+            if "HADM_ID" in df.columns:
+                df["HADM_ID"] = pd.to_numeric(df["HADM_ID"], errors="coerce")
+
+        adm_path = os.path.join(EHR_ROOT, "ADMISSIONS.csv.gz")
+        if not os.path.exists(adm_path):
+            adm_path = os.path.join(EHR_ROOT, "ADMISSIONS.csv")
+        admissions_df = pd.read_csv(adm_path, usecols=["SUBJECT_ID", "HADM_ID", "ADMITTIME", "DISCHTIME"])
+        admissions_df["ADMITTIME"] = pd.to_datetime(admissions_df["ADMITTIME"])
+        admissions_df["DISCHTIME"] = pd.to_datetime(admissions_df["DISCHTIME"])
+
+        extract_results = extract_missing_patients(missing, labs_df, vitals_df, admissions_df)
+
+        # Update processed_dirs
+        processed_dirs = set(os.listdir(PROCESSED_ROOT))
+
+    # 5. Now get all matched (including newly extracted)
+    matched = mapped[mapped["patient_id"].isin(processed_dirs)]
+    log.info(f"\n=== After extraction ===")
+    log.info(f"  Total matched: {len(matched)} patients")
+    log.info(f"  Mortality: {matched['died'].sum()} ({matched['died'].mean()*100:.1f}%)")
 
     if len(matched) == 0:
         log.error("ABORT: No overlap between sepsis cohort and processed patients!")
