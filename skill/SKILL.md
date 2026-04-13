@@ -226,6 +226,42 @@ assert np.all(events['seg_idx'] < n_seg)  # bounds
 assert np.all(np.diff(events['time_ms']) >= 0)  # sorted
 ```
 
+## Post-Stages: Downstream Task Adaptation
+
+The main pipeline produces a **task-agnostic** canonical dataset. Downstream tasks
+(sepsis prediction, AKI detection, mortality prediction, etc.) need additional steps:
+
+1. **Cohort filtering** -- select patients matching task criteria (e.g., Sepsis-3 cohort)
+2. **Add task-specific EHR** -- SOFA scores, onset times, mortality labels, treatment actions
+3. **Add task-specific labels** -- binary labels, time-to-event, severity scores
+4. **Generate task-specific splits** -- filtered version of downstream_splits.json
+
+These post-stages read from the canonical data and produce task-specific index files.
+They do NOT modify the canonical .npy files -- they add metadata alongside them.
+
+```
+{output_dir}/
+├── {patient_id}/              # Canonical (untouched by post-stages)
+│   ├── PLETH40.npy
+│   ├── II120.npy
+│   ├── time_ms.npy
+│   ├── ehr_events.npy
+│   └── meta.json
+├── manifest.json              # All patients
+├── pretrain_splits.json       # All patients
+├── tasks/                     # Task-specific (added by post-stages)
+│   ├── sepsis/
+│   │   ├── cohort.json        # Patient list + onset times + labels
+│   │   └── splits.json        # Task-specific train/val/test
+│   └── aki/
+│       └── ...
+```
+
+**Important design principle:** The main pipeline should extract ALL available EHR
+variables broadly, not filter to a narrow set. Task-specific variable requirements
+are a post-stage concern. If the main pipeline filters too aggressively (e.g., requiring
+70% of 9 specific variables), patients valid for other tasks may be excluded.
+
 ## Adding EHR Variables to Existing Data
 
 The sparse event format means new variables can be added without re-extracting waveforms.
@@ -256,6 +292,11 @@ This is fast because:
 - **Zero new runtime dependencies.** Training/eval code only needs numpy.
 - **C-contiguous float16 for signals.** This guarantees zero-copy `reshape(-1)`.
 - **Signal + event co-existence.** Don't process signals without events or vice versa.
+- **Extract EHR broadly, filter narrowly.** The main pipeline should extract ALL available
+  EHR variables, not just a narrow set. Cross-check should only verify the patient has
+  SOME EHR overlap. Task-specific variable requirements (e.g., "need SOFA components")
+  belong in post-stages, not in the main pipeline filter. Filtering too aggressively in
+  the main pipeline loses patients that are valid for other downstream tasks.
 - **Admission-level linkage.** One patient may have multiple hospital visits. Match signal
   recording time to the correct admission/encounter, then filter events by that admission ID.
   Output directory should be `{patient_id}_{admission_id}/`, not just `{patient_id}/`.
