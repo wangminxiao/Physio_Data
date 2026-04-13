@@ -214,6 +214,9 @@ assert np.all(np.diff(events['time_ms']) >= 0)  # sorted
 - **Zero new runtime dependencies.** Training/eval code only needs numpy.
 - **C-contiguous float16 for signals.** This guarantees zero-copy `reshape(-1)`.
 - **Signal + event co-existence.** Don't process signals without events or vice versa.
+- **Admission-level linkage.** One patient may have multiple hospital visits. Match signal
+  recording time to the correct admission/encounter, then filter events by that admission ID.
+  Output directory should be `{patient_id}_{admission_id}/`, not just `{patient_id}/`.
 
 ## Project Structure
 
