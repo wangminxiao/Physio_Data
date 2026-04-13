@@ -5,10 +5,10 @@
 mimic3:
   raw_waveform_dir: /labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0
   raw_ehr_dir: /labs/hulab/MIMICIII-v1.4
-  output_dir: /opt/localdata100tb/UNIPHY_Plus/dataset/EST/physio_data/mimic3
+  output_dir: /opt/localdata100tb/physio_data/mimic3
 
 # MC_MED
 mcmed:
-  raw_npz_dir: /home/mwang80/mxwang/MC_MED_ECG_PLETH_40hz_120hz_500hz_lab_vital
-  raw_csv_dir: /home/mwang80/mxwang/mc_med_csv
-  output_dir: /opt/localdata100tb/UNIPHY_Plus/dataset/EST/physio_data/mcmed
+  raw_npz_dir: /labs/hulab/mxwang/MC_MED_ECG_PLETH_40hz_120hz_500hz_lab_vital
+  raw_csv_dir: /labs/hulab/mxwang/mc_med_csv
+  output_dir: /opt/localdata100tb/physio_data/mcmed

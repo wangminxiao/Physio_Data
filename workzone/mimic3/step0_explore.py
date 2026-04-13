@@ -212,7 +212,7 @@ def check_existing_processed():
 
     check_paths = [
         "/opt/localdata100tb/UNIPHY_Plus/dataset/EST/MIMIC3_SPO2_I_40hz_v3_lab_vital",
-        "/opt/localdata100tb/UNIPHY_Plus/dataset/EST/MIMIC3_SPO2_I_40hz_v3",
+        "/opt/localdata100tb/physio_data/mimic3",
     ]
 
     result = {}
