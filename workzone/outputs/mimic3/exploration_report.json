@@ -1,0 +1,631 @@
+{
+  "server": "bedanalysis.priv.bmi.emory.edu",
+  "waveform": {
+    "root": "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0",
+    "exists": true,
+    "top_level_dirs": [
+      "p00",
+      "p01",
+      "p02",
+      "p03",
+      "p04",
+      "p05",
+      "p06",
+      "p07",
+      "p08",
+      "p09"
+    ],
+    "total_top_dirs": 10,
+    "sample_patients": [
+      {
+        "path": "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020",
+        "patient_id": "p000020",
+        "files": [
+          "3544749_0001.dat",
+          "3544749_0001.hea",
+          "3544749_0002.dat",
+          "3544749_0002.hea",
+          "3544749_0003.dat",
+          "3544749_0003.hea",
+          "3544749_0004.dat",
+          "3544749_0004.hea",
+          "3544749_0005.dat",
+          "3544749_0005.hea",
+          "3544749_0006.dat",
+          "3544749_0006.hea",
+          "3544749_0007.dat",
+          "3544749_0007.hea",
+          "3544749_0008.dat",
+          "3544749_0008.hea",
+          "3544749_layout.hea",
+          "3544749n.dat",
+          "RECORDS",
+          "index.html",
+          "p000020-2183-04-28-17-47.hea",
+          "p000020-2183-04-28-17-47n.hea"
+        ],
+        "n_files": 22
+      },
+      {
+        "path": "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000030",
+        "patient_id": "p000030",
+        "files": [
+          "3524877_0001.dat",
+          "3524877_0001.hea",
+          "3524877_layout.hea",
+          "3524877n.dat",
+          "RECORDS",
+          "index.html",
+          "p000030-2172-10-16-12-22.hea",
+          "p000030-2172-10-16-12-22n.hea"
+        ],
+        "n_files": 8
+      },
+      {
+        "path": "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p01/p010013",
+        "patient_id": "p010013",
+        "files": [
+          "3609176_0001.dat",
+          "3609176_0001.hea",
+          "3609176_0002.dat",
+          "3609176_0002.hea",
+          "3609176_0003.dat",
+          "3609176_0003.hea",
+          "3609176_0004.dat",
+          "3609176_0004.hea",
+          "3609176_0005.dat",
+          "3609176_0005.hea",
+          "3609176_0006.dat",
+          "3609176_0006.hea",
+          "3609176_0007.dat",
+          "3609176_0007.hea",
+          "3609176_0008.dat",
+          "3609176_0008.hea",
+          "3609176_0009.dat",
+          "3609176_0009.hea",
+          "3609176_0010.dat",
+          "3609176_0010.hea",
+          "3609176_0011.dat",
+          "3609176_0011.hea",
+          "3609176_0012.dat",
+          "3609176_0012.hea",
+          "3609176_layout.hea",
+          "3609176n.dat",
+          "RECORDS",
+          "index.html",
+          "p010013-2125-10-04-23-37.hea",
+          "p010013-2125-10-04-23-37n.hea"
+        ],
+        "n_files": 30
+      },
+      {
+        "path": "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p01/p010023",
+        "patient_id": "p010023",
+        "files": [
+          "3247161_0001.dat",
+          "3247161_0001.hea",
+          "3247161_0002.dat",
+          "3247161_0002.hea",
+          "3247161_0003.dat",
+          "3247161_0003.hea",
+          "3247161_0004.dat",
+          "3247161_0004.hea",
+          "3247161_0005.dat",
+          "3247161_0005.hea",
+          "3247161_0006.dat",
+          "3247161_0006.hea",
+          "3247161_0007.dat",
+          "3247161_0007.hea",
+          "3247161_0008.dat",
+          "3247161_0008.hea",
+          "3247161_0009.dat",
+          "3247161_0009.hea",
+          "3247161_0010.dat",
+          "3247161_0010.hea",
+          "3247161_0011.dat",
+          "3247161_0011.hea",
+          "3247161_0012.dat",
+          "3247161_0012.hea",
+          "3247161_0013.dat",
+          "3247161_0013.hea",
+          "3247161_0014.dat",
+          "3247161_0014.hea",
+          "3247161_0015.dat",
+          "3247161_0015.hea",
+          "3247161_0016.dat",
+          "3247161_0016.hea",
+          "3247161_0017.dat",
+          "3247161_0017.hea",
+          "3247161_0018.dat",
+          "3247161_0018.hea",
+          "3247161_0019.dat",
+          "3247161_0019.hea",
+          "3247161_0020.dat",
+          "3247161_0020.hea",
+          "3247161_layout.hea",
+          "3247161n.dat",
+          "RECORDS",
+          "index.html",
+          "p010023-2102-11-06-15-42.hea",
+          "p010023-2102-11-06-15-42n.hea"
+        ],
+        "n_files": 46
+      }
+    ],
+    "total_patients": 10282
+  },
+  "wfdb_headers": {
+    "candidates_found": 0,
+    "headers_inspected": 0,
+    "headers": [],
+    "errors": [],
+    "channel_frequency": {}
+  },
+  "ehr_tables": {
+    "root": "/labs/hulab/MIMICIII-v1.4",
+    "exists": true,
+    "all_files": [
+      "ADMISSIONS.csv.gz",
+      "CALLOUT.csv.gz",
+      "CAREGIVERS.csv.gz",
+      "CHARTEVENTS.csv",
+      "CHARTEVENTS.csv.gz",
+      "CPTEVENTS.csv.gz",
+      "DATETIMEEVENTS.csv.gz",
+      "DIAGNOSES_ICD.csv.gz",
+      "DRGCODES.csv.gz",
+      "D_CPT.csv.gz",
+      "D_ICD_DIAGNOSES.csv.gz",
+      "D_ICD_PROCEDURES.csv.gz",
+      "D_ITEMS.csv",
+      "D_LABITEMS.csv",
+      "ICUSTAYS.csv.gz",
+      "INPUTEVENTS_CV.csv.gz",
+      "INPUTEVENTS_MV.csv.gz",
+      "LABEVENTS.csv",
+      "LICENSE.txt",
+      "MICROBIOLOGYEVENTS.csv.gz",
+      "NOTEEVENTS.csv",
+      "OUTPUTEVENTS.csv.gz",
+      "PATIENTS.csv",
+      "PRESCRIPTIONS.csv.gz",
+      "PROCEDUREEVENTS_MV.csv.gz",
+      "PROCEDURES_ICD.csv.gz",
+      "README.md",
+      "SERVICES.csv.gz",
+      "SHA256SUMS.txt",
+      "TRANSFERS.csv.gz",
+      "index.html"
+    ],
+    "tables": {
+      "ADMISSIONS.csv.gz": {
+        "size_mb": 2.5,
+        "columns": [
+          "ROW_ID",
+          "SUBJECT_ID",
+          "HADM_ID",
+          "ADMITTIME",
+          "DISCHTIME",
+          "DEATHTIME",
+          "ADMISSION_TYPE",
+          "ADMISSION_LOCATION",
+          "DISCHARGE_LOCATION",
+          "INSURANCE",
+          "LANGUAGE",
+          "RELIGION",
+          "MARITAL_STATUS",
+          "ETHNICITY",
+          "EDREGTIME",
+          "EDOUTTIME",
+          "DIAGNOSIS",
+          "HOSPITAL_EXPIRE_FLAG",
+          "HAS_CHARTEVENTS_DATA"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "SUBJECT_ID": "int64",
+          "HADM_ID": "int64",
+          "ADMITTIME": "object",
+          "DISCHTIME": "object",
+          "DEATHTIME": "float64",
+          "ADMISSION_TYPE": "object",
+          "ADMISSION_LOCATION": "object",
+          "DISCHARGE_LOCATION": "object",
+          "INSURANCE": "object",
+          "LANGUAGE": "object",
+          "RELIGION": "object",
+          "MARITAL_STATUS": "object",
+          "ETHNICITY": "object",
+          "EDREGTIME": "object",
+          "EDOUTTIME": "object",
+          "DIAGNOSIS": "object",
+          "HOSPITAL_EXPIRE_FLAG": "int64",
+          "HAS_CHARTEVENTS_DATA": "int64"
+        },
+        "sample_row": {
+          "ROW_ID": "21",
+          "SUBJECT_ID": "22",
+          "HADM_ID": "165315",
+          "ADMITTIME": "2196-04-09 12:26:00",
+          "DISCHTIME": "2196-04-10 15:54:00",
+          "DEATHTIME": "nan",
+          "ADMISSION_TYPE": "EMERGENCY",
+          "ADMISSION_LOCATION": "EMERGENCY ROOM ADMIT",
+          "DISCHARGE_LOCATION": "DISC-TRAN CANCER/CHLDRN H",
+          "INSURANCE": "Private",
+          "LANGUAGE": "nan",
+          "RELIGION": "UNOBTAINABLE",
+          "MARITAL_STATUS": "MARRIED",
+          "ETHNICITY": "WHITE",
+          "EDREGTIME": "2196-04-09 10:06:00",
+          "EDOUTTIME": "2196-04-09 13:24:00",
+          "DIAGNOSIS": "BENZODIAZEPINE OVERDOSE",
+          "HOSPITAL_EXPIRE_FLAG": "0",
+          "HAS_CHARTEVENTS_DATA": "1"
+        }
+      },
+      "CHARTEVENTS.csv": {
+        "size_mb": 35307.9,
+        "columns": [
+          "ROW_ID",
+          "SUBJECT_ID",
+          "HADM_ID",
+          "ICUSTAY_ID",
+          "ITEMID",
+          "CHARTTIME",
+          "STORETIME",
+          "CGID",
+          "VALUE",
+          "VALUENUM",
+          "VALUEUOM",
+          "WARNING",
+          "ERROR",
+          "RESULTSTATUS",
+          "STOPPED"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "SUBJECT_ID": "int64",
+          "HADM_ID": "int64",
+          "ICUSTAY_ID": "int64",
+          "ITEMID": "int64",
+          "CHARTTIME": "object",
+          "STORETIME": "object",
+          "CGID": "int64",
+          "VALUE": "float64",
+          "VALUENUM": "float64",
+          "VALUEUOM": "object",
+          "WARNING": "int64",
+          "ERROR": "int64",
+          "RESULTSTATUS": "float64",
+          "STOPPED": "float64"
+        },
+        "sample_row": {
+          "ROW_ID": "788",
+          "SUBJECT_ID": "36",
+          "HADM_ID": "165660",
+          "ICUSTAY_ID": "241249",
+          "ITEMID": "223834",
+          "CHARTTIME": "2134-05-12 12:00:00",
+          "STORETIME": "2134-05-12 13:56:00",
+          "CGID": "17525",
+          "VALUE": "15.0",
+          "VALUENUM": "15.0",
+          "VALUEUOM": "L/min",
+          "WARNING": "0",
+          "ERROR": "0",
+          "RESULTSTATUS": "nan",
+          "STOPPED": "nan"
+        }
+      },
+      "CHARTEVENTS.csv.gz": {
+        "size_mb": 4287.0,
+        "columns": [
+          "ROW_ID",
+          "SUBJECT_ID",
+          "HADM_ID",
+          "ICUSTAY_ID",
+          "ITEMID",
+          "CHARTTIME",
+          "STORETIME",
+          "CGID",
+          "VALUE",
+          "VALUENUM",
+          "VALUEUOM",
+          "WARNING",
+          "ERROR",
+          "RESULTSTATUS",
+          "STOPPED"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "SUBJECT_ID": "int64",
+          "HADM_ID": "int64",
+          "ICUSTAY_ID": "int64",
+          "ITEMID": "int64",
+          "CHARTTIME": "object",
+          "STORETIME": "object",
+          "CGID": "int64",
+          "VALUE": "float64",
+          "VALUENUM": "float64",
+          "VALUEUOM": "object",
+          "WARNING": "int64",
+          "ERROR": "int64",
+          "RESULTSTATUS": "float64",
+          "STOPPED": "float64"
+        },
+        "sample_row": {
+          "ROW_ID": "788",
+          "SUBJECT_ID": "36",
+          "HADM_ID": "165660",
+          "ICUSTAY_ID": "241249",
+          "ITEMID": "223834",
+          "CHARTTIME": "2134-05-12 12:00:00",
+          "STORETIME": "2134-05-12 13:56:00",
+          "CGID": "17525",
+          "VALUE": "15.0",
+          "VALUENUM": "15.0",
+          "VALUEUOM": "L/min",
+          "WARNING": "0",
+          "ERROR": "0",
+          "RESULTSTATUS": "nan",
+          "STOPPED": "nan"
+        }
+      },
+      "DIAGNOSES_ICD.csv.gz": {
+        "size_mb": 4.7,
+        "columns": [
+          "ROW_ID",
+          "SUBJECT_ID",
+          "HADM_ID",
+          "SEQ_NUM",
+          "ICD9_CODE"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "SUBJECT_ID": "int64",
+          "HADM_ID": "int64",
+          "SEQ_NUM": "int64",
+          "ICD9_CODE": "int64"
+        },
+        "sample_row": {
+          "ROW_ID": "1297",
+          "SUBJECT_ID": "109",
+          "HADM_ID": "172335",
+          "SEQ_NUM": "1",
+          "ICD9_CODE": "40301"
+        }
+      },
+      "D_ICD_DIAGNOSES.csv.gz": {
+        "size_mb": 0.3,
+        "columns": [
+          "ROW_ID",
+          "ICD9_CODE",
+          "SHORT_TITLE",
+          "LONG_TITLE"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "ICD9_CODE": "int64",
+          "SHORT_TITLE": "object",
+          "LONG_TITLE": "object"
+        },
+        "sample_row": {
+          "ROW_ID": "174",
+          "ICD9_CODE": "1166",
+          "SHORT_TITLE": "TB pneumonia-oth test",
+          "LONG_TITLE": "Tuberculous pneumonia [any form], tubercle bacilli not found by bacteriological or histological examination, but tuberculosis confirmed by other methods [inoculation of animals]"
+        }
+      },
+      "D_LABITEMS.csv": {
+        "size_mb": 0.0,
+        "columns": [
+          "ROW_ID",
+          "ITEMID",
+          "LABEL",
+          "FLUID",
+          "CATEGORY",
+          "LOINC_CODE"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "ITEMID": "int64",
+          "LABEL": "object",
+          "FLUID": "object",
+          "CATEGORY": "object",
+          "LOINC_CODE": "object"
+        },
+        "sample_row": {
+          "ROW_ID": "546",
+          "ITEMID": "51346",
+          "LABEL": "Blasts",
+          "FLUID": "Cerebrospinal Fluid (CSF)",
+          "CATEGORY": "Hematology",
+          "LOINC_CODE": "26447-3"
+        }
+      },
+      "LABEVENTS.csv": {
+        "size_mb": 1854.2,
+        "columns": [
+          "ROW_ID",
+          "SUBJECT_ID",
+          "HADM_ID",
+          "ITEMID",
+          "CHARTTIME",
+          "VALUE",
+          "VALUENUM",
+          "VALUEUOM",
+          "FLAG"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "SUBJECT_ID": "int64",
+          "HADM_ID": "float64",
+          "ITEMID": "int64",
+          "CHARTTIME": "object",
+          "VALUE": "object",
+          "VALUENUM": "float64",
+          "VALUEUOM": "object",
+          "FLAG": "float64"
+        },
+        "sample_row": {
+          "ROW_ID": "281",
+          "SUBJECT_ID": "3",
+          "HADM_ID": "nan",
+          "ITEMID": "50820",
+          "CHARTTIME": "2101-10-12 16:07:00",
+          "VALUE": "7.39",
+          "VALUENUM": "7.39",
+          "VALUEUOM": "units",
+          "FLAG": "nan"
+        }
+      },
+      "PATIENTS.csv": {
+        "size_mb": 2.6,
+        "columns": [
+          "ROW_ID",
+          "SUBJECT_ID",
+          "GENDER",
+          "DOB",
+          "DOD",
+          "DOD_HOSP",
+          "DOD_SSN",
+          "EXPIRE_FLAG"
+        ],
+        "dtypes": {
+          "ROW_ID": "int64",
+          "SUBJECT_ID": "int64",
+          "GENDER": "object",
+          "DOB": "object",
+          "DOD": "object",
+          "DOD_HOSP": "object",
+          "DOD_SSN": "float64",
+          "EXPIRE_FLAG": "int64"
+        },
+        "sample_row": {
+          "ROW_ID": "234",
+          "SUBJECT_ID": "249",
+          "GENDER": "F",
+          "DOB": "2075-03-13 00:00:00",
+          "DOD": "nan",
+          "DOD_HOSP": "nan",
+          "DOD_SSN": "nan",
+          "EXPIRE_FLAG": "0"
+        }
+      }
+    }
+  },
+  "existing_processed": {
+    "/opt/localdata100tb/UNIPHY_Plus/dataset/EST/MIMIC3_SPO2_I_40hz_v3_lab_vital": {
+      "exists": true,
+      "n_files": 2674,
+      "sample_files": [
+        "10257_178509_0_PLETH40_II120_II500_2508.npz",
+        "10425_147243_0_PLETH40_II120_II500_17391.npz",
+        "10532_130690_0_PLETH40_II120_II500_4672.npz",
+        "10581_123247_0_PLETH40_II120_II500_3234.npz",
+        "10694_138159_0_PLETH40_II120_II500_35080.npz"
+      ],
+      "sample_npz": {
+        "file": "10257_178509_0_PLETH40_II120_II500_2508.npz",
+        "keys": {
+          "time": {
+            "shape": [
+              2508
+            ],
+            "dtype": "datetime64[ms]"
+          },
+          "clip_raw_index": {
+            "shape": [
+              1
+            ],
+            "dtype": "int64"
+          },
+          "PLETH40": {
+            "shape": [
+              2508,
+              1200
+            ],
+            "dtype": "float16"
+          },
+          "II120": {
+            "shape": [
+              2508,
+              3600
+            ],
+            "dtype": "float16"
+          },
+          "II500": {
+            "shape": [
+              2508,
+              15000
+            ],
+            "dtype": "float16"
+          },
+          "ehr_mask": {
+            "shape": [
+              2508,
+              9
+            ],
+            "dtype": "int32"
+          },
+          "ehr_gt": {
+            "shape": [
+              2508,
+              9
+            ],
+            "dtype": "float32"
+          },
+          "ehr_trend": {
+            "shape": [
+              2508,
+              9
+            ],
+            "dtype": "float32"
+          },
+          "emb_PLETH40_GPT19M": {
+            "shape": [
+              2508,
+              512
+            ],
+            "dtype": "float32"
+          },
+          "pyPPG": {
+            "shape": [
+              2508,
+              918
+            ],
+            "dtype": "float16"
+          },
+          "emb_PLETH40_GPT19M_emory": {
+            "shape": [
+              2508,
+              512
+            ],
+            "dtype": "float32"
+          },
+          "emb_PLETH40_MOMENT": {
+            "shape": [
+              2508,
+              768
+            ],
+            "dtype": "float32"
+          }
+        }
+      }
+    },
+    "/opt/localdata100tb/physio_data/mimic3": {
+      "exists": false
+    }
+  },
+  "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3",
+    "wfdb": "4.3.1",
+    "polars": "1.39.3",
+    "pyarrow": "23.0.1",
+    "torch": null,
+    "matplotlib": "3.10.8"
+  }
+}
