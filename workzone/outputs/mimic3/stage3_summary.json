@@ -1,36 +1,63 @@
 {
   "total_attempted": 5,
-  "ok": 0,
-  "skipped": 5,
+  "ok": 5,
+  "skipped": 0,
   "errors": 0,
-  "total_time_sec": 37.5,
+  "total_time_sec": 85.3,
   "output_dir": "/opt/localdata100tb/physio_data/mimic3",
+  "skip_reasons": {},
   "errors_detail": [],
-  "skips_detail": [
+  "skips_detail": [],
+  "ok_sample": [
     {
       "subject_id": 154,
-      "status": "SKIP",
-      "reason": "no start time"
+      "hadm_id": 102354,
+      "patient_id": "154_102354",
+      "status": "OK",
+      "n_segments": 4755,
+      "n_ehr_events": 147,
+      "duration_hours": 39.62,
+      "overlap_hours": 19.23
     },
     {
       "subject_id": 222,
-      "status": "SKIP",
-      "reason": "no start time"
+      "hadm_id": 188038,
+      "patient_id": "222_188038",
+      "status": "OK",
+      "n_segments": 8820,
+      "n_ehr_events": 140,
+      "duration_hours": 73.5,
+      "overlap_hours": 61.91
     },
     {
       "subject_id": 188,
-      "status": "SKIP",
-      "reason": "no start time"
+      "hadm_id": 132401,
+      "patient_id": "188_132401",
+      "status": "OK",
+      "n_segments": 20028,
+      "n_ehr_events": 710,
+      "duration_hours": 166.9,
+      "overlap_hours": 22.43
     },
     {
       "subject_id": 406,
-      "status": "SKIP",
-      "reason": "no start time"
+      "hadm_id": 174925,
+      "patient_id": "406_174925",
+      "status": "OK",
+      "n_segments": 7869,
+      "n_ehr_events": 245,
+      "duration_hours": 65.58,
+      "overlap_hours": 67.32
     },
     {
       "subject_id": 518,
-      "status": "SKIP",
-      "reason": "no start time"
+      "hadm_id": 120954,
+      "patient_id": "518_120954",
+      "status": "OK",
+      "n_segments": 8450,
+      "n_ehr_events": 20,
+      "duration_hours": 70.42,
+      "overlap_hours": 52.9
     }
   ]
 }
