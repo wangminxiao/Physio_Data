@@ -1,0 +1,168 @@
+{
+  "server": "bedanalysis.priv.bmi.emory.edu",
+  "waveform": {
+    "root": "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0",
+    "exists": true,
+    "top_level_dirs": [
+      "p00",
+      "p01",
+      "p02",
+      "p03",
+      "p04",
+      "p05",
+      "p06",
+      "p07",
+      "p08",
+      "p09"
+    ],
+    "total_top_dirs": 10,
+    "sample_hea_files": [
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0001.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0002.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0003.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0004.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0005.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0006.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0007.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_0008.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/3544749_layout.hea",
+      "/labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0/p00/p000020/p000020-2183-04-28-17-47.hea"
+    ]
+  },
+  "wfdb_headers": {
+    "headers_inspected": 0,
+    "headers": [],
+    "channel_frequency": {}
+  },
+  "ehr_tables": {
+    "LABEVENTS.csv.gz": {
+      "error": "not found at /labs/hulab/MIMICIII-v1.4/LABEVENTS.csv.gz"
+    },
+    "CHARTEVENTS.csv.gz": {
+      "description": "Charted vitals/observations",
+      "size_mb": 4287.0,
+      "columns": [
+        "ROW_ID",
+        "SUBJECT_ID",
+        "HADM_ID",
+        "ICUSTAY_ID",
+        "ITEMID",
+        "CHARTTIME",
+        "STORETIME",
+        "CGID",
+        "VALUE",
+        "VALUENUM",
+        "VALUEUOM",
+        "WARNING",
+        "ERROR",
+        "RESULTSTATUS",
+        "STOPPED"
+      ],
+      "dtypes": {
+        "ROW_ID": "int64",
+        "SUBJECT_ID": "int64",
+        "HADM_ID": "int64",
+        "ICUSTAY_ID": "int64",
+        "ITEMID": "int64",
+        "CHARTTIME": "object",
+        "STORETIME": "object",
+        "CGID": "int64",
+        "VALUE": "float64",
+        "VALUENUM": "float64",
+        "VALUEUOM": "object",
+        "WARNING": "int64",
+        "ERROR": "int64",
+        "RESULTSTATUS": "float64",
+        "STOPPED": "float64"
+      },
+      "sample_row": {
+        "ROW_ID": "788",
+        "SUBJECT_ID": "36",
+        "HADM_ID": "165660",
+        "ICUSTAY_ID": "241249",
+        "ITEMID": "223834",
+        "CHARTTIME": "2134-05-12 12:00:00",
+        "STORETIME": "2134-05-12 13:56:00",
+        "CGID": "17525",
+        "VALUE": "15.0",
+        "VALUENUM": "15.0",
+        "VALUEUOM": "L/min",
+        "WARNING": "0",
+        "ERROR": "0",
+        "RESULTSTATUS": "nan",
+        "STOPPED": "nan"
+      }
+    },
+    "PATIENTS.csv": {
+      "description": "Patient demographics",
+      "size_mb": 2.6,
+      "columns": [
+        "ROW_ID",
+        "SUBJECT_ID",
+        "GENDER",
+        "DOB",
+        "DOD",
+        "DOD_HOSP",
+        "DOD_SSN",
+        "EXPIRE_FLAG"
+      ],
+      "dtypes": {
+        "ROW_ID": "int64",
+        "SUBJECT_ID": "int64",
+        "GENDER": "object",
+        "DOB": "object",
+        "DOD": "object",
+        "DOD_HOSP": "object",
+        "DOD_SSN": "float64",
+        "EXPIRE_FLAG": "int64"
+      },
+      "sample_row": {
+        "ROW_ID": "234",
+        "SUBJECT_ID": "249",
+        "GENDER": "F",
+        "DOB": "2075-03-13 00:00:00",
+        "DOD": "nan",
+        "DOD_HOSP": "nan",
+        "DOD_SSN": "nan",
+        "EXPIRE_FLAG": "0"
+      }
+    },
+    "ADMISSIONS.csv": {
+      "error": "not found at /labs/hulab/MIMICIII-v1.4/ADMISSIONS.csv"
+    },
+    "DIAGNOSES_ICD.csv": {
+      "error": "not found at /labs/hulab/MIMICIII-v1.4/DIAGNOSES_ICD.csv"
+    }
+  },
+  "existing_processed": {
+    "/opt/localdata100tb/UNIPHY_Plus/dataset/EST/MIMIC3_SPO2_I_40hz_v3_lab_vital": {
+      "exists": true,
+      "n_files": 2674,
+      "total_size_gb": 1059.35,
+      "sample_files": [
+        "10257_178509_0_PLETH40_II120_II500_2508.npz",
+        "10425_147243_0_PLETH40_II120_II500_17391.npz",
+        "10532_130690_0_PLETH40_II120_II500_4672.npz",
+        "10581_123247_0_PLETH40_II120_II500_3234.npz",
+        "10694_138159_0_PLETH40_II120_II500_35080.npz",
+        "10774_173586_0-3231-17664-19636_PLETH40_II120_II500_19676.npz",
+        "107_174162_0_PLETH40_II120_II500_3260.npz",
+        "107_182383_0_PLETH40_II120_II500_2833.npz",
+        "10814_119849_0-13191-16590-18386_PLETH40_II120_II500_36794.npz",
+        "10814_171527_0-11511_PLETH40_II120_II500_11825.npz"
+      ]
+    },
+    "/opt/localdata100tb/UNIPHY_Plus/dataset/EST/MIMIC3_SPO2_I_40hz_v3": {
+      "exists": false
+    }
+  },
+  "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3",
+    "wfdb": "4.3.1",
+    "polars": "1.39.3",
+    "pyarrow": "23.0.1",
+    "torch": null
+  }
+}
