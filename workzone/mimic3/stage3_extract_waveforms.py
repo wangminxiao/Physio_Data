@@ -74,6 +74,34 @@ def resample_signal(signal, src_fs, target_fs):
     return resample_poly(signal, up, down).astype(np.float64)
 
 
+def get_master_start_time(patient_path):
+    """Read start time from the master record header (has both time AND date).
+
+    Master headers are named like: p000020-2183-04-28-17-47.hea
+    First line format: p000020-2183-04-28-17-47/10 4 125 9862593 17:47:59.486 28/04/2183
+    """
+    for f in os.listdir(patient_path):
+        # Master headers start with 'p' and don't end with 'n.hea' (numerics)
+        if f.startswith("p") and f.endswith(".hea") and not f.endswith("n.hea"):
+            try:
+                with open(os.path.join(patient_path, f)) as fh:
+                    parts = fh.readline().strip().split()
+                    # Look for time (HH:MM:SS) and date (DD/MM/YYYY)
+                    time_str = None
+                    date_str = None
+                    for p in parts:
+                        if '/' in p and len(p) == 10 and p[2] == '/' and p[5] == '/':
+                            date_str = p  # DD/MM/YYYY
+                        elif ':' in p and '.' in p and len(p) > 8:
+                            time_str = p  # HH:MM:SS.mmm
+                    if time_str and date_str:
+                        dt_str = f"{date_str} {time_str.split('.')[0]}"
+                        return datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
+            except Exception:
+                continue
+    return None
+
+
 def read_wfdb_segments(patient_path, channel_name):
     """Read and concatenate all segments for a given channel from a patient directory."""
     import wfdb
@@ -87,7 +115,6 @@ def read_wfdb_segments(patient_path, channel_name):
     ])
 
     signals = []
-    start_time = None
 
     for seg_name in hea_files:
         record_path = os.path.join(patient_path, seg_name)
@@ -101,20 +128,6 @@ def read_wfdb_segments(patient_path, channel_name):
 
         ch_idx = h.sig_name.index(channel_name)
 
-        # Get start time from first segment
-        if start_time is None:
-            try:
-                with open(record_path + ".hea") as fh:
-                    parts = fh.readline().strip().split()
-                    time_str = parts[4] if len(parts) >= 5 else None
-                    date_str = parts[5] if len(parts) >= 6 else None
-                    if time_str and date_str:
-                        # Parse "HH:MM:SS.mmm DD/MM/YYYY"
-                        dt_str = f"{date_str} {time_str.split('.')[0]}"
-                        start_time = datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
-            except Exception:
-                pass
-
         # Read signal data
         try:
             rec = wfdb.rdrecord(record_path, channels=[ch_idx])
@@ -125,6 +138,9 @@ def read_wfdb_segments(patient_path, channel_name):
 
     if not signals:
         return None, None
+
+    # Get start time from master record header (has date + time)
+    start_time = get_master_start_time(patient_path)
 
     concatenated = np.concatenate(signals)
     return concatenated, start_time
