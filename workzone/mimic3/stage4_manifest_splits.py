@@ -154,38 +154,74 @@ def main():
         json.dump(valid_entries, f, indent=2)
     log.info(f"Manifest: {manifest_path} ({len(valid_entries)} patients)")
 
-    # Generate splits
+    # Generate splits -- split by SUBJECT_ID (not by dir)
+    # All admissions from the same subject must be in the same set (no data leakage)
     rng = np.random.RandomState(SPLIT_SEED)
-    patient_ids = [e["dir"] for e in valid_entries]
-    rng.shuffle(patient_ids)
 
-    n_test = int(len(patient_ids) * TEST_FRACTION)
-    test_ids = set(patient_ids[:n_test])
-    train_ids = set(patient_ids[n_test:])
+    # Get unique subject IDs
+    subject_to_dirs = {}
+    for e in valid_entries:
+        sid = e.get("subject_id")
+        if sid is None:
+            # Parse from dir name: "154_102354" -> 154
+            sid = int(e["dir"].split("_")[0])
+        subject_to_dirs.setdefault(sid, []).append(e["dir"])
+
+    unique_subjects = sorted(subject_to_dirs.keys())
+    rng.shuffle(unique_subjects)
+
+    n_test_subjects = int(len(unique_subjects) * TEST_FRACTION)
+    test_subjects = set(unique_subjects[:n_test_subjects])
+    train_subjects = set(unique_subjects[n_test_subjects:])
+
+    # Map back to dirs
+    train_ids = set()
+    test_ids = set()
+    for sid in train_subjects:
+        train_ids.update(subject_to_dirs[sid])
+    for sid in test_subjects:
+        test_ids.update(subject_to_dirs[sid])
+
+    # Verify no subject overlap
+    train_sids = {int(d.split("_")[0]) for d in train_ids}
+    test_sids = {int(d.split("_")[0]) for d in test_ids}
+    overlap = train_sids & test_sids
+    assert len(overlap) == 0, f"Subject overlap in splits: {overlap}"
+
+    n_multi = sum(1 for dirs in subject_to_dirs.values() if len(dirs) > 1)
+    log.info(f"  Unique subjects: {len(unique_subjects)} ({n_multi} with multiple admissions)")
+    log.info(f"  Split by subject: train={len(train_subjects)} subjects, test={len(test_subjects)} subjects")
+    log.info(f"  -> train={len(train_ids)} dirs, test={len(test_ids)} dirs")
 
     splits = {
         "train": sorted(train_ids),
         "test": sorted(test_ids),
         "seed": SPLIT_SEED,
         "test_fraction": TEST_FRACTION,
-        "n_train": len(train_ids),
-        "n_test": len(test_ids),
+        "n_unique_subjects": len(unique_subjects),
+        "n_train_subjects": len(train_subjects),
+        "n_test_subjects": len(test_subjects),
+        "n_train_dirs": len(train_ids),
+        "n_test_dirs": len(test_ids),
+        "n_subjects_with_multi_admissions": n_multi,
     }
 
     splits_path = os.path.join(PROCESSED_ROOT, "pretrain_splits.json")
     with open(splits_path, "w") as f:
         json.dump(splits, f, indent=2)
-    log.info(f"Pretrain splits: {splits_path} (train={len(train_ids)}, test={len(test_ids)})")
+    log.info(f"Pretrain splits: {splits_path}")
 
     # Also save downstream splits in UNIPHY_Plus format
     downstream = {
         "train_control_list": [
-            [os.path.join(PROCESSED_ROOT, pid), e["subject_id"], 0, e["n_segments"], -1, 0]
+            [os.path.join(PROCESSED_ROOT, pid), e.get("subject_id", int(pid.split("_")[0])),
+             0, e["n_segments"], -1, 0]
             for e in valid_entries if e["dir"] in train_ids
             for pid in [e["dir"]]
         ],
         "test_control_list": [
-            [os.path.join(PROCESSED_ROOT, pid), e["subject_id"], 0, e["n_segments"], -1, 0]
+            [os.path.join(PROCESSED_ROOT, pid), e.get("subject_id", int(pid.split("_")[0])),
+             0, e["n_segments"], -1, 0]
             for e in valid_entries if e["dir"] in test_ids
             for pid in [e["dir"]]
         ],

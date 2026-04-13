@@ -208,7 +208,11 @@ Signal extraction is per-patient independent -- parallelize with multiprocessing
 | **Cross-check** | **>=70% of target variables present, each with >=2 data points** | **Zero overlap or too few variables covered** |
 | Signal extraction (.npy) | float16, C-contiguous, N_seg consistent, NaN < 20%, time_ms monotonic | Shape mismatch, all NaN |
 | Event building (ehr_events) | Correct dtype, sorted by time_ms, seg_idx in bounds, var_id in registry | seg_idx out of bounds |
-| Manifest + splits | All dirs valid, no entity overlap in splits, ratio within 5% | Missing dirs, split overlap |
+| Manifest + splits | All dirs valid, no **subject**-level overlap in splits, ratio within 5% | Missing dirs, same subject in both sets |
+
+**Critical: split by subject, not by admission.** One subject may have multiple
+admissions/encounters. All admissions from the same subject must be in the same
+train/test set. Splitting by directory (admission-level) causes data leakage.
 
 **Inline assertions in save function:**
 ```python
