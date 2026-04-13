@@ -186,9 +186,18 @@ For each stage, use shared utilities:
 
 ### Testing: Always `--limit` first
 
-Signal extraction (stage 4) is the slow stage (hours for large datasets). Always test
+Signal extraction is the slow stage (hours for large datasets). Always test
 with `--limit 5` first to verify the output format before committing to a full run.
 Check the output directory: each entity should have all expected .npy files + meta.json.
+
+### Parallelization
+
+Signal extraction is per-patient independent -- parallelize with multiprocessing:
+- Pre-group EHR data by patient ID before distributing to workers (avoid copying full tables)
+- Use `mp.Pool` with `imap_unordered` for best throughput
+- Cap `--workers` at 50% of total cores (shared cluster)
+- Use `tqdm` for progress bar with live OK/SKIP/ERR counts
+- Run in tmux/screen so SSH disconnect doesn't kill the job
 
 ### Verification: Run After EVERY Stage
 
