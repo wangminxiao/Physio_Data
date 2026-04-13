@@ -1,0 +1,22 @@
+# Machine-local data (large, generated)
+datasets/*/processed/
+datasets/*/ehr/
+datasets/*/explore/demo_*/
+
+# Eval workspace (skill-creator artifacts)
+eval_review_*.html
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

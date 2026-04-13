@@ -1,0 +1,16 @@
+{
+  "variables": [
+    {"id": 0,  "name": "Potassium",  "unit": "mEq/L",  "type": "lab"},
+    {"id": 1,  "name": "Calcium",    "unit": "mg/dL",   "type": "lab"},
+    {"id": 2,  "name": "Sodium",     "unit": "mEq/L",   "type": "lab"},
+    {"id": 3,  "name": "Glucose",    "unit": "mg/dL",   "type": "lab"},
+    {"id": 4,  "name": "Lactate",    "unit": "mmol/L",  "type": "lab"},
+    {"id": 5,  "name": "Creatinine", "unit": "mg/dL",   "type": "lab"},
+    {"id": 6,  "name": "NBPs",       "unit": "mmHg",    "type": "vital"},
+    {"id": 7,  "name": "NBPd",       "unit": "mmHg",    "type": "vital"},
+    {"id": 8,  "name": "NBPm",       "unit": "mmHg",    "type": "vital"},
+    {"id": 9,  "name": "HR",         "unit": "bpm",     "type": "vital"},
+    {"id": 10, "name": "SpO2",       "unit": "%",       "type": "vital"},
+    {"id": 11, "name": "RR",         "unit": "/min",    "type": "vital"}
+  ]
+}
