@@ -43,8 +43,8 @@ pip install polars pyarrow pandas
 # Config parsing
 pip install pyyaml
 
-# Visualization (for Step 0c demo alignment plots)
-pip install matplotlib
+# Progress bars + visualization
+pip install tqdm matplotlib
 
 # Install physio_data package in editable mode
 pip install -e .

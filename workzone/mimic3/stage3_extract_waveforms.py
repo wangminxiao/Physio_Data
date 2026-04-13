@@ -459,35 +459,34 @@ def main():
     t0 = time.time()
     results = []
 
+    from tqdm import tqdm
+
+    n_ok = n_skip = n_err = 0
+
+    def update_bar(pbar, result):
+        nonlocal n_ok, n_skip, n_err
+        if result["status"] == "OK":
+            n_ok += 1
+        elif result["status"] == "SKIP":
+            n_skip += 1
+        else:
+            n_err += 1
+        pbar.set_postfix(OK=n_ok, SKIP=n_skip, ERR=n_err, refresh=False)
+        pbar.update(1)
+
     if n_workers <= 1 or args.limit:
-        # Sequential for testing/debugging
-        for i, task in enumerate(task_args):
-            result = process_patient(task)
-            results.append(result)
-            if (i + 1) % 50 == 0 or (i + 1) == len(task_args):
-                n_ok = sum(1 for r in results if r["status"] == "OK")
-                n_skip = sum(1 for r in results if r["status"] == "SKIP")
-                n_err = sum(1 for r in results if r["status"] == "ERROR")
-                elapsed = time.time() - t0
-                rate = (i + 1) / elapsed if elapsed > 0 else 0
-                eta = (len(task_args) - i - 1) / rate / 3600 if rate > 0 else 0
-                log.info(f"  [{i+1}/{len(task_args)}] OK={n_ok} SKIP={n_skip} ERR={n_err} "
-                         f"({elapsed:.0f}s, {rate:.1f} pat/s, ETA {eta:.1f}h)")
+        with tqdm(total=len(task_args), desc="Stage 3", unit="pat") as pbar:
+            for task in task_args:
+                result = process_patient(task)
+                results.append(result)
+                update_bar(pbar, result)
     else:
-        # Parallel processing
         log.info(f"Starting {n_workers} workers...")
         with mp.Pool(n_workers) as pool:
-            for i, result in enumerate(pool.imap_unordered(process_patient, task_args, chunksize=4)):
-                results.append(result)
-                if (i + 1) % 100 == 0 or (i + 1) == len(task_args):
-                    n_ok = sum(1 for r in results if r["status"] == "OK")
-                    n_skip = sum(1 for r in results if r["status"] == "SKIP")
-                    n_err = sum(1 for r in results if r["status"] == "ERROR")
-                    elapsed = time.time() - t0
-                    rate = (i + 1) / elapsed if elapsed > 0 else 0
-                    eta = (len(task_args) - i - 1) / rate / 3600 if rate > 0 else 0
-                    log.info(f"  [{i+1}/{len(task_args)}] OK={n_ok} SKIP={n_skip} ERR={n_err} "
-                             f"({elapsed:.0f}s, {rate:.1f} pat/s, ETA {eta:.1f}h)")
+            with tqdm(total=len(task_args), desc=f"Stage 3 ({n_workers}w)", unit="pat") as pbar:
+                for result in pool.imap_unordered(process_patient, task_args, chunksize=4):
+                    results.append(result)
+                    update_bar(pbar, result)
 
     # Summary
     elapsed = time.time() - t0
