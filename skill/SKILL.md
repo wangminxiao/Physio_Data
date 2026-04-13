@@ -138,24 +138,57 @@ Use `datasets/TEMPLATE_API.md` as starting point. See `datasets/mimic3/API.md` f
 
 **API.md must be reviewed before writing extraction scripts.**
 
-### Steps 1-4: Extraction Pipeline
+### Pre-flight: Check server resources
 
-Write dataset-specific extraction scripts. Use shared utilities for:
+Before running any heavy processing, check what you're working with:
+- CPU cores and current load (to set `--workers`)
+- Available memory (each wfdb worker uses ~1-2 GB)
+- Free disk on the output directory
+- GPU availability (for later training, not preprocessing)
+- Job scheduler (SLURM/PBS) -- may need `sbatch` instead of direct `python`
+
+### Steps 1-5: Extraction Pipeline
+
+The pipeline has a critical ordering constraint: **check EHR availability BEFORE
+extracting waveforms.** Waveform-only patients are not useful for training. Don't
+waste hours extracting signals for patients with no labs/vitals.
+
+```
+Stage 1: Scan signals     -> which entities have the required channels?
+Stage 2: Extract events   -> filter EHR tables to target variables
+Stage 3: Cross-check      -> keep ONLY entities with BOTH signals AND events
+Stage 4: Extract signals  -> read raw, resample, segment, align events, save .npy
+Stage 5: Manifest + splits -> validate, build index, generate train/test
+```
+
+**Stage 3 (cross-check) is the gate.** It joins the signal inventory with EHR event
+counts per entity and drops any entity with insufficient overlap. Report the numbers:
+how many entities have signals only, events only, both, neither. This catches data
+linkage problems early (e.g., ID mismatch between signal and event sources).
+
+For each stage, use shared utilities:
 - Resampling: `scipy.signal.resample_poly`
 - Segmenting: split 1D signal into `[N_seg, samples_per_seg]` float16 C-contiguous
 - Event alignment: `np.searchsorted` on segment timestamps
 - Saving: enforce dtype, contiguity, meta.json schema
 - Verification: run after each stage
 
+### Testing: Always `--limit` first
+
+Signal extraction (stage 4) is the slow stage (hours for large datasets). Always test
+with `--limit 5` first to verify the output format before committing to a full run.
+Check the output directory: each entity should have all expected .npy files + meta.json.
+
 ### Verification: Run After EVERY Stage
 
 | After | Check | Abort if |
 |-------|-------|----------|
-| Event table extraction | No duplicate rows, values in valid range, timestamps sane, no null IDs | Duplicates, null IDs, timestamps out of range |
-| Signal-event alignment | Windows have start < end, reasonable duration, entity IDs exist in both | Impossible windows, broken linkage |
-| Signal extraction (.npy) | float16, C-contiguous, consistent N_seg, NaN < 20%, not flat-line, time_ms monotonic | Shape mismatch, not C-contiguous, all NaN |
-| Event building (ehr_events) | Correct dtype, sorted by time_ms, seg_idx in bounds, var_id in registry, no duplicates | seg_idx out of bounds, unknown var_id |
-| Manifest + splits | All dirs in manifest, no entity overlap in splits, ratio within 5% of target | Missing dirs, entity overlap |
+| Signal scan | Target channels found, sample rates consistent | No entities with required channels |
+| Event extraction | No duplicates, values in physiological range, timestamps sane | Null IDs, timestamps out of range |
+| **Cross-check** | **Entities have BOTH signals AND events** | **Zero overlap (linkage broken)** |
+| Signal extraction (.npy) | float16, C-contiguous, N_seg consistent, NaN < 20%, time_ms monotonic | Shape mismatch, all NaN |
+| Event building (ehr_events) | Correct dtype, sorted by time_ms, seg_idx in bounds, var_id in registry | seg_idx out of bounds |
+| Manifest + splits | All dirs valid, no entity overlap in splits, ratio within 5% | Missing dirs, split overlap |
 
 **Inline assertions in save function:**
 ```python
@@ -176,6 +209,7 @@ assert np.all(np.diff(events['time_ms']) >= 0)  # sorted
 - **No interpolation in storage.** Interpolation strategy is a downstream decision.
 - **Zero new runtime dependencies.** Training/eval code only needs numpy.
 - **C-contiguous float16 for signals.** This guarantees zero-copy `reshape(-1)`.
+- **Signal + event co-existence.** Don't process signals without events or vice versa.
 
 ## Project Structure
 
