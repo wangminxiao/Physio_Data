@@ -271,8 +271,13 @@ def save_patient(out_dir, channels, time_ms, ehr_events, meta_extra):
 # Process one patient
 # ========================================================================
 
-def process_patient(row, labs_df, vitals_df, admissions_df):
-    """Process one patient: match admission -> read WFDB -> resample -> align EHR -> save."""
+def process_patient(args):
+    """Process one patient: match admission -> read WFDB -> resample -> align EHR -> save.
+
+    Takes a single tuple for multiprocessing compatibility:
+    (row_dict, patient_labs, patient_vitals, patient_admissions)
+    """
+    row, patient_labs, patient_vitals, patient_admissions = args
     subject_id = row["subject_id"]
     patient_path = row["patient_path"]
 
@@ -285,7 +290,7 @@ def process_patient(row, labs_df, vitals_df, admissions_df):
             return {"subject_id": subject_id, "status": "SKIP", "reason": f"duration too short: {wav_duration}s"}
 
         # 2. Match to hospital admission
-        hadm_id, overlap_hours = match_admission(subject_id, wav_start, wav_duration, admissions_df)
+        hadm_id, overlap_hours = match_admission(subject_id, wav_start, wav_duration, patient_admissions)
         if hadm_id is None:
             return {"subject_id": subject_id, "status": "SKIP", "reason": "no matching admission"}
         if overlap_hours < 1.0:
@@ -325,7 +330,7 @@ def process_patient(row, labs_df, vitals_df, admissions_df):
         )
 
         # 7. Build EHR events (filtered by HADM_ID)
-        ehr_events = build_ehr_events(subject_id, hadm_id, time_ms, labs_df, vitals_df)
+        ehr_events = build_ehr_events(subject_id, hadm_id, time_ms, patient_labs, patient_vitals)
 
         # 8. Save as {SUBJECT_ID}_{HADM_ID}/
         patient_id = f"{subject_id}_{hadm_id}"
@@ -380,11 +385,19 @@ def process_patient(row, labs_df, vitals_df, admissions_df):
 # ========================================================================
 
 def main():
+    import multiprocessing as mp
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=None, help="Process only N patients (for testing)")
+    parser.add_argument("--workers", type=int, default=12, help="Parallel workers (default 12, max 50%% of cores)")
     args = parser.parse_args()
 
+    # Cap workers at 50% of cores (shared cluster)
+    max_workers = os.cpu_count() // 2
+    n_workers = min(args.workers, max_workers)
+
     log.info(f"Stage 3: Extract waveforms -> {PROCESSED_ROOT}")
+    log.info(f"  Workers: {n_workers} (max {max_workers} = 50% of {os.cpu_count()} cores)")
     os.makedirs(PROCESSED_ROOT, exist_ok=True)
 
     # Load inventory
@@ -416,25 +429,65 @@ def main():
     for df in [labs_df, vitals_df]:
         if "charttime_dt" not in df.columns:
             df["charttime_dt"] = pd.to_datetime(df["CHARTTIME"])
-        # Ensure HADM_ID is numeric (not float with NaN)
         if "HADM_ID" in df.columns:
             df["HADM_ID"] = pd.to_numeric(df["HADM_ID"], errors="coerce")
     log.info(f"  Labs: {len(labs_df)} events, Vitals: {len(vitals_df)} events")
 
-    # Process patients
+    # Pre-filter EHR per patient (avoid passing full DataFrames to workers)
+    log.info("Pre-filtering EHR per patient...")
+    subject_ids = set(inventory["subject_id"].values)
+    labs_grouped = {sid: grp for sid, grp in labs_df.groupby("SUBJECT_ID") if sid in subject_ids}
+    vitals_grouped = {sid: grp for sid, grp in vitals_df.groupby("SUBJECT_ID") if sid in subject_ids}
+    adm_grouped = {sid: grp for sid, grp in admissions_df.groupby("SUBJECT_ID") if sid in subject_ids}
+    empty_df_labs = labs_df.iloc[:0]
+    empty_df_vitals = vitals_df.iloc[:0]
+    empty_df_adm = admissions_df.iloc[:0]
+    log.info(f"  Pre-filtered: {len(labs_grouped)} lab groups, {len(vitals_grouped)} vital groups")
+
+    # Build argument tuples for multiprocessing
+    task_args = []
+    for _, row in inventory.iterrows():
+        sid = row["subject_id"]
+        task_args.append((
+            row.to_dict(),
+            labs_grouped.get(sid, empty_df_labs),
+            vitals_grouped.get(sid, empty_df_vitals),
+            adm_grouped.get(sid, empty_df_adm),
+        ))
+
+    # Process with multiprocessing
     t0 = time.time()
     results = []
 
-    for i, (_, row) in enumerate(inventory.iterrows()):
-        result = process_patient(row, labs_df, vitals_df, admissions_df)
-        results.append(result)
-
-        if (i + 1) % 50 == 0 or (i + 1) == len(inventory):
-            n_ok = sum(1 for r in results if r["status"] == "OK")
-            n_skip = sum(1 for r in results if r["status"] == "SKIP")
-            n_err = sum(1 for r in results if r["status"] == "ERROR")
-            elapsed = time.time() - t0
-            log.info(f"  [{i+1}/{len(inventory)}] OK={n_ok} SKIP={n_skip} ERR={n_err} ({elapsed:.0f}s)")
+    if n_workers <= 1 or args.limit:
+        # Sequential for testing/debugging
+        for i, task in enumerate(task_args):
+            result = process_patient(task)
+            results.append(result)
+            if (i + 1) % 50 == 0 or (i + 1) == len(task_args):
+                n_ok = sum(1 for r in results if r["status"] == "OK")
+                n_skip = sum(1 for r in results if r["status"] == "SKIP")
+                n_err = sum(1 for r in results if r["status"] == "ERROR")
+                elapsed = time.time() - t0
+                rate = (i + 1) / elapsed if elapsed > 0 else 0
+                eta = (len(task_args) - i - 1) / rate / 3600 if rate > 0 else 0
+                log.info(f"  [{i+1}/{len(task_args)}] OK={n_ok} SKIP={n_skip} ERR={n_err} "
+                         f"({elapsed:.0f}s, {rate:.1f} pat/s, ETA {eta:.1f}h)")
+    else:
+        # Parallel processing
+        log.info(f"Starting {n_workers} workers...")
+        with mp.Pool(n_workers) as pool:
+            for i, result in enumerate(pool.imap_unordered(process_patient, task_args, chunksize=4)):
+                results.append(result)
+                if (i + 1) % 100 == 0 or (i + 1) == len(task_args):
+                    n_ok = sum(1 for r in results if r["status"] == "OK")
+                    n_skip = sum(1 for r in results if r["status"] == "SKIP")
+                    n_err = sum(1 for r in results if r["status"] == "ERROR")
+                    elapsed = time.time() - t0
+                    rate = (i + 1) / elapsed if elapsed > 0 else 0
+                    eta = (len(task_args) - i - 1) / rate / 3600 if rate > 0 else 0
+                    log.info(f"  [{i+1}/{len(task_args)}] OK={n_ok} SKIP={n_skip} ERR={n_err} "
+                             f"({elapsed:.0f}s, {rate:.1f} pat/s, ETA {eta:.1f}h)")
 
     # Summary
     elapsed = time.time() - t0
