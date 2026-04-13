@@ -1,0 +1,9 @@
+{
+  "n_valid": 5110,
+  "n_failed": 0,
+  "total_hours": 414604.4,
+  "total_ehr_events": 1160197,
+  "n_train": 4088,
+  "n_test": 1022,
+  "failed_patients": {}
+}

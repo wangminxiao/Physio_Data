@@ -1,0 +1,7 @@
+nohup: ignoring input
+2026-04-13 15:48:56,167 INFO Stage 3: Extract waveforms -> /opt/localdata100tb/physio_data/mimic3
+2026-04-13 15:48:56,546 INFO Loaded inventory: 5905 patients
+2026-04-13 15:48:56,546 INFO Loading ADMISSIONS...
+2026-04-13 15:48:56,724 INFO   58976 admissions loaded
+2026-04-13 15:48:56,724 INFO Loading EHR data...
+2026-04-13 15:48:59,682 INFO   Labs: 4434456 events, Vitals: 3872773 events
