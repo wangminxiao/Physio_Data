@@ -226,6 +226,27 @@ assert np.all(events['seg_idx'] < n_seg)  # bounds
 assert np.all(np.diff(events['time_ms']) >= 0)  # sorted
 ```
 
+## Adding EHR Variables to Existing Data
+
+The sparse event format means new variables can be added without re-extracting waveforms.
+Waveform extraction is the slow step (hours). EHR event building is fast (minutes).
+
+When the user wants to add new variables (e.g., HR, SpO2, Bilirubin) to already-processed data:
+
+1. Add the new variable to `var_registry.json` (assign next ID)
+2. Write a **stage 3b** script that:
+   - Reads the new variable's events from raw EHR tables
+   - For each existing patient directory, loads `time_ms.npy`
+   - Builds new events with `searchsorted` alignment
+   - **Merges** with existing `ehr_events.npy` (load old + append new + re-sort)
+   - Re-saves `ehr_events.npy` and updates `meta.json` event count
+3. Do NOT re-extract waveforms -- `.npy` waveform files stay untouched
+
+This is fast because:
+- Only reads small EHR tables, not raw WFDB
+- Only writes the small `ehr_events.npy` per patient, not the large waveform arrays
+- Can be parallelized same as stage 3
+
 ## Key Constraints
 
 - **No compression.** Disk is not a constraint. CPU on GPU servers is weak.
