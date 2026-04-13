@@ -189,7 +189,7 @@ Check the output directory: each entity should have all expected .npy files + me
 |-------|-------|----------|
 | Signal scan | Target channels found, sample rates consistent | No entities with required channels |
 | Event extraction | No duplicates, values in physiological range, timestamps sane | Null IDs, timestamps out of range |
-| **Cross-check** | **Entities have BOTH signals AND events** | **Zero overlap (linkage broken)** |
+| **Cross-check** | **>=70% of target variables present, each with >=2 data points** | **Zero overlap or too few variables covered** |
 | Signal extraction (.npy) | float16, C-contiguous, N_seg consistent, NaN < 20%, time_ms monotonic | Shape mismatch, all NaN |
 | Event building (ehr_events) | Correct dtype, sorted by time_ms, seg_idx in bounds, var_id in registry | seg_idx out of bounds |
 | Manifest + splits | All dirs valid, no entity overlap in splits, ratio within 5% | Missing dirs, split overlap |
