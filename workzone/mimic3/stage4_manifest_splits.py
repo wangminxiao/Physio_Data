@@ -255,7 +255,7 @@ def main():
     log.info(f"  Valid patients: {len(valid_entries)}")
     log.info(f"  Total recording hours: {total_hours:.1f}")
     log.info(f"  Total EHR events: {total_events}")
-    log.info(f"  Train/Test: {len(train_ids)}/{len(test_ids)} ({1-TEST_FRACTION:.0%}/{TEST_FRACTION:.0%})")
+    log.info(f"  Train/Val/Test: {len(train_ids)}/{len(val_ids)}/{len(test_ids)}")
     log.info(f"  Time: {elapsed:.1f}s")
 
     # Save summary
@@ -265,7 +265,10 @@ def main():
         "total_hours": round(total_hours, 1),
         "total_ehr_events": total_events,
         "n_train": len(train_ids),
+        "n_val": len(val_ids),
         "n_test": len(test_ids),
+        "n_unique_subjects": len(unique_subjects),
+        "n_subjects_with_multi_admissions": n_multi,
         "failed_patients": dict(list(all_errors.items())[:20]),
     }
     with open(OUT_DIR_OUTPUTS / "stage4_summary.json", "w") as f:
