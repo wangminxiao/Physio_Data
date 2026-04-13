@@ -213,14 +213,18 @@ def recommend(resources):
     load = resources["cpu"].get("load_1m", 0) or 0
     avail_mem = resources["memory"].get("available_gb", 0)
 
-    free_cores = max(1, int(cores - load))
+    # SHARED CLUSTER: never use more than half of total resources
+    max_cores = cores // 2
+    free_cores = max(1, min(int(cores - load), max_cores))
     # Each wfdb worker uses ~1-2 GB for reading + resampling
     mem_workers = max(1, int(avail_mem / 2))
-    recommended = min(free_cores, mem_workers, 16)
+    # Cap at half of total cores (shared cluster policy)
+    recommended = min(free_cores, mem_workers, max_cores)
 
+    print(f"  Total cores: {cores}, max allowed (50%): {max_cores}")
     print(f"  Free cores: ~{free_cores}")
     print(f"  Memory allows: ~{mem_workers} workers (at ~2 GB each)")
-    print(f"  Recommended --workers: {recommended}")
+    print(f"  Recommended --workers: {recommended} (shared cluster: capped at 50%)")
 
     # Disk warning
     for key, disk in resources["disk"].items():
