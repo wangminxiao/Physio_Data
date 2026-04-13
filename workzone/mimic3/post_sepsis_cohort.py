@@ -136,17 +136,18 @@ def compute_sofa_from_ehr_events(patient_dir):
     return sofa_events
 
 
-def add_sepsis_events_to_patient(patient_dir, onset_time_sec, sofa_events):
-    """Merge sepsis-specific events into existing ehr_events.npy."""
-    time_ms_path = os.path.join(patient_dir, "time_ms.npy")
-    ehr_path = os.path.join(patient_dir, "ehr_events.npy")
+def build_sepsis_extra_events(patient_dir, onset_time_sec, sofa_events, extra_events_dir):
+    """Save sepsis-specific events to a SEPARATE file. Does NOT modify canonical ehr_events.npy.
 
-    if not os.path.exists(time_ms_path) or not os.path.exists(ehr_path):
+    Saves to: tasks/sepsis/extra_events/{patient_id}.npy
+    At training time, the adapter merges base + extra if needed.
+    """
+    time_ms_path = os.path.join(patient_dir, "time_ms.npy")
+    if not os.path.exists(time_ms_path):
         return 0
 
     time_ms = np.load(time_ms_path)
     n_seg = len(time_ms)
-    old_events = np.load(ehr_path)
 
     new_events = []
 
@@ -165,27 +166,13 @@ def add_sepsis_events_to_patient(patient_dir, onset_time_sec, sofa_events):
     if not new_events:
         return 0
 
-    # Build new events array
     new_arr = np.array(new_events, dtype=EHR_EVENT_DTYPE)
+    new_arr.sort(order="time_ms")
 
-    # Merge with existing
-    if len(old_events) > 0:
-        combined = np.concatenate([old_events, new_arr])
-    else:
-        combined = new_arr
-    combined.sort(order="time_ms")
-
-    # Save
-    np.save(ehr_path, combined)
-
-    # Update meta.json
-    meta_path = os.path.join(patient_dir, "meta.json")
-    if os.path.exists(meta_path):
-        with open(meta_path) as f:
-            meta = json.load(f)
-        meta["n_ehr_events"] = len(combined)
-        with open(meta_path, "w") as f:
-            json.dump(meta, f, indent=2)
+    # Save to extra_events directory (NOT modifying canonical files)
+    patient_id = os.path.basename(patient_dir)
+    os.makedirs(extra_events_dir, exist_ok=True)
+    np.save(os.path.join(extra_events_dir, f"{patient_id}.npy"), new_arr)
 
     return len(new_events)
 
@@ -352,13 +339,18 @@ def main():
         log.error("ABORT: No overlap between sepsis cohort and processed patients!")
         return
 
-    # 4. Add SOFA + onset events to each matched patient
-    log.info(f"\nAdding SOFA scores and sepsis onset markers...")
+    # 4. Build sepsis-specific extra events (SEPARATE from canonical ehr_events.npy)
+    tasks_dir = os.path.join(PROCESSED_ROOT, "tasks", "sepsis")
+    extra_events_dir = os.path.join(tasks_dir, "extra_events")
+    os.makedirs(extra_events_dir, exist_ok=True)
+
+    log.info(f"\nBuilding sepsis extra events (SOFA + onset) -> {extra_events_dir}")
+    log.info(f"  NOTE: canonical ehr_events.npy is NOT modified")
     n_events_added = 0
     for i, (_, row) in enumerate(matched.iterrows()):
         patient_dir = os.path.join(PROCESSED_ROOT, row["patient_id"])
         sofa_events = compute_sofa_from_ehr_events(patient_dir)
-        n = add_sepsis_events_to_patient(patient_dir, row["onset_time"], sofa_events)
+        n = build_sepsis_extra_events(patient_dir, row["onset_time"], sofa_events, extra_events_dir)
         n_events_added += n
         if (i + 1) % 200 == 0:
             log.info(f"  [{i+1}/{len(matched)}] {n_events_added} events added")
@@ -366,8 +358,6 @@ def main():
     log.info(f"  Total events added: {n_events_added}")
 
     # 5. Generate task-specific cohort + splits
-    tasks_dir = os.path.join(PROCESSED_ROOT, "tasks", "sepsis")
-    os.makedirs(tasks_dir, exist_ok=True)
 
     # Cohort file
     cohort = []

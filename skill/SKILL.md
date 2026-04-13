@@ -236,8 +236,12 @@ The main pipeline produces a **task-agnostic** canonical dataset. Downstream tas
 3. **Add task-specific labels** -- binary labels, time-to-event, severity scores
 4. **Generate task-specific splits** -- filtered version of downstream_splits.json
 
-These post-stages read from the canonical data and produce task-specific index files.
-They do NOT modify the canonical .npy files -- they add metadata alongside them.
+**Critical: post-stages NEVER modify canonical files.** Canonical `.npy` files are
+immutable after the main pipeline. Post-stages write task-specific data ALONGSIDE them.
+This ensures:
+- Pretraining sees only base EHR events (no task-specific var_ids leaking in)
+- Different downstream tasks don't contaminate each other
+- Post-stages are idempotent (safe to re-run)
 
 ```
 {output_dir}/
@@ -252,9 +256,14 @@ They do NOT modify the canonical .npy files -- they add metadata alongside them.
 ├── tasks/                     # Task-specific (added by post-stages)
 │   ├── sepsis/
 │   │   ├── cohort.json        # Patient list + onset times + labels
-│   │   └── splits.json        # Task-specific train/val/test
+│   │   ├── splits.json        # Task-specific train/val/test
+│   │   └── extra_events/      # Task-specific EHR events (SOFA, onset markers)
+│   │       └── {patient_id}.npy  # Same dtype as ehr_events.npy
 │   └── aki/
 │       └── ...
+
+At training time, the adapter loads base `ehr_events.npy` and optionally merges
+`tasks/{task}/extra_events/{patient_id}.npy` if the task requires it.
 ```
 
 **Important design principle:** The main pipeline should extract ALL available EHR
