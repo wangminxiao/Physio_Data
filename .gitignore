@@ -6,6 +6,10 @@ datasets/*/explore/demo_*/
 # Eval workspace (skill-creator artifacts)
 eval_review_*.html
 
+# Workzone: large outputs stay on server
+workzone/logs/*.log
+!workzone/logs/*.summary.txt
+
 # Python
 __pycache__/
 *.pyc
