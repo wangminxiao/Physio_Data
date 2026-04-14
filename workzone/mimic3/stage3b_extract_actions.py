@@ -236,15 +236,18 @@ def extract_urine():
     log.info(f"  Reading: {output_path}")
 
     t0 = time.time()
-    df = pl.scan_csv(output_path, infer_schema_length=1000).filter(
+    df = pl.scan_csv(
+        output_path, infer_schema_length=10000,
+        schema_overrides={"VALUE": pl.Float64},
+    ).filter(
         pl.col("ITEMID").is_in(URINE_ITEMIDS) &
         pl.col("VALUE").is_not_null() &
-        (pl.col("VALUE").cast(pl.Float64, strict=False).is_not_null())
+        pl.col("VALUE").is_not_nan()
     ).select(["SUBJECT_ID", "HADM_ID", "ITEMID", "CHARTTIME", "VALUE"]).collect()
     log.info(f"  Loaded {len(df)} rows in {time.time()-t0:.1f}s")
 
     df = df.with_columns([
-        pl.col("VALUE").cast(pl.Float64).alias("VALUENUM"),
+        pl.col("VALUE").alias("VALUENUM"),
         pl.lit(206).cast(pl.Int32).alias("var_id"),
     ])
 
