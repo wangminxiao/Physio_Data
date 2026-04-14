@@ -47,17 +47,16 @@ EHR_EVENT_DTYPE = np.dtype([
     ('value', 'float32'),
 ])
 
-# SOFA-related var_ids (add to var_registry)
-# Using IDs starting at 100 for task-specific variables
+# SOFA-related var_ids (from var_registry.json, scores 300-399)
 SEPSIS_VAR_IDS = {
-    "sofa_total": 100,
-    "sofa_resp": 101,
-    "sofa_coag": 102,
-    "sofa_liver": 103,
-    "sofa_cardio": 104,
-    "sofa_cns": 105,
-    "sofa_renal": 106,
-    "sepsis_onset": 107,  # binary marker: 1.0 at onset time
+    "sofa_total": 300,
+    "sofa_resp": 301,
+    "sofa_coag": 302,
+    "sofa_liver": 303,
+    "sofa_cardio": 304,
+    "sofa_cns": 305,
+    "sofa_renal": 306,
+    "sepsis_onset": 307,  # binary marker: 1.0 at onset time
 }
 
 SPLIT_SEED = 42
@@ -102,14 +101,11 @@ def map_icustay_to_hadm(sepsis_patients):
 
 
 def compute_sofa_from_ehr_events(patient_dir):
-    """Compute SOFA scores from existing ehr_events.npy (uses Creatinine from var_id 5).
+    """Compute all 6 SOFA component scores from ehr_events.npy.
 
-    Only computes renal SOFA from creatinine (var_id 5) since that's what we have
-    in the base EHR events. Full SOFA requires Bilirubin, Platelets, PaO2/FiO2,
-    MAP + vasopressors -- which need additional EHR variables to be added first.
-
-    For now: returns partial SOFA (renal only) as a starting point.
-    TODO: Add Bilirubin, Platelets, etc. via stage3b, then compute full SOFA.
+    Uses: Platelets (7), Bilirubin (6), Creatinine (5), paO2 (14), GCS (108),
+          NBPm/MAP (106), FiO2 (203), vasopressor_rate (200).
+    Returns list of (time_ms, var_id, value) tuples for SOFA scores.
     """
     ehr_path = os.path.join(patient_dir, "ehr_events.npy")
     if not os.path.exists(ehr_path):
@@ -121,17 +117,91 @@ def compute_sofa_from_ehr_events(patient_dir):
 
     sofa_events = []
 
-    # Creatinine = var_id 5
-    cr_events = events[events['var_id'] == 5]
-    for ev in cr_events:
-        cr = ev['value']
-        sofa_renal = 0
-        if cr >= 5: sofa_renal = 4
-        elif cr >= 3.5: sofa_renal = 3
-        elif cr >= 2: sofa_renal = 2
-        elif cr >= 1.2: sofa_renal = 1
+    # --- SOFA Coagulation (var 302): Platelets ---
+    for ev in events[events['var_id'] == 7]:
+        plt = ev['value']
+        score = 0
+        if plt < 20: score = 4
+        elif plt < 50: score = 3
+        elif plt < 100: score = 2
+        elif plt < 150: score = 1
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_coag"], float(score)))
 
-        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_renal"], float(sofa_renal)))
+    # --- SOFA Liver (var 303): Bilirubin ---
+    for ev in events[events['var_id'] == 6]:
+        bili = ev['value']
+        score = 0
+        if bili >= 12: score = 4
+        elif bili >= 6: score = 3
+        elif bili >= 1.2: score = 2  # 1.2-5.9
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_liver"], float(score)))
+
+    # --- SOFA CNS (var 305): GCS ---
+    for ev in events[events['var_id'] == 108]:
+        gcs = ev['value']
+        score = 0
+        if gcs < 6: score = 4
+        elif gcs < 10: score = 3
+        elif gcs < 13: score = 2
+        elif gcs < 15: score = 1
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_cns"], float(score)))
+
+    # --- SOFA Renal (var 306): Creatinine ---
+    for ev in events[events['var_id'] == 5]:
+        cr = ev['value']
+        score = 0
+        if cr >= 5: score = 4
+        elif cr >= 3.5: score = 3
+        elif cr >= 2: score = 2
+        elif cr >= 1.2: score = 1
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_renal"], float(score)))
+
+    # --- SOFA Cardiovascular (var 304): MAP + vasopressor ---
+    # Score based on vasopressor dose (NE-eq) or low MAP
+    vaso_events = events[events['var_id'] == 200]
+    map_events = events[events['var_id'] == 106]
+
+    for ev in map_events:
+        mapv = ev['value']
+        # Find concurrent vasopressor (within 1 hour)
+        nearby_vaso = vaso_events[
+            (np.abs(vaso_events['time_ms'] - ev['time_ms']) < 3600000)
+        ]
+        max_ne = float(nearby_vaso['value'].max()) if len(nearby_vaso) > 0 else 0.0
+
+        score = 0
+        if max_ne > 0.1: score = 4
+        elif max_ne > 0: score = 3  # any vasopressor ≤ 0.1
+        elif mapv < 70: score = 1
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_cardio"], float(score)))
+
+    # --- SOFA Respiratory (var 301): PaO2/FiO2 ---
+    pao2_events = events[events['var_id'] == 14]
+    fio2_events = events[events['var_id'] == 203]
+
+    for ev in pao2_events:
+        pao2 = ev['value']
+        # Find nearest FiO2 (within 4 hours)
+        nearby_fio2 = fio2_events[
+            (np.abs(fio2_events['time_ms'] - ev['time_ms']) < 14400000)
+        ]
+        if len(nearby_fio2) > 0:
+            # Pick closest in time
+            closest_idx = np.argmin(np.abs(nearby_fio2['time_ms'] - ev['time_ms']))
+            fio2 = float(nearby_fio2[closest_idx]['value'])
+        else:
+            fio2 = 0.21  # assume room air
+
+        if fio2 <= 0:
+            continue
+        pf_ratio = pao2 / fio2
+
+        score = 0
+        if pf_ratio < 100: score = 4
+        elif pf_ratio < 200: score = 3
+        elif pf_ratio < 300: score = 2
+        elif pf_ratio < 400: score = 1
+        sofa_events.append((int(ev['time_ms']), SEPSIS_VAR_IDS["sofa_resp"], float(score)))
 
     return sofa_events
 
@@ -186,11 +256,11 @@ def extract_missing_patients(missing_df, labs_df, vitals_df, admissions_df):
     """
     import sys
     sys.path.insert(0, str(REPO_ROOT))
-    # Import extraction functions from stage3
     from workzone.mimic3.stage3_extract_waveforms import (
-        get_master_start_time, read_wfdb_segments, resample_signal,
+        parse_master_header, read_wfdb_blocks, resample_signal,
         segment_signal, build_ehr_events, save_patient,
-        SOURCE_FS, SEGMENT_DUR_SEC, WAVEFORM_DTYPE, TIME_DTYPE,
+        SOURCE_FS, SEGMENT_DUR_SEC, STRIDE_SEC, OVERLAP_SEC,
+        WAVEFORM_DTYPE, TIME_DTYPE, TARGET_CHANNELS, BASE_CHANNEL,
     )
 
     WAV_ROOT = cfg["mimic3"]["raw_waveform_dir"]
@@ -213,49 +283,83 @@ def extract_missing_patients(missing_df, labs_df, vitals_df, admissions_df):
             continue
 
         try:
-            # Get recording time
-            wav_start, wav_duration = get_master_start_time(patient_path)
-            if wav_start is None or wav_duration is None or wav_duration < 300:
-                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "no/short recording"})
+            # Parse master header
+            wav_start, source_fs, segment_list = parse_master_header(patient_path)
+            if wav_start is None or segment_list is None:
+                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "no master header"})
                 continue
 
-            # Read waveforms
-            pleth_raw = read_wfdb_segments(patient_path, "PLETH")
-            ii_raw = read_wfdb_segments(patient_path, "II")
-            if pleth_raw is None or ii_raw is None:
-                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "missing PLETH or II"})
-                continue
-
-            # Resample + segment
-            pleth40 = resample_signal(pleth_raw, SOURCE_FS, 40)
-            ii120 = resample_signal(ii_raw, SOURCE_FS, 120)
-            pleth40_seg = segment_signal(pleth40, 40)
-            ii120_seg = segment_signal(ii120, 120)
-            if pleth40_seg is None or ii120_seg is None:
+            total_samples = sum(n for _, n in segment_list)
+            wav_duration = total_samples / source_fs
+            if wav_duration < 300:
                 results.append({"patient_id": patient_id, "status": "SKIP", "reason": "too short"})
                 continue
 
-            n_seg = min(pleth40_seg.shape[0], ii120_seg.shape[0])
-            pleth40_seg = pleth40_seg[:n_seg]
-            ii120_seg = ii120_seg[:n_seg]
+            # Read PLETH-anchored blocks
+            blocks = read_wfdb_blocks(patient_path, segment_list, source_fs)
+            if not blocks:
+                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "no PLETH blocks"})
+                continue
 
-            start_ms = int(wav_start.timestamp() * 1000)
-            time_ms = np.array(
-                [start_ms + i * SEGMENT_DUR_SEC * 1000 for i in range(n_seg)],
-                dtype=TIME_DTYPE,
-            )
+            # Process blocks: resample + segment with overlap
+            all_channel_segs = {ch: [] for ch in TARGET_CHANNELS}
+            all_time_ms = []
 
-            # Build EHR events (filtered by HADM_ID)
+            for block in blocks:
+                block_start_ms = int((wav_start.timestamp() + block['start_sec']) * 1000)
+                resampled = {}
+                for ch, target_hz in TARGET_CHANNELS.items():
+                    raw = block['channels'].get(ch)
+                    if raw is not None and len(raw) > 0:
+                        resampled[ch] = resample_signal(raw, source_fs, target_hz)
+                    else:
+                        base_raw = block['channels'][BASE_CHANNEL]
+                        target_len = int(np.ceil(len(base_raw) * target_hz / source_fs))
+                        resampled[ch] = np.full(target_len, np.nan)
+
+                segmented = {}
+                for ch, sig in resampled.items():
+                    seg = segment_signal(sig, TARGET_CHANNELS[ch])
+                    if seg is None:
+                        break
+                    segmented[ch] = seg
+
+                if len(segmented) != len(TARGET_CHANNELS):
+                    continue
+
+                n_seg_block = min(s.shape[0] for s in segmented.values())
+                for ch in segmented:
+                    segmented[ch] = segmented[ch][:n_seg_block]
+
+                stride_ms = STRIDE_SEC * 1000
+                block_time_ms = np.array(
+                    [block_start_ms + i * stride_ms for i in range(n_seg_block)],
+                    dtype=TIME_DTYPE,
+                )
+                for ch in TARGET_CHANNELS:
+                    all_channel_segs[ch].append(segmented[ch])
+                all_time_ms.append(block_time_ms)
+
+            if not all_time_ms:
+                results.append({"patient_id": patient_id, "status": "SKIP", "reason": "blocks too short"})
+                continue
+
+            channels_out = {}
+            for ch in TARGET_CHANNELS:
+                ch_name = f"{ch}{TARGET_CHANNELS[ch]}"
+                channels_out[ch_name] = np.concatenate(all_channel_segs[ch], axis=0)
+            time_ms = np.concatenate(all_time_ms)
+            n_seg = len(time_ms)
+
+            # Build EHR events
             patient_labs = labs_df[labs_df["SUBJECT_ID"] == subject_id]
             patient_vitals = vitals_df[vitals_df["SUBJECT_ID"] == subject_id]
             ehr_events = build_ehr_events(subject_id, hadm_id, time_ms, patient_labs, patient_vitals)
 
             out_dir = os.path.join(PROCESSED_ROOT, patient_id)
-            channels = {"PLETH40": pleth40_seg, "II120": ii120_seg}
-
             save_patient(
                 out_dir=out_dir,
-                channels=channels,
+                channels=channels_out,
                 time_ms=time_ms,
                 ehr_events=ehr_events,
                 meta_extra={
@@ -264,9 +368,10 @@ def extract_missing_patients(missing_df, labs_df, vitals_df, admissions_df):
                     "hadm_id": hadm_id,
                     "source_dataset": "mimic3",
                     "source_path": patient_path,
-                    "recording_start_ms": int(start_ms),
-                    "total_duration_hours": round(n_seg * SEGMENT_DUR_SEC / 3600, 2),
+                    "recording_start_ms": int(time_ms[0]),
+                    "total_duration_hours": round(n_seg * STRIDE_SEC / 3600, 2),
                     "added_by": "post_sepsis_cohort",
+                    "n_blocks": len(blocks),
                 },
             )
             results.append({"patient_id": patient_id, "status": "OK", "n_segments": n_seg})
