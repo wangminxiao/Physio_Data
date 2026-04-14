@@ -47,9 +47,16 @@ optimized for deep learning training. Works with any combination of:
 All channels share dim 0. Segment index `i` = same time window across all channels.
 Channel naming: `{SIGNAL}{RATE}` (e.g. PLETH40, II120, ABP125, EEG256).
 
+**Windowing**: 30s windows with 5s overlap (25s stride). `time_ms[i+1] - time_ms[i]` = 25s
+within a contiguous block; larger jumps indicate recording gaps.
+
+**PLETH-anchored alignment**: PLETH (PPG) is the base channel. Only WFDB segments where
+PLETH exists are included. ECG II is NaN-filled when absent in a PLETH-present segment.
+Recording gaps produce time_ms jumps, not NaN padding. Windows never span gaps.
+
 **Standard channels for physiological waveform pretraining:**
-- **PLETH40**: PPG at 40 Hz (1200 samples/seg) -- primary photoplethysmography channel
-- **II120** (or **I120**): ECG Lead II (or I) at 120 Hz (3600 samples/seg) -- primary ECG channel
+- **PLETH40**: PPG at 40 Hz (1200 samples/seg) -- base channel, always has real data
+- **II120** (or **I120**): ECG Lead II (or I) at 120 Hz (3600 samples/seg) -- NaN when absent
 
 These two are the minimum required. Higher-rate or additional channels (II500, ABP125)
 are optional and dataset-specific. Keep storage lean -- only extract what training needs.
@@ -67,6 +74,8 @@ np.dtype([
 
 **Variable registry** (`var_registry.json`): global ID -> name, unit, category mapping.
 Shared across datasets. Stable IDs. Extensible by appending.
+Includes `physio_min`/`physio_max` for outlier filtering and `mimic_itemids` for MIMIC-III
+ITEMID mapping. Unit conversions (e.g. Fahrenheit->Celsius) via `mimic_convert` field.
 
 **EHR variable categories** (encoded in var_id ranges):
 ```
@@ -217,7 +226,7 @@ Signal extraction is per-patient independent -- parallelize with multiprocessing
 |-------|-------|----------|
 | Signal scan | Target channels found, sample rates consistent | No entities with required channels |
 | Event extraction | No duplicates, values in physiological range, timestamps sane | Null IDs, timestamps out of range |
-| **Cross-check** | **>=70% of target variables present, each with >=2 data points** | **Zero overlap or too few variables covered** |
+| **Cross-check** | **Any EHR overlap (>=1 event). Report variable coverage for diagnostics.** | **Zero overlap** |
 | Signal extraction (.npy) | float16, C-contiguous, N_seg consistent, NaN < 20%, time_ms monotonic | Shape mismatch, all NaN |
 | Event building (ehr_events) | Correct dtype, sorted by time_ms, seg_idx in bounds, var_id in registry | seg_idx out of bounds |
 | Manifest + splits | All dirs valid, no **subject**-level overlap in splits, ratio within 5% | Missing dirs, same subject in both sets |

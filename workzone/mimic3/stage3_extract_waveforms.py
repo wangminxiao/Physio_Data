@@ -2,12 +2,17 @@
 """
 Stage 3: Extract waveforms from raw WFDB records into canonical .npy format.
 
+PLETH-anchored alignment: only include WFDB segments where PLETH is present.
+Other channels (II) are NaN-filled when absent in a PLETH-present segment.
+Gaps between recording blocks are reflected in time_ms jumps (no NaN-fill).
+Segments use 30s windows with 5s overlap (25s stride).
+
 For each patient in the filtered inventory:
-  1. Read master header to get waveform recording time
+  1. Parse master header to get segment list + recording start time
   2. Match to hospital admission (HADM_ID) via ADMISSIONS table
-  3. Read all WFDB segments, concatenate PLETH and II channels
-  4. Resample: PLETH 125Hz -> 40Hz, II 125Hz -> 120Hz and 500Hz
-  5. Segment into 30-second windows
+  3. Read PLETH-anchored blocks (joint channel reading)
+  4. Resample: PLETH 125Hz -> 40Hz, II 125Hz -> 120Hz
+  5. Segment into 30s overlapping windows (5s overlap)
   6. Build ehr_events.npy from labs + vitals filtered by HADM_ID
   7. Save as per-patient directory: {SUBJECT_ID}_{HADM_ID}/
 
@@ -50,6 +55,8 @@ PROCESSED_ROOT = cfg["mimic3"]["output_dir"]
 
 # Canonical format constants
 SEGMENT_DUR_SEC = 30
+OVERLAP_SEC = 5
+STRIDE_SEC = SEGMENT_DUR_SEC - OVERLAP_SEC  # 25
 WAVEFORM_DTYPE = np.float16
 TIME_DTYPE = np.int64
 EHR_EVENT_DTYPE = np.dtype([
@@ -59,77 +66,186 @@ EHR_EVENT_DTYPE = np.dtype([
     ('value', 'float32'),
 ])
 SOURCE_FS = 125  # MIMIC-III waveform source rate
+BASE_CHANNEL = "PLETH"
+TARGET_CHANNELS = {"PLETH": 40, "II": 120}  # channel -> target Hz
 
 
 # ========================================================================
-# Waveform reading
+# Master header parsing
 # ========================================================================
 
-def get_master_start_time(patient_path):
-    """Read start time + total duration from master record header."""
+def parse_master_header(patient_path):
+    """Parse master multi-segment .hea header.
+
+    Returns (start_dt, source_fs, segments) where:
+        segments: [(seg_name | None, n_samples), ...]
+        None = null segment (recording gap)
+    Or (None, None, None) if no master header found.
+    """
+    # Find master header (starts with "p", not numerics "n")
+    hea_path = None
     for f in os.listdir(patient_path):
         if f.startswith("p") and f.endswith(".hea") and not f.endswith("n.hea"):
+            hea_path = os.path.join(patient_path, f)
+            break
+    if hea_path is None:
+        return None, None, None
+
+    with open(hea_path) as fh:
+        lines = fh.read().strip().split('\n')
+
+    # Line 1: record_name/n_seg n_sig fs total_samples [time] [date]
+    parts = lines[0].split()
+    try:
+        source_fs = float(parts[2])
+    except (IndexError, ValueError):
+        return None, None, None
+
+    # Parse date/time from extra fields
+    start_dt = None
+    time_str = date_str = None
+    for p in parts:
+        if '/' in p and len(p) == 10 and p[2] == '/' and p[5] == '/':
+            date_str = p
+        elif ':' in p and '.' in p and len(p) > 8:
+            time_str = p
+    if time_str and date_str:
+        try:
+            dt_str = f"{date_str} {time_str.split('.')[0]}"
+            start_dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
+        except ValueError:
+            pass
+
+    # Parse segment lines (lines 2+)
+    segments = []
+    for line in lines[1:]:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        seg_parts = line.split()
+        if len(seg_parts) >= 2:
+            seg_name = seg_parts[0]
             try:
-                with open(os.path.join(patient_path, f)) as fh:
-                    parts = fh.readline().strip().split()
-                    time_str = None
-                    date_str = None
-                    total_samples = None
-                    fs = None
-                    for i, p in enumerate(parts):
-                        if '/' in p and len(p) == 10 and p[2] == '/' and p[5] == '/':
-                            date_str = p
-                        elif ':' in p and '.' in p and len(p) > 8:
-                            time_str = p
-                    # Format: name/n_seg n_sig fs total_samples time date
-                    # e.g.: p000020-2183-04-28-17-47/10 4 125 9862593 17:47:59.486 28/04/2183
-                    try:
-                        fs = float(parts[2])
-                        total_samples = int(parts[3])
-                    except (IndexError, ValueError):
-                        pass
-
-                    if time_str and date_str:
-                        dt_str = f"{date_str} {time_str.split('.')[0]}"
-                        start_dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
-                        duration_sec = total_samples / fs if fs and total_samples else None
-                        return start_dt, duration_sec
-            except Exception:
+                seg_len = int(seg_parts[1])
+            except ValueError:
                 continue
-    return None, None
+            if seg_name == '~':
+                segments.append((None, seg_len))
+            else:
+                segments.append((seg_name, seg_len))
+
+    if not segments:
+        return None, None, None
+
+    return start_dt, source_fs, segments
 
 
-def read_wfdb_segments(patient_path, channel_name):
-    """Read and concatenate all segments for a given channel."""
+# ========================================================================
+# PLETH-anchored block reading
+# ========================================================================
+
+def read_wfdb_blocks(patient_path, segments, source_fs):
+    """Read waveform as PLETH-anchored blocks with joint channel reading.
+
+    A 'block' is a maximal run of consecutive segments where PLETH exists.
+    Gaps (null segments or PLETH absent) break blocks.
+
+    Returns list of blocks:
+        [{'start_sec': float, 'channels': {name: 1D ndarray}}, ...]
+    All channel arrays within a block have identical length.
+    Missing II in a PLETH-present segment -> NaN-fill.
+    """
     import wfdb
 
-    hea_files = sorted([
-        f[:-4] for f in os.listdir(patient_path)
-        if f.endswith(".hea") and "_layout" not in f
-        and not f.startswith("p") and not f.endswith("n.hea")
-        and f != "RECORDS"
-    ])
+    target_names = list(TARGET_CHANNELS.keys())
+    blocks = []
+    current_parts = None  # {channel: [arrays]} for current block
+    current_start_sec = None
+    cumulative_samples = 0
 
-    signals = []
-    for seg_name in hea_files:
-        record_path = os.path.join(patient_path, seg_name)
+    for seg_name, seg_len in segments:
+        seg_start_sec = cumulative_samples / source_fs
+
+        if seg_name is None:
+            # Null segment (recording gap) — close current block
+            if current_parts is not None:
+                blocks.append(_finalize_block(current_start_sec, current_parts))
+                current_parts = None
+            cumulative_samples += seg_len
+            continue
+
+        # Read segment header to check which channels exist
+        seg_path = os.path.join(patient_path, seg_name)
         try:
-            h = wfdb.rdheader(record_path)
+            h = wfdb.rdheader(seg_path)
         except Exception:
+            # Unreadable segment — treat as gap
+            if current_parts is not None:
+                blocks.append(_finalize_block(current_start_sec, current_parts))
+                current_parts = None
+            cumulative_samples += seg_len
             continue
-        if h.sig_name is None or channel_name not in h.sig_name:
+
+        available = set(h.sig_name) if h.sig_name else set()
+
+        if BASE_CHANNEL not in available:
+            # Base channel absent — gap
+            if current_parts is not None:
+                blocks.append(_finalize_block(current_start_sec, current_parts))
+                current_parts = None
+            cumulative_samples += seg_len
             continue
-        ch_idx = h.sig_name.index(channel_name)
+
+        # PLETH present — include this segment
+        if current_parts is None:
+            current_parts = {ch: [] for ch in target_names}
+            current_start_sec = seg_start_sec
+
+        # Read all available target channels in one rdrecord call
+        channels_to_read = [ch for ch in target_names if ch in available]
+        channel_indices = [h.sig_name.index(ch) for ch in channels_to_read]
+
         try:
-            rec = wfdb.rdrecord(record_path, channels=[ch_idx])
-            signals.append(rec.p_signal[:, 0])
+            rec = wfdb.rdrecord(seg_path, channels=channel_indices)
+            sig_data = {ch: rec.p_signal[:, i] for i, ch in enumerate(channels_to_read)}
         except Exception:
+            # Failed to read — treat as gap
+            if current_parts is not None and any(len(v) > 0 for v in current_parts.values()):
+                blocks.append(_finalize_block(current_start_sec, current_parts))
+            current_parts = None
+            cumulative_samples += seg_len
             continue
 
-    if not signals:
-        return None
-    return np.concatenate(signals)
+        actual_len = sig_data[BASE_CHANNEL].shape[0]
 
+        # Append each channel (NaN-fill if absent in this segment)
+        for ch in target_names:
+            if ch in sig_data:
+                current_parts[ch].append(sig_data[ch])
+            else:
+                current_parts[ch].append(np.full(actual_len, np.nan))
+
+        cumulative_samples += seg_len
+
+    # Close last block
+    if current_parts is not None:
+        blocks.append(_finalize_block(current_start_sec, current_parts))
+
+    return blocks
+
+
+def _finalize_block(start_sec, parts):
+    """Concatenate segment arrays within a block."""
+    channels = {}
+    for ch, arrays in parts.items():
+        if arrays:
+            channels[ch] = np.concatenate(arrays)
+    return {'start_sec': start_sec, 'channels': channels}
+
+
+# ========================================================================
+# Resampling and segmenting
+# ========================================================================
 
 def resample_signal(signal, src_fs, target_fs):
     """Resample 1D signal using polyphase filtering."""
@@ -141,14 +257,27 @@ def resample_signal(signal, src_fs, target_fs):
     return resample_poly(signal, up, down).astype(np.float64)
 
 
-def segment_signal(signal, sample_rate, seg_dur_sec=SEGMENT_DUR_SEC):
-    """Split 1D signal into [N_seg, samples_per_seg] float16 C-contiguous."""
+def segment_signal(signal, sample_rate, seg_dur_sec=SEGMENT_DUR_SEC, overlap_sec=OVERLAP_SEC):
+    """Split 1D signal into overlapping [N_seg, samples_per_seg] float16 segments.
+
+    Window: seg_dur_sec (30s)
+    Stride: seg_dur_sec - overlap_sec (25s)
+    """
     samples_per_seg = int(sample_rate * seg_dur_sec)
-    n_seg = len(signal) // samples_per_seg
-    if n_seg == 0:
+    stride_samples = int(sample_rate * (seg_dur_sec - overlap_sec))
+
+    if len(signal) < samples_per_seg:
         return None
-    trimmed = signal[:n_seg * samples_per_seg]
-    return np.ascontiguousarray(trimmed.reshape(n_seg, samples_per_seg), dtype=WAVEFORM_DTYPE)
+
+    n_seg = (len(signal) - samples_per_seg) // stride_samples + 1
+
+    # as_strided creates overlapping views, ascontiguousarray copies to C-contiguous
+    view = np.lib.stride_tricks.as_strided(
+        signal,
+        shape=(n_seg, samples_per_seg),
+        strides=(signal.strides[0] * stride_samples, signal.strides[0]),
+    )
+    return np.ascontiguousarray(view, dtype=WAVEFORM_DTYPE)
 
 
 # ========================================================================
@@ -175,7 +304,6 @@ def match_admission(subject_id, wav_start, wav_duration_sec, admissions_df):
         if pd.isna(adm_start) or pd.isna(adm_end):
             continue
 
-        # Compute overlap
         overlap_start = max(wav_start, adm_start.to_pydatetime())
         overlap_end = min(wav_end, adm_end.to_pydatetime())
         overlap_sec = max(0, (overlap_end - overlap_start).total_seconds())
@@ -196,7 +324,6 @@ def build_ehr_events(subject_id, hadm_id, segment_times_ms, labs_df, vitals_df):
     events = []
 
     for source_df in [labs_df, vitals_df]:
-        # Filter by SUBJECT_ID and HADM_ID
         mask = (source_df["SUBJECT_ID"] == subject_id)
         if hadm_id is not None and "HADM_ID" in source_df.columns:
             mask = mask & (source_df["HADM_ID"] == hadm_id)
@@ -252,6 +379,8 @@ def save_patient(out_dir, channels, time_ms, ehr_events, meta_extra):
     meta = {
         "n_segments": n_seg,
         "segment_duration_sec": SEGMENT_DUR_SEC,
+        "overlap_sec": OVERLAP_SEC,
+        "stride_sec": STRIDE_SEC,
         "channels": {
             name: {
                 "shape": list(arr.shape),
@@ -272,7 +401,7 @@ def save_patient(out_dir, channels, time_ms, ehr_events, meta_extra):
 # ========================================================================
 
 def process_patient(args):
-    """Process one patient: match admission -> read WFDB -> resample -> align EHR -> save.
+    """Process one patient: parse header -> match admission -> read blocks -> align -> save.
 
     Takes a single tuple for multiprocessing compatibility:
     (row_dict, patient_labs, patient_vitals, patient_admissions)
@@ -282,68 +411,118 @@ def process_patient(args):
     patient_path = row["patient_path"]
 
     try:
-        # 1. Get waveform recording time from master header
-        wav_start, wav_duration = get_master_start_time(patient_path)
-        if wav_start is None:
-            return {"subject_id": subject_id, "status": "SKIP", "reason": "no master header start time"}
-        if wav_duration is None or wav_duration < 300:
-            return {"subject_id": subject_id, "status": "SKIP", "reason": f"duration too short: {wav_duration}s"}
+        # 1. Parse master header for segment list + start time
+        wav_start, source_fs, segment_list = parse_master_header(patient_path)
+        if wav_start is None or segment_list is None:
+            return {"subject_id": subject_id, "status": "SKIP", "reason": "no master header"}
+
+        total_samples = sum(n for _, n in segment_list)
+        wav_duration = total_samples / source_fs
+        if wav_duration < 300:
+            return {"subject_id": subject_id, "status": "SKIP",
+                    "reason": f"duration too short: {wav_duration:.0f}s"}
 
         # 2. Match to hospital admission
-        hadm_id, overlap_hours = match_admission(subject_id, wav_start, wav_duration, patient_admissions)
+        hadm_id, overlap_hours = match_admission(
+            subject_id, wav_start, wav_duration, patient_admissions)
         if hadm_id is None:
             return {"subject_id": subject_id, "status": "SKIP", "reason": "no matching admission"}
         if overlap_hours < 1.0:
             return {"subject_id": subject_id, "status": "SKIP",
                     "reason": f"admission overlap too short: {overlap_hours:.1f}h"}
 
-        # 3. Read raw waveform channels
-        pleth_raw = read_wfdb_segments(patient_path, "PLETH")
-        ii_raw = read_wfdb_segments(patient_path, "II")
-
-        if pleth_raw is None or ii_raw is None:
+        # 3. Read PLETH-anchored blocks (joint channel reading)
+        blocks = read_wfdb_blocks(patient_path, segment_list, source_fs)
+        if not blocks:
             return {"subject_id": subject_id, "hadm_id": hadm_id,
-                    "status": "SKIP", "reason": "missing channel data"}
+                    "status": "SKIP", "reason": "no blocks with PLETH"}
 
-        # 4. Resample: PLETH->40Hz, II->120Hz only (no II500)
-        pleth40 = resample_signal(pleth_raw, SOURCE_FS, 40)
-        ii120 = resample_signal(ii_raw, SOURCE_FS, 120)
+        # 4. Process each block: resample + segment with overlap
+        all_channel_segs = {ch: [] for ch in TARGET_CHANNELS}
+        all_time_ms = []
 
-        # 5. Segment into 30s windows
-        pleth40_seg = segment_signal(pleth40, 40)
-        ii120_seg = segment_signal(ii120, 120)
+        for block in blocks:
+            block_start_ms = int((wav_start.timestamp() + block['start_sec']) * 1000)
 
-        if pleth40_seg is None or ii120_seg is None:
+            # Resample each channel
+            resampled = {}
+            for ch, target_hz in TARGET_CHANNELS.items():
+                raw = block['channels'].get(ch)
+                if raw is not None and len(raw) > 0:
+                    resampled[ch] = resample_signal(raw, source_fs, target_hz)
+                else:
+                    # Channel entirely missing in block — NaN at target rate
+                    base_raw = block['channels'][BASE_CHANNEL]
+                    target_len = int(np.ceil(len(base_raw) * target_hz / source_fs))
+                    resampled[ch] = np.full(target_len, np.nan)
+
+            # Segment each channel with overlap
+            segmented = {}
+            for ch, sig in resampled.items():
+                seg = segment_signal(sig, TARGET_CHANNELS[ch])
+                if seg is None:
+                    break  # block too short for even one window
+                segmented[ch] = seg
+
+            if len(segmented) != len(TARGET_CHANNELS):
+                continue  # skip this block (too short)
+
+            # Align segment counts (may differ by 1 due to resampling rounding)
+            n_seg_block = min(s.shape[0] for s in segmented.values())
+            for ch in segmented:
+                segmented[ch] = segmented[ch][:n_seg_block]
+
+            # Build time_ms for this block
+            stride_ms = STRIDE_SEC * 1000
+            block_time_ms = np.array(
+                [block_start_ms + i * stride_ms for i in range(n_seg_block)],
+                dtype=TIME_DTYPE,
+            )
+
+            for ch in TARGET_CHANNELS:
+                all_channel_segs[ch].append(segmented[ch])
+            all_time_ms.append(block_time_ms)
+
+        if not all_time_ms:
             return {"subject_id": subject_id, "hadm_id": hadm_id,
-                    "status": "SKIP", "reason": "too short after resampling"}
+                    "status": "SKIP", "reason": "all blocks too short"}
 
-        # Use minimum segment count across channels
-        n_seg = min(pleth40_seg.shape[0], ii120_seg.shape[0])
-        pleth40_seg = pleth40_seg[:n_seg]
-        ii120_seg = ii120_seg[:n_seg]
+        # 5. Concatenate across blocks
+        channels_out = {}
+        for ch in TARGET_CHANNELS:
+            ch_name = f"{ch}{TARGET_CHANNELS[ch]}"  # e.g. PLETH40, II120
+            channels_out[ch_name] = np.concatenate(all_channel_segs[ch], axis=0)
 
-        # 6. Build time_ms array
-        start_ms = int(wav_start.timestamp() * 1000)
-        time_ms = np.array(
-            [start_ms + i * SEGMENT_DUR_SEC * 1000 for i in range(n_seg)],
-            dtype=TIME_DTYPE,
-        )
+        time_ms = np.concatenate(all_time_ms)
+        n_seg = len(time_ms)
 
-        # 7. Build EHR events (filtered by HADM_ID)
+        # 6. Build EHR events (filtered by HADM_ID)
         ehr_events = build_ehr_events(subject_id, hadm_id, time_ms, patient_labs, patient_vitals)
 
-        # 8. Save as {SUBJECT_ID}_{HADM_ID}/
+        # 7. Compute NaN ratios per channel
+        nan_ratios = {}
+        valid_seg_ratios = {}
+        for ch_name, arr in channels_out.items():
+            arr32 = arr.astype(np.float32)
+            nan_ratios[ch_name] = float(np.isnan(arr32).mean())
+            # A segment is "valid" if not entirely NaN
+            seg_nan = np.isnan(arr32).all(axis=1)
+            valid_seg_ratios[ch_name] = float(1.0 - seg_nan.mean())
+
+        # 8. Count recording blocks (gaps show up as time_ms jumps > stride)
+        if len(time_ms) > 1:
+            diffs = np.diff(time_ms)
+            n_gaps = int(np.sum(diffs > STRIDE_SEC * 1000 * 1.5))  # >37.5s gap
+        else:
+            n_gaps = 0
+
+        # 9. Save
         patient_id = f"{subject_id}_{hadm_id}"
         out_dir = os.path.join(PROCESSED_ROOT, patient_id)
 
-        pleth_nan = np.isnan(pleth40_seg.astype(np.float32)).mean()
-        ii_nan = np.isnan(ii120_seg.astype(np.float32)).mean()
-
-        channels = {"PLETH40": pleth40_seg, "II120": ii120_seg}
-
         save_patient(
             out_dir=out_dir,
-            channels=channels,
+            channels=channels_out,
             time_ms=time_ms,
             ehr_events=ehr_events,
             meta_extra={
@@ -352,11 +531,18 @@ def process_patient(args):
                 "hadm_id": int(hadm_id),
                 "source_dataset": "mimic3",
                 "source_path": patient_path,
-                "recording_start_ms": int(start_ms),
-                "total_duration_hours": round(n_seg * SEGMENT_DUR_SEC / 3600, 2),
+                "recording_start_ms": int(time_ms[0]),
+                "total_duration_hours": round(n_seg * STRIDE_SEC / 3600, 2),
                 "admission_overlap_hours": round(overlap_hours, 2),
-                "pleth_nan_ratio": round(float(pleth_nan), 4),
-                "ii_nan_ratio": round(float(ii_nan), 4),
+                "n_blocks": len(blocks),
+                "n_gaps": n_gaps,
+                "per_channel": {
+                    ch_name: {
+                        "nan_ratio": round(nan_ratios[ch_name], 4),
+                        "valid_seg_ratio": round(valid_seg_ratios[ch_name], 4),
+                    }
+                    for ch_name in channels_out
+                },
             },
         )
 
@@ -367,8 +553,10 @@ def process_patient(args):
             "status": "OK",
             "n_segments": n_seg,
             "n_ehr_events": len(ehr_events),
-            "duration_hours": round(n_seg * SEGMENT_DUR_SEC / 3600, 2),
+            "duration_hours": round(n_seg * STRIDE_SEC / 3600, 2),
             "overlap_hours": round(overlap_hours, 2),
+            "n_blocks": len(blocks),
+            "n_gaps": n_gaps,
         }
 
     except Exception as e:
@@ -398,6 +586,8 @@ def main():
 
     log.info(f"Stage 3: Extract waveforms -> {PROCESSED_ROOT}")
     log.info(f"  Workers: {n_workers} (max {max_workers} = 50% of {os.cpu_count()} cores)")
+    log.info(f"  Window: {SEGMENT_DUR_SEC}s, overlap: {OVERLAP_SEC}s, stride: {STRIDE_SEC}s")
+    log.info(f"  Base channel: {BASE_CHANNEL}, targets: {TARGET_CHANNELS}")
     os.makedirs(PROCESSED_ROOT, exist_ok=True)
 
     # Load inventory
@@ -494,7 +684,6 @@ def main():
     n_skip = sum(1 for r in results if r["status"] == "SKIP")
     n_err = sum(1 for r in results if r["status"] == "ERROR")
 
-    # Count skip reasons
     skip_reasons = {}
     for r in results:
         if r["status"] == "SKIP":
@@ -508,6 +697,11 @@ def main():
         "errors": n_err,
         "total_time_sec": round(elapsed, 1),
         "output_dir": PROCESSED_ROOT,
+        "segment_params": {
+            "duration_sec": SEGMENT_DUR_SEC,
+            "overlap_sec": OVERLAP_SEC,
+            "stride_sec": STRIDE_SEC,
+        },
         "skip_reasons": skip_reasons,
         "errors_detail": [r for r in results if r["status"] == "ERROR"][:20],
         "skips_detail": [r for r in results if r["status"] == "SKIP"][:20],
@@ -528,8 +722,11 @@ def main():
         ok_results = [r for r in results if r["status"] == "OK"]
         avg_events = np.mean([r["n_ehr_events"] for r in ok_results])
         avg_hours = np.mean([r["duration_hours"] for r in ok_results])
+        avg_blocks = np.mean([r.get("n_blocks", 1) for r in ok_results])
+        avg_gaps = np.mean([r.get("n_gaps", 0) for r in ok_results])
         log.info(f"  Avg EHR events/patient: {avg_events:.0f}")
         log.info(f"  Avg duration: {avg_hours:.1f} hours")
+        log.info(f"  Avg blocks/patient: {avg_blocks:.1f}, avg gaps: {avg_gaps:.1f}")
 
     log.info(f"\nNext: python workzone/mimic3/stage4_manifest_splits.py")
 

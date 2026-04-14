@@ -44,7 +44,25 @@
 ```
 
 All waveform .npy files share dimension 0 (N_seg). Segment index `i` across all files
-corresponds to the same time window `[i * seg_dur, (i+1) * seg_dur)`.
+corresponds to the same time window `[time_ms[i], time_ms[i] + seg_dur)`.
+
+### Windowing: overlapping segments
+
+- **Window**: 30 seconds (`seg_dur`)
+- **Overlap**: 5 seconds
+- **Stride**: 25 seconds (`seg_dur - overlap`)
+- `time_ms[i]` is the absolute start time of window `i`
+- Within a contiguous recording block: `time_ms[i+1] - time_ms[i] = stride (25s)`
+- Across a recording gap: `time_ms[i+1] - time_ms[i] > stride` (the jump IS the gap)
+- ~20% more segments than non-overlapping, smoother boundaries for models
+
+### Channel alignment: PLETH-anchored
+
+PLETH (PPG) is the **base channel**. Only WFDB segments where PLETH exists are included.
+Other channels (ECG II) are NaN-filled when absent in a PLETH-present segment.
+If PLETH is missing, the segment is skipped for ALL channels (even if ECG exists).
+Recording gaps (null segments or PLETH-absent segments) are NOT NaN-filled —
+they produce jumps in `time_ms`. Windows never span gap boundaries.
 
 ### Waveform arrays
 
@@ -52,6 +70,7 @@ corresponds to the same time window `[i * seg_dur, (i+1) * seg_dur)`.
 - **Dtype**: float16 (sufficient for physiological signals, halves storage vs float32)
 - **Layout**: C-contiguous (row-major), guaranteed by `np.ascontiguousarray()` at save time
 - **Access**: `np.load(path, mmap_mode='r')` -> OS-backed memory mapping
+- **NaN**: segments where a non-base channel was absent are filled with NaN (float16 supports NaN)
 
 **Why this shape enables zero-copy concatenation:**
 ```python
@@ -131,15 +150,21 @@ Per-variable, per-dataset normalization parameters. Computed during extraction, 
 {
   "patient_id": "10032_174162",
   "source_dataset": "mimic3",
-  "n_segments": 1440,
+  "n_segments": 1727,
   "segment_duration_sec": 30,
+  "overlap_sec": 5,
+  "stride_sec": 25,
   "total_duration_hours": 12.0,
   "recording_start_ms": 1234567890000,
-  "recording_end_ms": 1234611090000,
+  "n_blocks": 2,
+  "n_gaps": 1,
   "channels": {
-    "PLETH40": {"sample_rate_hz": 40,  "shape": [1440, 1200],  "dtype": "float16"},
-    "II120":   {"sample_rate_hz": 120, "shape": [1440, 3600],  "dtype": "float16"},
-    "II500":   {"sample_rate_hz": 500, "shape": [1440, 15000], "dtype": "float16"}
+    "PLETH40": {"sample_rate_hz": 40,  "shape": [1727, 1200],  "dtype": "float16"},
+    "II120":   {"sample_rate_hz": 120, "shape": [1727, 3600],  "dtype": "float16"}
+  },
+  "per_channel": {
+    "PLETH40": {"nan_ratio": 0.0,  "valid_seg_ratio": 1.0},
+    "II120":   {"nan_ratio": 0.03, "valid_seg_ratio": 0.97}
   },
   "n_ehr_events": 187
 }

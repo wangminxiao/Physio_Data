@@ -2,8 +2,9 @@
 """
 Stage 2: Extract and filter EHR data (labs + vitals) from raw MIMIC-III CSVs.
 
-Reads LABEVENTS.csv and CHARTEVENTS.csv.gz, filters to target variables,
-joins with ADMISSIONS for HADM_ID linkage, computes normalization stats.
+Reads var_registry.json for variable definitions (ITEMIDs, physio ranges).
+Extracts ALL labs from LABEVENTS.csv and ALL vitals from CHARTEVENTS.csv.gz.
+Handles unit conversions (e.g. Fahrenheit -> Celsius for Temperature).
 
 Run:  python workzone/mimic3/stage2_extract_ehr.py
 Output:
@@ -34,30 +35,63 @@ with open(REPO_ROOT / "workzone" / "configs" / "server_paths.yaml") as f:
 
 EHR_ROOT = cfg["mimic3"]["raw_ehr_dir"]
 
-# Variable definitions from API.md / var_registry.json
-LAB_ITEMS = {
-    # var_id: (name, [ITEMIDs], unit, physiological_min, physiological_max)
-    0: ("Potassium",  [50971, 50822], "mEq/L", 1.0, 10.0),
-    1: ("Calcium",    [50893],        "mg/dL", 4.0, 15.0),
-    2: ("Sodium",     [50983, 50824], "mEq/L", 100, 180),
-    3: ("Glucose",    [50931, 50809], "mg/dL", 10, 1000),
-    4: ("Lactate",    [50813],        "mmol/L", 0.1, 30.0),
-    5: ("Creatinine", [50912],        "mg/dL", 0.1, 25.0),
-}
+# --------------------------------------------------------------------------
+# Load variable definitions from var_registry.json
+# --------------------------------------------------------------------------
+with open(REPO_ROOT / "indices" / "var_registry.json") as f:
+    VAR_REGISTRY = json.load(f)
 
-VITAL_ITEMS = {
-    # var_id: (name, [ITEMIDs], unit, physiological_min, physiological_max)
-    6: ("NBPs", [220179], "mmHg", 30, 300),
-    7: ("NBPd", [220180], "mmHg", 10, 200),
-    8: ("NBPm", [220181], "mmHg", 20, 250),
-}
+# Build per-category variable dicts: {var_id: {name, itemids, unit, physio_min, physio_max, convert}}
+LAB_VARS = {}    # from LABEVENTS (category == "lab", has mimic_itemids)
+VITAL_VARS = {}  # from CHARTEVENTS (category == "vital", has mimic_itemids)
 
-# Build ITEMID -> var_id lookup
-ITEMID_TO_VARID = {}
-for var_id, (name, itemids, unit, vmin, vmax) in {**LAB_ITEMS, **VITAL_ITEMS}.items():
-    for iid in itemids:
-        ITEMID_TO_VARID[iid] = var_id
+for v in VAR_REGISTRY["variables"]:
+    if "mimic_itemids" not in v:
+        continue  # skip actions/scores without direct ITEMID extraction
+    entry = {
+        "name": v["name"],
+        "itemids": v["mimic_itemids"],
+        "unit": v["unit"],
+        "physio_min": v.get("physio_min"),
+        "physio_max": v.get("physio_max"),
+        "convert": v.get("mimic_convert", {}),
+    }
+    if v["category"] == "lab":
+        LAB_VARS[v["id"]] = entry
+    elif v["category"] == "vital":
+        VITAL_VARS[v["id"]] = entry
 
+# Build ITEMID -> var_id lookup (separate for labs and vitals since they come from different tables)
+LAB_ITEMID_TO_VARID = {}
+for var_id, info in LAB_VARS.items():
+    for iid in info["itemids"]:
+        LAB_ITEMID_TO_VARID[iid] = var_id
+
+VITAL_ITEMID_TO_VARID = {}
+# Track which ITEMIDs need unit conversion
+VITAL_ITEMID_CONVERT = {}  # {itemid: conversion_type}
+for var_id, info in VITAL_VARS.items():
+    for iid in info["itemids"]:
+        VITAL_ITEMID_TO_VARID[iid] = var_id
+        str_iid = str(iid)
+        if str_iid in info["convert"]:
+            VITAL_ITEMID_CONVERT[iid] = info["convert"][str_iid]
+
+log.info(f"Loaded var_registry: {len(LAB_VARS)} labs (var_ids {sorted(LAB_VARS.keys())}), "
+         f"{len(VITAL_VARS)} vitals (var_ids {sorted(VITAL_VARS.keys())})")
+
+
+# --------------------------------------------------------------------------
+# Unit conversions
+# --------------------------------------------------------------------------
+def fahrenheit_to_celsius(f):
+    """Convert Fahrenheit to Celsius."""
+    return (f - 32) * 5 / 9
+
+
+# --------------------------------------------------------------------------
+# Extraction
+# --------------------------------------------------------------------------
 
 def extract_labs():
     """Extract lab events from LABEVENTS.csv."""
@@ -66,10 +100,9 @@ def extract_labs():
     if not os.path.exists(lab_path):
         lab_path = os.path.join(EHR_ROOT, "LABEVENTS.csv.gz")
     log.info(f"  Reading: {lab_path}")
+    log.info(f"  Target: {len(LAB_VARS)} variables, {len(LAB_ITEMID_TO_VARID)} ITEMIDs")
 
-    target_itemids = []
-    for var_id, (name, itemids, *_) in LAB_ITEMS.items():
-        target_itemids.extend(itemids)
+    target_itemids = list(LAB_ITEMID_TO_VARID.keys())
 
     t0 = time.time()
     df = pl.scan_csv(lab_path, infer_schema_length=1000).filter(
@@ -85,21 +118,24 @@ def extract_labs():
 
     # Map ITEMID -> var_id
     itemid_map = pl.DataFrame({
-        "ITEMID": list(ITEMID_TO_VARID.keys()),
-        "var_id": [ITEMID_TO_VARID[k] for k in ITEMID_TO_VARID.keys()],
-    }).filter(pl.col("var_id") < 6)  # labs only
-
+        "ITEMID": list(LAB_ITEMID_TO_VARID.keys()),
+        "var_id": list(LAB_ITEMID_TO_VARID.values()),
+    })
     df = df.join(itemid_map, on="ITEMID", how="inner")
 
     # Apply physiological range filters
     rows_before = len(df)
     range_filters = []
-    for var_id, (name, _, _, vmin, vmax) in LAB_ITEMS.items():
-        range_filters.append(
-            (pl.col("var_id") == var_id) &
-            (pl.col("VALUENUM") >= vmin) &
-            (pl.col("VALUENUM") <= vmax)
-        )
+    for var_id, info in LAB_VARS.items():
+        vmin, vmax = info["physio_min"], info["physio_max"]
+        if vmin is not None and vmax is not None:
+            range_filters.append(
+                (pl.col("var_id") == var_id) &
+                (pl.col("VALUENUM") >= vmin) &
+                (pl.col("VALUENUM") <= vmax)
+            )
+        else:
+            range_filters.append(pl.col("var_id") == var_id)
 
     combined_filter = range_filters[0]
     for rf in range_filters[1:]:
@@ -120,21 +156,24 @@ def extract_labs():
         pl.col("CHARTTIME").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S").alias("charttime_dt")
     )
 
+    # Per-variable counts
+    for var_id, info in sorted(LAB_VARS.items()):
+        n = df.filter(pl.col("var_id") == var_id).height
+        log.info(f"    var_id={var_id:3d} {info['name']:15s}: {n:>10,} events")
+
     return df
 
 
 def extract_vitals():
     """Extract vital events from CHARTEVENTS.csv.gz."""
     log.info("\n=== Extracting Vitals ===")
-    # Try .csv.gz first, then .csv
     vital_path = os.path.join(EHR_ROOT, "CHARTEVENTS.csv.gz")
     if not os.path.exists(vital_path):
         vital_path = os.path.join(EHR_ROOT, "CHARTEVENTS.csv")
     log.info(f"  Reading: {vital_path}")
+    log.info(f"  Target: {len(VITAL_VARS)} variables, {len(VITAL_ITEMID_TO_VARID)} ITEMIDs")
 
-    target_itemids = []
-    for var_id, (name, itemids, *_) in VITAL_ITEMS.items():
-        target_itemids.extend(itemids)
+    target_itemids = list(VITAL_ITEMID_TO_VARID.keys())
 
     t0 = time.time()
     df = pl.scan_csv(vital_path, infer_schema_length=1000).filter(
@@ -148,23 +187,40 @@ def extract_vitals():
     elapsed = time.time() - t0
     log.info(f"  Loaded {len(df)} vital events in {elapsed:.1f}s")
 
+    # Apply unit conversions BEFORE mapping to var_id
+    # (conversion is per-ITEMID, not per-var_id)
+    if VITAL_ITEMID_CONVERT:
+        for itemid, conv_type in VITAL_ITEMID_CONVERT.items():
+            if conv_type == "F_to_C":
+                n_before = df.filter(pl.col("ITEMID") == itemid).height
+                df = df.with_columns(
+                    pl.when(pl.col("ITEMID") == itemid)
+                    .then((pl.col("VALUENUM") - 32) * 5 / 9)
+                    .otherwise(pl.col("VALUENUM"))
+                    .alias("VALUENUM")
+                )
+                log.info(f"  Converted {n_before} ITEMID={itemid} values from F to C")
+
     # Map ITEMID -> var_id
     itemid_map = pl.DataFrame({
-        "ITEMID": list(ITEMID_TO_VARID.keys()),
-        "var_id": [ITEMID_TO_VARID[k] for k in ITEMID_TO_VARID.keys()],
-    }).filter(pl.col("var_id") >= 6)  # vitals only
-
+        "ITEMID": list(VITAL_ITEMID_TO_VARID.keys()),
+        "var_id": list(VITAL_ITEMID_TO_VARID.values()),
+    })
     df = df.join(itemid_map, on="ITEMID", how="inner")
 
-    # Apply physiological range filters
+    # Apply physiological range filters (after conversion)
     rows_before = len(df)
     range_filters = []
-    for var_id, (name, _, _, vmin, vmax) in VITAL_ITEMS.items():
-        range_filters.append(
-            (pl.col("var_id") == var_id) &
-            (pl.col("VALUENUM") >= vmin) &
-            (pl.col("VALUENUM") <= vmax)
-        )
+    for var_id, info in VITAL_VARS.items():
+        vmin, vmax = info["physio_min"], info["physio_max"]
+        if vmin is not None and vmax is not None:
+            range_filters.append(
+                (pl.col("var_id") == var_id) &
+                (pl.col("VALUENUM") >= vmin) &
+                (pl.col("VALUENUM") <= vmax)
+            )
+        else:
+            range_filters.append(pl.col("var_id") == var_id)
 
     combined_filter = range_filters[0]
     for rf in range_filters[1:]:
@@ -185,13 +241,18 @@ def extract_vitals():
         pl.col("CHARTTIME").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S").alias("charttime_dt")
     )
 
+    # Per-variable counts
+    for var_id, info in sorted(VITAL_VARS.items()):
+        n = df.filter(pl.col("var_id") == var_id).height
+        log.info(f"    var_id={var_id:3d} {info['name']:15s}: {n:>10,} events")
+
     return df
 
 
 def compute_normalization(labs_df, vitals_df):
     """Compute per-variable normalization stats."""
     log.info("\n=== Normalization Stats ===")
-    all_items = {**LAB_ITEMS, **VITAL_ITEMS}
+    all_vars = {**LAB_VARS, **VITAL_VARS}
     stats = {}
 
     combined = pl.concat([
@@ -199,16 +260,16 @@ def compute_normalization(labs_df, vitals_df):
         vitals_df.select(["var_id", "VALUENUM"]),
     ])
 
-    for var_id, (name, _, unit, vmin, vmax) in all_items.items():
+    for var_id, info in sorted(all_vars.items()):
         subset = combined.filter(pl.col("var_id") == var_id)["VALUENUM"]
         if len(subset) == 0:
-            log.warning(f"  {name} (var_id={var_id}): no data!")
+            log.warning(f"  {info['name']} (var_id={var_id}): no data!")
             continue
 
         vals = subset.to_numpy()
         stats[str(var_id)] = {
-            "name": name,
-            "unit": unit,
+            "name": info["name"],
+            "unit": info["unit"],
             "count": int(len(vals)),
             "min": float(np.min(vals)),
             "max": float(np.max(vals)),
@@ -218,13 +279,16 @@ def compute_normalization(labs_df, vitals_df):
             "p99": float(np.percentile(vals, 99)),
             "median": float(np.median(vals)),
         }
-        log.info(f"  {name}: n={len(vals)}, range=[{stats[str(var_id)]['p01']:.2f}, {stats[str(var_id)]['p99']:.2f}]")
+        log.info(f"  {info['name']:15s}: n={len(vals):>10,}, "
+                 f"range=[{stats[str(var_id)]['p01']:.2f}, {stats[str(var_id)]['p99']:.2f}]")
 
     return stats
 
 
 def main():
-    log.info("Stage 2: Extract EHR from MIMIC-III")
+    log.info("Stage 2: Extract EHR from MIMIC-III (full var_registry)")
+    log.info(f"  Labs: {len(LAB_VARS)} variables from LABEVENTS")
+    log.info(f"  Vitals: {len(VITAL_VARS)} variables from CHARTEVENTS")
     t0 = time.time()
 
     labs_df = extract_labs()
@@ -256,14 +320,18 @@ def main():
         "total_vital_events": len(vitals_df),
         "n_lab_subjects": n_lab_subjects,
         "n_vital_subjects": n_vital_subjects,
-        "per_variable": {
-            str(var_id): {
-                "name": name,
-                "count": int(norm_stats.get(str(var_id), {}).get("count", 0)),
-            }
-            for var_id, (name, *_) in {**LAB_ITEMS, **VITAL_ITEMS}.items()
-        },
+        "n_lab_variables": len(LAB_VARS),
+        "n_vital_variables": len(VITAL_VARS),
+        "per_variable": {},
     }
+    for var_id in sorted({**LAB_VARS, **VITAL_VARS}.keys()):
+        info = LAB_VARS.get(var_id) or VITAL_VARS.get(var_id)
+        summary["per_variable"][str(var_id)] = {
+            "name": info["name"],
+            "category": "lab" if var_id in LAB_VARS else "vital",
+            "count": int(norm_stats.get(str(var_id), {}).get("count", 0)),
+        }
+
     with open(OUT_DIR / "stage2_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
 
@@ -275,12 +343,12 @@ def main():
     assert len(vitals_df) > 0, "No vital events extracted"
     assert labs_df["SUBJECT_ID"].null_count() == 0, "Null SUBJECT_IDs in labs"
     assert vitals_df["SUBJECT_ID"].null_count() == 0, "Null SUBJECT_IDs in vitals"
-    log.info(f"  [PASS] {len(labs_df)} lab events from {n_lab_subjects} subjects")
-    log.info(f"  [PASS] {len(vitals_df)} vital events from {n_vital_subjects} subjects")
+    log.info(f"  [PASS] {len(labs_df):,} lab events from {n_lab_subjects} subjects ({len(LAB_VARS)} vars)")
+    log.info(f"  [PASS] {len(vitals_df):,} vital events from {n_vital_subjects} subjects ({len(VITAL_VARS)} vars)")
     log.info(f"  [PASS] No null SUBJECT_IDs")
     log.info(f"  Total time: {elapsed:.1f}s")
 
-    log.info(f"\nNext: python workzone/mimic3/stage3_extract_waveforms.py")
+    log.info(f"\nNext: python workzone/mimic3/stage2b_cross_check.py")
 
 
 if __name__ == "__main__":
