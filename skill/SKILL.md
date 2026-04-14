@@ -65,8 +65,20 @@ np.dtype([
 # Sorted by time_ms. Only actual measurements. No padding.
 ```
 
-**Variable registry** (`var_registry.json`): global ID -> name, unit, type mapping.
+**Variable registry** (`var_registry.json`): global ID -> name, unit, category mapping.
 Shared across datasets. Stable IDs. Extensible by appending.
+
+**EHR variable categories** (encoded in var_id ranges):
+```
+var_id 0-99:     Labs       Point measurements from blood draws (Potassium, Creatinine, ...)
+var_id 100-199:  Vitals     Semi-regular bedside monitor readings (HR, SpO2, RR, BP, ...)
+var_id 200-299:  Actions    Interventions charted at rate changes (vasopressors, fluids, vent, ...)
+var_id 300-399:  Scores     Derived values computed from above (SOFA, sepsis onset, ...)
+```
+
+All categories share the same sparse event dtype `(time_ms, seg_idx, var_id, value)`.
+Actions store the rate/dose at each charting point (value=0.0 means stopped).
+Category filtering at runtime: `events[events['var_id'] < 100]` = labs only.
 
 ## Workflow: Onboarding a New Dataset
 
