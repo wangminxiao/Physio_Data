@@ -1,0 +1,12 @@
+{
+  "total_patients_scanned": 10099,
+  "has_pleth_and_ii": 7097,
+  "has_pleth_only": 5,
+  "has_ii_only": 2905,
+  "has_neither": 92,
+  "after_duration_filter": 6987,
+  "min_duration_sec": 300,
+  "scan_time_sec": 320.0,
+  "median_pleth_duration_hours": 43.4,
+  "median_ii_duration_hours": 50.6
+}

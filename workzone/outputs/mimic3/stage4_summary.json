@@ -1,0 +1,12 @@
+{
+  "n_valid": 5621,
+  "n_failed": 0,
+  "total_hours": 215895.8,
+  "total_ehr_events": 3619083,
+  "n_train": 3935,
+  "n_val": 843,
+  "n_test": 843,
+  "n_unique_subjects": 5621,
+  "n_subjects_with_multi_admissions": 0,
+  "failed_patients": {}
+}

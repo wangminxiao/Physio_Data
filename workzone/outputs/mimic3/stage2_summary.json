@@ -1,0 +1,140 @@
+{
+  "total_lab_events": 10651535,
+  "total_vital_events": 14057016,
+  "n_lab_subjects": 46243,
+  "n_vital_subjects": 38394,
+  "n_lab_variables": 17,
+  "n_vital_variables": 9,
+  "per_variable": {
+    "0": {
+      "name": "Potassium",
+      "category": "lab",
+      "count": 1036831
+    },
+    "1": {
+      "name": "Calcium",
+      "category": "lab",
+      "count": 591219
+    },
+    "2": {
+      "name": "Sodium",
+      "category": "lab",
+      "count": 878982
+    },
+    "3": {
+      "name": "Glucose",
+      "category": "lab",
+      "count": 943889
+    },
+    "4": {
+      "name": "Lactate",
+      "category": "lab",
+      "count": 186916
+    },
+    "5": {
+      "name": "Creatinine",
+      "category": "lab",
+      "count": 796619
+    },
+    "6": {
+      "name": "Bilirubin",
+      "category": "lab",
+      "count": 237951
+    },
+    "7": {
+      "name": "Platelets",
+      "category": "lab",
+      "count": 777095
+    },
+    "8": {
+      "name": "WBC",
+      "category": "lab",
+      "count": 751795
+    },
+    "9": {
+      "name": "Hemoglobin",
+      "category": "lab",
+      "count": 751776
+    },
+    "10": {
+      "name": "INR",
+      "category": "lab",
+      "count": 470151
+    },
+    "11": {
+      "name": "BUN",
+      "category": "lab",
+      "count": 791208
+    },
+    "12": {
+      "name": "Albumin",
+      "category": "lab",
+      "count": 146571
+    },
+    "13": {
+      "name": "Arterial_pH",
+      "category": "lab",
+      "count": 530343
+    },
+    "14": {
+      "name": "paO2",
+      "category": "lab",
+      "count": 490186
+    },
+    "15": {
+      "name": "paCO2",
+      "category": "lab",
+      "count": 490110
+    },
+    "16": {
+      "name": "HCO3",
+      "category": "lab",
+      "count": 779893
+    },
+    "100": {
+      "name": "HR",
+      "category": "vital",
+      "count": 2761123
+    },
+    "101": {
+      "name": "SpO2",
+      "category": "vital",
+      "count": 2671382
+    },
+    "102": {
+      "name": "RR",
+      "category": "vital",
+      "count": 2726865
+    },
+    "103": {
+      "name": "Temperature",
+      "category": "vital",
+      "count": 594599
+    },
+    "104": {
+      "name": "NBPs",
+      "category": "vital",
+      "count": 1290355
+    },
+    "105": {
+      "name": "NBPd",
+      "category": "vital",
+      "count": 1289647
+    },
+    "106": {
+      "name": "NBPm",
+      "category": "vital",
+      "count": 1292771
+    },
+    "107": {
+      "name": "CVP",
+      "category": "vital",
+      "count": 484853
+    },
+    "108": {
+      "name": "GCS_total",
+      "category": "vital",
+      "count": 945421
+    }
+  }
+}

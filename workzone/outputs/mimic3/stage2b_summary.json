@@ -1,0 +1,14 @@
+{
+  "waveform_patients": 6987,
+  "with_labs": 6979,
+  "with_vitals": 6974,
+  "with_both": 6966,
+  "with_any_ehr": 6987,
+  "with_no_ehr": 0,
+  "after_filter": 6987,
+  "dropped": 0,
+  "filter_rules": {
+    "min_total_ehr_events": 1,
+    "note": "Loose filter: store all EHR, filter at runtime"
+  }
+}
