@@ -140,28 +140,20 @@ def extract_vasopressors():
     ).select(["SUBJECT_ID", "HADM_ID", "ITEMID", "STARTTIME", "RATE"]).collect()
     log.info(f"  Loaded {len(df)} rows in {time.time()-t0:.1f}s")
 
-    # Convert each drug to NE-equivalent
-    ne_exprs = []
-    for itemid, info in VASOPRESSOR_ITEMS.items():
-        if info["ne_factor"] > 0:
-            ne_exprs.append(
-                pl.when(pl.col("ITEMID") == itemid)
-                .then(pl.col("RATE") * info["ne_factor"])
-            )
-        else:
-            # Vasopressin: binary — any dose = 0.1 mcg/kg/min NE-eq
-            ne_exprs.append(
-                pl.when(pl.col("ITEMID") == itemid)
-                .then(pl.lit(0.1))
-            )
+    # Convert each drug to NE-equivalent via join
+    vaso_map = pl.DataFrame({
+        "ITEMID": list(VASOPRESSOR_ITEMS.keys()),
+        "ne_factor": [v["ne_factor"] for v in VASOPRESSOR_ITEMS.values()],
+        "is_binary": [v["ne_factor"] == 0.0 for v in VASOPRESSOR_ITEMS.values()],
+    })
+    df = df.join(vaso_map, on="ITEMID", how="inner")
 
-    # Chain the when-then expressions
-    expr = ne_exprs[0]
-    for e in ne_exprs[1:]:
-        expr = expr.otherwise(e)
-    expr = expr.otherwise(pl.col("RATE"))
-
-    df = df.with_columns(expr.alias("ne_rate"))
+    df = df.with_columns(
+        pl.when(pl.col("is_binary"))
+        .then(pl.lit(0.1))  # Vasopressin: any dose = 0.1 mcg/kg/min NE-eq
+        .otherwise(pl.col("RATE") * pl.col("ne_factor"))
+        .alias("ne_rate")
+    ).drop(["ne_factor", "is_binary"])
 
     # Aggregate per (SUBJECT_ID, HADM_ID, STARTTIME): sum NE-eq across concurrent pressors
     df = df.group_by(["SUBJECT_ID", "HADM_ID", "STARTTIME"]).agg(
