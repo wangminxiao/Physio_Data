@@ -64,6 +64,12 @@ OUT_DIR_OUTPUTS = REPO_ROOT / "workzone" / "outputs" / "mimic3"
 ACTION_VAR_MIN = 200   # actions + scores preserved from existing ehr_events.npy
 ACTION_VAR_MAX = 399   # (300-399 = sepsis/SOFA, usually in task-specific file)
 
+# Extension beyond time_ms[-1] that still counts as in-waveform. stage3b aligns
+# events via `searchsorted(side="right") - 1`, so any event later than the last
+# segment start gets seg_idx = N_seg-1 -- treat the full 30 s segment duration
+# as still "inside the waveform window" to keep stage3b-emitted actions there.
+WAVE_END_PAD_MS = 30 * 1000
+
 
 # --------------------------------------------------------------------------
 # Inputs
@@ -82,13 +88,35 @@ def load_admissions() -> pd.DataFrame:
 
 
 def load_events_parquet(path: Path) -> pd.DataFrame:
+    """Normalize a filtered events parquet for SUBJECT_ID/HADM_ID groupby."""
     df = pd.read_parquet(path)
-    if "charttime_dt" not in df.columns:
-        df["charttime_dt"] = pd.to_datetime(df["CHARTTIME"])
-    df["time_ms"] = (df["charttime_dt"].astype("int64") // 10**6).astype("int64")
+    if "SUBJECT_ID" not in df.columns:
+        raise RuntimeError(f"{path}: missing SUBJECT_ID column (cols: {list(df.columns)})")
+    if "var_id" not in df.columns:
+        raise RuntimeError(f"{path}: missing var_id column (cols: {list(df.columns)})")
+    if "VALUENUM" not in df.columns:
+        raise RuntimeError(f"{path}: missing VALUENUM column (cols: {list(df.columns)})")
+
+    df["SUBJECT_ID"] = pd.to_numeric(df["SUBJECT_ID"], errors="coerce").astype("Int64")
+    df = df[df["SUBJECT_ID"].notna()].copy()
+    df["SUBJECT_ID"] = df["SUBJECT_ID"].astype("int64")
+
+    if "charttime_dt" in df.columns:
+        ctt = df["charttime_dt"]
+    elif "CHARTTIME" in df.columns:
+        ctt = pd.to_datetime(df["CHARTTIME"])
+    else:
+        raise RuntimeError(f"{path}: no CHARTTIME or charttime_dt column")
+    df["time_ms"] = (pd.to_datetime(ctt).astype("int64") // 10**6).astype("int64")
+
     if "HADM_ID" in df.columns:
-        df["HADM_ID"] = pd.to_numeric(df["HADM_ID"], errors="coerce")
-    return df
+        df["HADM_ID"] = pd.to_numeric(df["HADM_ID"], errors="coerce").astype("Int64")
+
+    df["var_id"]   = pd.to_numeric(df["var_id"], errors="coerce").astype("int64")
+    df["VALUENUM"] = pd.to_numeric(df["VALUENUM"], errors="coerce")
+    df = df[df["VALUENUM"].notna() & df["var_id"].notna()]
+
+    return df[["SUBJECT_ID", "HADM_ID", "time_ms", "var_id", "VALUENUM"]].reset_index(drop=True)
 
 
 # --------------------------------------------------------------------------
@@ -123,7 +151,8 @@ def convert_patient(
     subject_id = int(meta.get("subject_id", -1))
     hadm_id    = int(meta.get("hadm_id", -1))
 
-    # Source of truth for existing events (actions are only in the old file)
+    # ALL existing events are preserved (labs, vitals, actions, scores) from .bak
+    # if present, else from the live file.
     if events_bak_path.exists():
         existing = np.load(events_bak_path)
     elif events_path.exists():
@@ -131,39 +160,39 @@ def convert_patient(
     else:
         existing = np.empty(0, dtype=EHR_EVENT_DTYPE)
 
-    # Actions + scores to preserve (var_id 200-399 that were in ehr_events.npy)
-    if len(existing) > 0:
-        action_mask = (existing["var_id"] >= ACTION_VAR_MIN) & (existing["var_id"] <= ACTION_VAR_MAX)
-        actions = existing[action_mask]
-    else:
-        actions = np.empty(0, dtype=EHR_EVENT_DTYPE)
+    if existing.dtype != EHR_EVENT_DTYPE:
+        return {"patient_id": pid, "status": "ERROR",
+                "reason": f"source dtype {existing.dtype} != {EHR_EVENT_DTYPE}"}
 
-    # Re-derive labs + vitals for the full admission window from the parquets.
-    rows: list[tuple] = []
-    for gdf_group in (labs_g, vitals_g):
+    # Augment with labs + vitals from the filtered parquets. Existing in-waveform
+    # lab/vital events will dedupe against these; parquet adds OUT-of-waveform
+    # coverage (baseline + recent + future) that stage3's build_ehr_events dropped.
+    n_parquet = 0
+    parquet_rows: list[tuple] = []
+    for gdf in (labs_g, vitals_g):
+        if gdf is None:
+            continue
         try:
-            sub = gdf_group.get_group(subject_id)
+            sub = gdf.get_group(subject_id)
         except KeyError:
             continue
         if hadm_id > 0 and "HADM_ID" in sub.columns:
             sub = sub[sub["HADM_ID"] == hadm_id]
         if len(sub) == 0:
             continue
-        # columns: time_ms, var_id, VALUENUM
-        for t, vid, val in zip(
-            sub["time_ms"].to_numpy(),
-            sub["var_id"].to_numpy(),
-            sub["VALUENUM"].to_numpy(),
-        ):
-            rows.append((int(t), 0, int(vid), float(val)))
-    lv_events = (
-        np.array(rows, dtype=EHR_EVENT_DTYPE)
-        if rows
-        else np.empty(0, dtype=EHR_EVENT_DTYPE)
+        n_parquet += len(sub)
+        t_arr   = sub["time_ms"].to_numpy(dtype="int64")
+        vid_arr = sub["var_id"].to_numpy(dtype="int64")
+        val_arr = sub["VALUENUM"].to_numpy(dtype="float64")
+        for t, vid, val in zip(t_arr, vid_arr, val_arr):
+            parquet_rows.append((int(t), 0, int(vid), float(val)))
+    parquet_events = (
+        np.array(parquet_rows, dtype=EHR_EVENT_DTYPE)
+        if parquet_rows else np.empty(0, dtype=EHR_EVENT_DTYPE)
     )
 
-    # Combine labs+vitals (full window) with preserved actions (in-waveform only)
-    combined = merge_partition(lv_events, actions)
+    # Combine (dedupe on (time_ms, var_id, value))
+    combined = merge_partition(existing, parquet_events)
 
     # Admission bounds (optional)
     ep_start = ep_end = None
@@ -177,6 +206,7 @@ def convert_patient(
         time_ms,
         episode_start_ms=ep_start,
         episode_end_ms=ep_end,
+        wave_end_pad_ms=WAVE_END_PAD_MS,
     )
 
     # Validate
@@ -187,11 +217,12 @@ def convert_patient(
     if errs:
         return {"patient_id": pid, "status": "ERROR", "reason": "; ".join(errs)}
 
+    result_counts = {f"n_{k}": int(len(v)) for k, v in partitions.items()}
+    result_counts["n_source_existing"] = int(len(existing))
+    result_counts["n_source_parquet"]  = int(n_parquet)
+
     if dry_run:
-        return {
-            "patient_id": pid, "status": "DRY_OK",
-            **{f"n_{k}": int(len(v)) for k, v in partitions.items()},
-        }
+        return {"patient_id": pid, "status": "DRY_OK", **result_counts}
 
     # Back up original ehr_events.npy once
     if events_path.exists() and not events_bak_path.exists():
@@ -203,25 +234,43 @@ def convert_patient(
     np.save(patient_dir / FNAME_EVENTS,   partitions["events"])
     np.save(patient_dir / FNAME_FUTURE,   partitions["future"])
 
-    # Update meta
-    def _nvar(arr: np.ndarray) -> int:
-        return int(len(np.unique(arr["var_id"]))) if len(arr) else 0
+    # Update meta using counts read back from disk (defensive)
+    def _count(fname: str) -> tuple[int, int]:
+        arr = np.load(patient_dir / fname, mmap_mode="r")
+        return int(len(arr)), (int(len(np.unique(arr["var_id"]))) if len(arr) else 0)
+
+    nb, nbv = _count(FNAME_BASELINE)
+    nr, nrv = _count(FNAME_RECENT)
+    ne, nev = _count(FNAME_EVENTS)
+    nf, nfv = _count(FNAME_FUTURE)
+
+    # Detect which var_id categories are present in future (for leakage flags)
+    fut_arr = np.load(patient_dir / FNAME_FUTURE, mmap_mode="r")
+    if len(fut_arr):
+        fut_vids = np.unique(fut_arr["var_id"])
+        has_fut_actions = bool(np.any((fut_vids >= 200) & (fut_vids <= 299)))
+        has_fut_sofa    = bool(np.any((fut_vids >= 300) & (fut_vids <= 306)))
+        has_fut_onset   = bool(np.any(fut_vids == 307))
+    else:
+        has_fut_actions = has_fut_sofa = has_fut_onset = False
 
     meta.update({
-        "n_ehr_events":   int(len(partitions["events"])),
-        "n_events":       int(len(partitions["events"])),
-        "n_baseline":     int(len(partitions["baseline"])),
-        "n_recent":       int(len(partitions["recent"])),
-        "n_future":       int(len(partitions["future"])),
-        "n_baseline_vars": _nvar(partitions["baseline"]),
-        "n_recent_vars":   _nvar(partitions["recent"]),
-        "n_future_vars":   _nvar(partitions["future"]),
+        "n_ehr_events":   ne,
+        "n_events":       ne,
+        "n_baseline":     nb,
+        "n_recent":       nr,
+        "n_future":       nf,
+        "n_events_vars":    nev,
+        "n_baseline_vars":  nbv,
+        "n_recent_vars":    nrv,
+        "n_future_vars":    nfv,
         "context_window_ms": CONTEXT_WINDOW_MS,
         "baseline_cap_ms":   BASELINE_CAP_MS,
         "future_cap_ms":     FUTURE_CAP_MS,
-        "has_future_actions":      False,  # stage3b did not populate future actions
-        "has_future_sofa":         False,
-        "has_future_sepsis_onset": False,
+        "wave_end_pad_ms":   WAVE_END_PAD_MS,
+        "has_future_actions":      has_fut_actions,
+        "has_future_sofa":         has_fut_sofa,
+        "has_future_sepsis_onset": has_fut_onset,
         "ehr_layout_version": 2,
     })
     if ep_start is not None:
@@ -230,10 +279,7 @@ def convert_patient(
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
 
-    return {
-        "patient_id": pid, "status": "OK",
-        **{f"n_{k}": int(len(v)) for k, v in partitions.items()},
-    }
+    return {"patient_id": pid, "status": "OK", **result_counts}
 
 
 # --------------------------------------------------------------------------
@@ -281,7 +327,10 @@ def main():
     log.info("Loading labs_filtered + vitals_filtered ...")
     labs  = load_events_parquet(OUT_DIR_OUTPUTS / "labs_filtered.parquet")
     vitals = load_events_parquet(OUT_DIR_OUTPUTS / "vitals_filtered.parquet")
-    log.info(f"  labs: {len(labs)} rows / vitals: {len(vitals)} rows")
+    log.info(f"  labs: {len(labs)} rows, {labs['SUBJECT_ID'].nunique()} subjects, "
+             f"var_ids={sorted(labs['var_id'].unique())[:10]}...")
+    log.info(f"  vitals: {len(vitals)} rows, {vitals['SUBJECT_ID'].nunique()} subjects, "
+             f"var_ids={sorted(vitals['var_id'].unique())[:10]}...")
 
     labs_g   = labs.groupby("SUBJECT_ID", sort=False)
     vitals_g = vitals.groupby("SUBJECT_ID", sort=False)
@@ -310,8 +359,11 @@ def main():
     log.info(f"  ERROR: {len(errors)}")
     if ok_rows:
         tot = {k: sum(r.get(f"n_{k}", 0) for r in ok_rows) for k in
-               ("baseline", "recent", "events", "future")}
-        log.info(f"  Events: baseline={tot['baseline']} recent={tot['recent']} "
+               ("baseline", "recent", "events", "future",
+                "source_existing", "source_parquet")}
+        log.info(f"  Source: existing={tot['source_existing']} "
+                 f"parquet={tot['source_parquet']}")
+        log.info(f"  Partitions: baseline={tot['baseline']} recent={tot['recent']} "
                  f"events={tot['events']} future={tot['future']}")
 
     if errors:

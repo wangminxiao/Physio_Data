@@ -47,6 +47,7 @@ def split_events(
     context_window_ms: int = CONTEXT_WINDOW_MS,
     baseline_cap_ms:   int = BASELINE_CAP_MS,
     future_cap_ms:     int = FUTURE_CAP_MS,
+    wave_end_pad_ms:   int = 0,
 ) -> dict[str, np.ndarray]:
     """Partition events into the four trajectory files.
 
@@ -76,7 +77,9 @@ def split_events(
         raise ValueError("time_ms is empty; cannot split events without a waveform window")
 
     wave_start = int(time_ms[0])
-    wave_end   = int(time_ms[-1])  # last segment start; the segment extends slightly beyond
+    # time_ms[-1] is the last segment START. Events up to time_ms[-1] + pad
+    # still count as in-waveform (stage3b aligns them to seg_idx = N_seg-1).
+    wave_end   = int(time_ms[-1]) + int(wave_end_pad_ms)
     n_seg      = int(len(time_ms))
 
     # Compute partition boundaries
