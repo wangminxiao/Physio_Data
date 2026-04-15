@@ -37,11 +37,17 @@ optimized for deep learning training. Works with any combination of:
 
 ```
 {entity_id}/                           # patient, subject, session, encounter, ...
-  {CHANNEL}.npy     # [N_seg, samples_per_seg]  float16, C-contiguous
-  time_ms.npy       # [N_seg]                    int64, monotonically increasing
-  ehr_events.npy    # [N_events]                 structured array (sparse)
-  meta.json         # metadata + array manifest
+  {CHANNEL}.npy       # [N_seg, samples_per_seg]  float16, C-contiguous
+  time_ms.npy         # [N_seg]                    int64, monotonically increasing
+  ehr_baseline.npy    # [N_baseline]  structured   far history (pre-waveform, outside context window)
+  ehr_recent.npy      # [N_recent]    structured   close history (pre-waveform, within context window)
+  ehr_events.npy      # [N_events]    structured   waveform-overlapping events (seg_idx ∈ [0, N_seg))
+  ehr_future.npy      # [N_future]    structured   post-waveform events
+  meta.json           # metadata + array manifest
 ```
+
+The four EHR files share a single dtype. Readers pick which subset they need; no
+reader ever has to re-do time-based splitting. See "EHR Trajectory Structure" below.
 
 **Signal arrays**: `[N_seg, rate_hz * seg_duration_sec]` float16.
 All channels share dim 0. Segment index `i` = same time window across all channels.
@@ -61,16 +67,89 @@ Recording gaps produce time_ms jumps, not NaN padding. Windows never span gaps.
 These two are the minimum required. Higher-rate or additional channels (II500, ABP125)
 are optional and dataset-specific. Keep storage lean -- only extract what training needs.
 
-**Event array** (structured dtype):
+**Event array** (structured dtype, shared across all four EHR files):
 ```python
 np.dtype([
     ('time_ms', 'int64'),     # actual event timestamp (absolute ms)
-    ('seg_idx', 'int32'),     # aligned signal segment index
+    ('seg_idx', 'int32'),     # aligned signal segment index or sentinel (see below)
     ('var_id',  'uint16'),    # variable ID (lookup in var_registry.json)
     ('value',   'float32'),   # raw measured value
 ])
-# Sorted by time_ms. Only actual measurements. No padding.
+# Each file sorted by time_ms ascending. Only actual measurements. No padding.
 ```
+
+## EHR Trajectory Structure
+
+Events inside an entity's full clinical episode are split into four files by their
+time relation to the waveform window. The split is done **once, at storage time**,
+so downstream adapters never need to re-filter by time.
+
+| File | Time range | `seg_idx` value | Typical consumer |
+|------|-----------|-----------------|------------------|
+| `ehr_baseline.npy` | `[episode_start, wave_start − context_window)` capped at `baseline_cap_ms` | `INT32_MIN` | Chronic/trend features, long-history priors |
+| `ehr_recent.npy`   | `[wave_start − context_window, wave_start)` | `INT32_MIN + 1` | PCS initial-state seed, immediate clinical context |
+| `ehr_events.npy`   | `[wave_start, wave_end]` | `[0, N_seg)` (real index) | Waveform-aligned training / concurrent EHR |
+| `ehr_future.npy`   | `(wave_end, episode_end]` capped at `future_cap_ms` | `INT32_MIN + 2` | Forecasting / outcome labels — **label-leakage risk** |
+
+**Constants** (defined in `physio_data/ehr_trajectory.py`, overridable per dataset):
+```python
+SEG_IDX_BASELINE   = np.iinfo(np.int32).min      # -2147483648
+SEG_IDX_RECENT     = SEG_IDX_BASELINE + 1
+SEG_IDX_FUTURE     = SEG_IDX_BASELINE + 2
+
+CONTEXT_WINDOW_MS  = 24 * 3600 * 1000            # recent vs baseline cutoff
+BASELINE_CAP_MS    = 30 * 24 * 3600 * 1000       # don't dump lifelong history
+FUTURE_CAP_MS      =  7 * 24 * 3600 * 1000
+```
+
+**Why sentinel = `INT32_MIN` not `-1`:** code paths that assume `seg_idx >= 0`
+(e.g. `signal[seg_idx]`) fail loudly with IndexError instead of silently wrapping
+or indexing `signal[-1]`.
+
+**Why four files, not one:** readers can mmap only what they need. The common
+case (waveform-aligned training) reads `ehr_events.npy` alone and gets the exact
+same bytes it gets today. No new cost.
+
+**`meta.json` additions** (per entity):
+```json
+{
+  "n_events":    1873,
+  "n_baseline":  120,
+  "n_recent":    412,
+  "n_future":     85,
+  "n_baseline_vars": 14,
+  "n_recent_vars":   11,
+  "n_future_vars":    3,
+  "context_window_ms": 86400000,
+  "baseline_cap_ms":   2592000000,
+  "future_cap_ms":     604800000,
+  "has_future_actions":      true,
+  "has_future_sofa":         false,
+  "has_future_sepsis_onset": false
+}
+```
+
+`has_future_*` flags let outcome-prediction tasks assert no treatment leakage
+before using `ehr_future.npy` as labels.
+
+## Consumer Recipes
+
+Any of these is a few lines on top of the canonical files; none require a
+preprocessing pass.
+
+| Purpose | Files used | Recipe |
+|---------|-----------|--------|
+| Waveform-only pretraining | `{CHANNEL}.npy` | standard mmap read |
+| Waveform + concurrent EHR | `{CHANNEL}.npy` + `ehr_events.npy` | index events by `seg_idx` |
+| PCS / patient-state prior | `ehr_recent.npy` | group by `var_id`, take last value |
+| Chronic / baseline conditioning | `ehr_baseline.npy` | aggregate per `var_id` (mean/min/max) |
+| EHR-only pretraining (no waveform) | `ehr_baseline + recent + events + future` | concat, re-sort by `time_ms` |
+| Forecasting / outcome prediction | `ehr_future.npy` | labels; assert `has_future_actions==False` |
+| Demographics conditioning | `demographics.csv` (dataset-level) | join by `entity_id` |
+
+**Runtime rule:** adapters consume these files; they do not modify them. Any
+downstream task-specific data (cohort membership, task labels, derived scores)
+belongs in `tasks/{task_name}/` — never in the canonical entity directory.
 
 **Variable registry** (`var_registry.json`): global ID -> name, unit, category mapping.
 Shared across datasets. Stable IDs. Extensible by appending.
@@ -228,7 +307,7 @@ Signal extraction is per-patient independent -- parallelize with multiprocessing
 | Event extraction | No duplicates, values in physiological range, timestamps sane | Null IDs, timestamps out of range |
 | **Cross-check** | **Any EHR overlap (>=1 event). Report variable coverage for diagnostics.** | **Zero overlap** |
 | Signal extraction (.npy) | float16, C-contiguous, N_seg consistent, NaN < 20%, time_ms monotonic | Shape mismatch, all NaN |
-| Event building (ehr_events) | Correct dtype, sorted by time_ms, seg_idx in bounds, var_id in registry | seg_idx out of bounds |
+| Event building (ehr_baseline / recent / events / future) | Correct dtype, each file sorted by time_ms, `ehr_events.seg_idx ∈ [0, N_seg)`, sentinels match spec for others, var_id in registry, no event straddles two files | seg_idx out of bounds in `ehr_events.npy`, or an event appears in two partitions |
 | Manifest + splits | All dirs valid, no **subject**-level overlap in splits, ratio within 5% | Missing dirs, same subject in both sets |
 
 **Critical: split by subject, not by admission.** One subject may have multiple
@@ -243,8 +322,10 @@ assert arr.flags['C_CONTIGUOUS']
 assert arr.shape[0] == len(time_ms)       # signal-time consistency
 assert np.all(np.diff(time_ms) > 0)       # monotonicity
 assert np.all(events['seg_idx'] >= 0)
-assert np.all(events['seg_idx'] < n_seg)  # bounds
+assert np.all(events['seg_idx'] < n_seg)  # bounds for ehr_events.npy only
 assert np.all(np.diff(events['time_ms']) >= 0)  # sorted
+# For baseline/recent/future: assert seg_idx equals the file's sentinel value
+# and that time_ms respects the partition boundary.
 ```
 
 ## Post-Stages: Downstream Task Adaptation
@@ -270,8 +351,12 @@ This ensures:
 │   ├── PLETH40.npy
 │   ├── II120.npy
 │   ├── time_ms.npy
+│   ├── ehr_baseline.npy
+│   ├── ehr_recent.npy
 │   ├── ehr_events.npy
+│   ├── ehr_future.npy
 │   └── meta.json
+├── demographics.csv           # One row per entity, static attributes
 ├── manifest.json              # All patients
 ├── pretrain_splits.json       # All patients
 ├── tasks/                     # Task-specific (added by post-stages)
@@ -283,8 +368,10 @@ This ensures:
 │   └── aki/
 │       └── ...
 
-At training time, the adapter loads base `ehr_events.npy` and optionally merges
-`tasks/{task}/extra_events/{patient_id}.npy` if the task requires it.
+At training time, the adapter loads whichever canonical EHR files the task needs
+and optionally merges `tasks/{task}/extra_events/{patient_id}.npy`. Task-specific
+events follow the same four-file split convention (`seg_idx` sentinel rules apply)
+so forecasting tasks still get clean label/feature separation.
 ```
 
 **Important design principle:** The main pipeline should extract ALL available EHR
@@ -302,10 +389,12 @@ When the user wants to add new variables (e.g., HR, SpO2, Bilirubin) to already-
 1. Add the new variable to `var_registry.json` (assign next ID)
 2. Write a **stage 3b** script that:
    - Reads the new variable's events from raw EHR tables
-   - For each existing patient directory, loads `time_ms.npy`
-   - Builds new events with `searchsorted` alignment
-   - **Merges** with existing `ehr_events.npy` (load old + append new + re-sort)
-   - Re-saves `ehr_events.npy` and updates `meta.json` event count
+   - For each existing patient directory, loads `time_ms.npy` and episode bounds from `meta.json`
+   - Splits new events into baseline / recent / events / future using the same
+     rules as the main pipeline (see `physio_data/ehr_trajectory.split_events`)
+   - **Merges** each new partition with the matching existing file
+     (load + append + re-sort by `time_ms`)
+   - Re-saves all four `ehr_*.npy` files and updates `meta.json` counts
 3. Do NOT re-extract waveforms -- `.npy` waveform files stay untouched
 
 This is fast because:

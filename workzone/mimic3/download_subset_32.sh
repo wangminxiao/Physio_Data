@@ -18,11 +18,11 @@
 set -euo pipefail
 
 REMOTE_USER="${REMOTE_USER:-mwang80}"
-REMOTE_HOST="${REMOTE_HOST:-bedanalysis.priv.bmi.emory.edu}"
+REMOTE_HOST="${REMOTE_HOST:-bedanalysis.bmi.emory.edu}"
 REMOTE_ROOT="${REMOTE_ROOT:-/opt/localdata100tb/physio_data/mimic3}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-LOCAL_ROOT="${LOCAL_ROOT:-${REPO_ROOT}/datasets/mimic3/processed_subset32}"
+LOCAL_ROOT="${LOCAL_ROOT:-/home/mxwan/workspace/mimic3-sample}"
 
 SSH_OPTS="-o StrictHostKeyChecking=no"
 if [[ -n "${SSH_KEY:-}" ]]; then

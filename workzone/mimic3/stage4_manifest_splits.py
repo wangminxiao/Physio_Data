@@ -26,6 +26,14 @@ log = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 OUT_DIR_OUTPUTS = REPO_ROOT / "workzone" / "outputs" / "mimic3"
 
+import sys
+sys.path.insert(0, str(REPO_ROOT))
+from physio_data.ehr_trajectory import (
+    EHR_EVENT_DTYPE,
+    FNAME_BASELINE, FNAME_RECENT, FNAME_EVENTS, FNAME_FUTURE,
+    validate_partition,
+)
+
 import yaml
 with open(REPO_ROOT / "workzone" / "configs" / "server_paths.yaml") as f:
     cfg = yaml.safe_load(f)
@@ -36,13 +44,6 @@ SPLIT_SEED = 42
 TRAIN_FRACTION = 0.7
 VAL_FRACTION = 0.15
 TEST_FRACTION = 0.15
-
-EHR_EVENT_DTYPE = np.dtype([
-    ('time_ms', 'int64'),
-    ('seg_idx', 'int32'),
-    ('var_id', 'uint16'),
-    ('value', 'float32'),
-])
 
 
 def validate_patient(patient_dir):
@@ -95,17 +96,49 @@ def validate_patient(patient_dir):
         if len(time_ms) > 1 and not np.all(np.diff(time_ms) > 0):
             errors.append("time_ms: not monotonically increasing")
 
-    # Validate ehr_events
-    ehr_path = os.path.join(patient_dir, "ehr_events.npy")
-    if os.path.exists(ehr_path):
-        events = np.load(ehr_path)
-        if len(events) > 0:
-            if events.dtype != EHR_EVENT_DTYPE:
-                errors.append(f"ehr_events: dtype mismatch")
-            if not np.all(np.diff(events['time_ms']) >= 0):
-                errors.append("ehr_events: not sorted by time_ms")
-            if np.any(events['seg_idx'] < 0) or np.any(events['seg_idx'] >= n_seg):
-                errors.append(f"ehr_events: seg_idx out of bounds [0, {n_seg})")
+    # Validate ehr trajectory files
+    time_path = os.path.join(patient_dir, "time_ms.npy")
+    time_ms_arr = np.load(time_path) if os.path.exists(time_path) else None
+    wave_start = int(time_ms_arr[0]) if time_ms_arr is not None and len(time_ms_arr) else None
+    wave_end   = int(time_ms_arr[-1]) if time_ms_arr is not None and len(time_ms_arr) else None
+
+    for kind, fname in (
+        ("baseline", FNAME_BASELINE),
+        ("recent",   FNAME_RECENT),
+        ("events",   FNAME_EVENTS),
+        ("future",   FNAME_FUTURE),
+    ):
+        p = os.path.join(patient_dir, fname)
+        if not os.path.exists(p):
+            # Old-format patients (pre-stage3c) only have ehr_events.npy
+            if kind == "events":
+                errors.append(f"missing {fname}")
+            continue
+        arr = np.load(p)
+        errors.extend(validate_partition(arr, kind=kind, n_seg=n_seg))
+        # Partition time-range checks
+        if len(arr) and wave_start is not None:
+            t_min = int(arr["time_ms"].min())
+            t_max = int(arr["time_ms"].max())
+            if kind == "baseline" and t_max >= wave_start:
+                errors.append(f"baseline: event at {t_max} >= wave_start {wave_start}")
+            if kind == "recent" and (t_max >= wave_start or t_min < wave_start - meta.get("baseline_cap_ms", 0)):
+                if t_max >= wave_start:
+                    errors.append(f"recent: event at {t_max} >= wave_start {wave_start}")
+            if kind == "events" and (t_min < wave_start or t_max > wave_end):
+                errors.append(f"events: time_ms outside [wave_start, wave_end]")
+            if kind == "future" and t_min <= wave_end:
+                errors.append(f"future: event at {t_min} <= wave_end {wave_end}")
+
+    # Summaries for manifest
+    for kind, fname, mkey in (
+        ("baseline", FNAME_BASELINE, "n_baseline"),
+        ("recent",   FNAME_RECENT,   "n_recent"),
+        ("future",   FNAME_FUTURE,   "n_future"),
+    ):
+        p = os.path.join(patient_dir, fname)
+        if os.path.exists(p):
+            entry[mkey] = int(len(np.load(p, mmap_mode="r")))
 
     return entry, errors
 
