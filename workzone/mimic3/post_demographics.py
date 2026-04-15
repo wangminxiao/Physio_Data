@@ -67,9 +67,21 @@ def main():
     pid_df = pd.DataFrame(pids)
     log.info(f"  {len(pid_df)} patients")
 
-    # 2. Join PATIENTS (gender, dob)
+    # 2. Join PATIENTS (gender, dob). MIMIC shifts DOBs of patients 89+ by
+    # ~300 years, which overflows datetime64[ns]. Parse to python date and
+    # compute age via (year,month,day) arithmetic to avoid the overflow.
     patients = _load("PATIENTS", usecols=["SUBJECT_ID", "GENDER", "DOB"])
-    patients["DOB"] = pd.to_datetime(patients["DOB"])
+    patients["DOB_date"] = pd.to_datetime(patients["DOB"], errors="coerce", format="mixed").dt.date
+    # For DOBs pandas can't represent (year > 2262), fall back to str parsing.
+    missing = patients["DOB_date"].isna()
+    if missing.any():
+        from datetime import datetime as _dt
+        def _parse(s):
+            try:
+                return _dt.strptime(str(s).split(" ")[0], "%Y-%m-%d").date()
+            except Exception:
+                return None
+        patients.loc[missing, "DOB_date"] = patients.loc[missing, "DOB"].map(_parse)
     out = pid_df.merge(patients, left_on="subject_id", right_on="SUBJECT_ID", how="left")
 
     # 3. Join ADMISSIONS (ethnicity, insurance, admission_type, admittime, expire flag)
@@ -78,6 +90,7 @@ def main():
         "ADMISSION_TYPE", "HOSPITAL_EXPIRE_FLAG",
     ])
     admissions["ADMITTIME"] = pd.to_datetime(admissions["ADMITTIME"])
+    admissions["ADMITTIME_date"] = admissions["ADMITTIME"].dt.date
     out = out.merge(
         admissions,
         left_on=["subject_id", "hadm_id"],
@@ -100,12 +113,19 @@ def main():
         suffixes=("", "_d"),
     )
 
-    # 5. Compute age, cap at 89 per MIMIC policy
-    age_yr = (
-        (out["ADMITTIME"] - out["DOB"]).dt.total_seconds() / (365.25 * 24 * 3600)
-    ).astype("float64")
-    age_yr = age_yr.clip(lower=0, upper=89.0)
-    out["age_years"] = age_yr.round(2)
+    # 5. Compute age via date-of-year arithmetic (overflow-safe for shifted DOBs).
+    # Cap at 89 per MIMIC de-identification policy (ages >89 are shifted +300y).
+    def _age_years(adm, dob):
+        if adm is None or dob is None or pd.isna(adm) or pd.isna(dob):
+            return np.nan
+        days = (adm - dob).days
+        return days / 365.25
+    age_yr = np.array(
+        [_age_years(a, d) for a, d in zip(out["ADMITTIME_date"], out["DOB_date"])],
+        dtype="float64",
+    )
+    age_yr = np.clip(age_yr, 0, 89.0)
+    out["age_years"] = np.round(age_yr, 2)
 
     # 6. Select + rename
     final = pd.DataFrame({
