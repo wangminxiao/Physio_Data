@@ -1,0 +1,8 @@
+{
+  "n_ok": 2593,
+  "n_error": 0,
+  "n_with_future_sofa": 2450,
+  "n_with_future_onset": 430,
+  "dry_run": false,
+  "errors": []
+}
