@@ -134,21 +134,78 @@ computed from `gcd(source_rate, target_rate)`.
 datasets/mimic3/
 ├── processed/
 │   └── {SUBJECT_ID}_{HADM_ID}/
-│       ├── PLETH40.npy          [N_seg, 1200]  float16
-│       ├── II120.npy            [N_seg, 3600]  float16
-│       ├── II500.npy            [N_seg, 15000] float16
-│       ├── time_ms.npy          [N_seg]         int64
-│       ├── ehr_events.npy       [N_events]      structured
+│       ├── PLETH40.npy          [N_seg, 1200]   float16
+│       ├── II120.npy            [N_seg, 3600]   float16
+│       ├── II500.npy            [N_seg, 15000]  float16   (optional)
+│       ├── time_ms.npy          [N_seg]          int64
+│       ├── ehr_baseline.npy     [N_baseline]     structured   far history
+│       ├── ehr_recent.npy       [N_recent]       structured   close history
+│       ├── ehr_events.npy       [N_events]       structured   waveform-aligned
+│       ├── ehr_future.npy       [N_future]       structured   post-waveform
 │       └── meta.json
-├── ehr/
-│   ├── labs.parquet
-│   ├── vitals.parquet
-│   └── demographics.parquet
-└── indices/
-    ├── manifest.json
-    ├── pretrain_splits.json
-    └── downstream_splits.json
+├── demographics.csv             one row per {SUBJECT_ID}_{HADM_ID}
+├── manifest.json
+├── pretrain_splits.json
+├── downstream_splits.json
+└── tasks/
+    └── sepsis/
+        ├── cohort.json
+        ├── splits.json
+        └── extra_events/
+            ├── {pid}.npy                in-waveform SOFA / onset
+            ├── {pid}.baseline.npy       far-history SOFA
+            ├── {pid}.recent.npy         recent SOFA
+            └── {pid}.future.npy         post-waveform SOFA (LEAKAGE if used as input)
 ```
+
+## EHR Trajectory Files
+
+All four files share the `EHR_EVENT_DTYPE` and are sorted by `time_ms` ascending.
+`seg_idx` is a real segment index only in `ehr_events.npy`; the other three files
+use sentinel values so bounds-checking code fails loudly if misused.
+
+| File | Time window | `seg_idx` value |
+|---|---|---|
+| `ehr_baseline.npy` | `[max(ADMITTIME, wave_start − baseline_cap), wave_start − context_window)` | `INT32_MIN` (-2147483648) |
+| `ehr_recent.npy`   | `[wave_start − context_window, wave_start)` | `INT32_MIN + 1` |
+| `ehr_events.npy`   | `[wave_start, wave_end]` | searchsorted index in `[0, N_seg)` |
+| `ehr_future.npy`   | `(wave_end, min(DISCHTIME, wave_end + future_cap)]` | `INT32_MIN + 2` |
+
+Defaults (see `physio_data/ehr_trajectory.py`):
+- `context_window_ms` = 24 h
+- `baseline_cap_ms`   = 30 d
+- `future_cap_ms`     = 7 d
+
+`meta.json` adds: `n_events`, `n_baseline`, `n_recent`, `n_future`,
+`n_baseline_vars`, `n_recent_vars`, `n_future_vars`,
+`context_window_ms`, `baseline_cap_ms`, `future_cap_ms`,
+`has_future_actions`, `has_future_sofa`, `has_future_sepsis_onset`,
+`admission_start_ms`, `admission_end_ms`, `ehr_layout_version`.
+
+**Actions (var_id 200-299):** presently populated in `ehr_events.npy` only
+(`has_future_actions == false`). Extending actions to baseline/future partitions
+would be a follow-up post-stage that re-queries INPUTEVENTS/OUTPUTEVENTS for
+the full admission window.
+
+## Demographics CSV
+
+`{output_dir}/demographics.csv`, one row per `patient_id = {SUBJECT_ID}_{HADM_ID}`.
+
+| Column | Type | Source | Notes |
+|---|---|---|---|
+| `patient_id` | str | derived | Use as index when read by UNIPHY |
+| `subject_id` | Int64 | from dir name | |
+| `hadm_id` | Int64 | from dir name | |
+| `gender` | str | PATIENTS.GENDER | "M" / "F" / "" |
+| `age_years` | float | ADMITTIME − DOB | capped at 89 per MIMIC policy |
+| `ethnicity` | str | ADMISSIONS.ETHNICITY | raw MIMIC label; consumer may re-bin |
+| `insurance` | str | ADMISSIONS.INSURANCE | |
+| `admission_type` | str | ADMISSIONS.ADMISSION_TYPE | |
+| `icd9_primary` | str | DIAGNOSES_ICD where SEQ_NUM=1 | "" if missing |
+| `died_in_hospital` | int | ADMISSIONS.HOSPITAL_EXPIRE_FLAG | 0 / 1 |
+
+Categorical columns are stored as raw strings; UNIPHY's PatientEncoder will
+auto-encode to integer IDs 1..C (0 reserved for unknown/pad).
 
 ## References
 
