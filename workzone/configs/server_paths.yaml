@@ -12,3 +12,13 @@ mcmed:
   raw_npz_dir: /labs/hulab/mxwang/MC_MED_ECG_PLETH_40hz_120hz_500hz_lab_vital
   raw_csv_dir: /labs/hulab/mxwang/mc_med_csv
   output_dir: /opt/localdata100tb/physio_data/mcmed
+
+# UCSF
+ucsf:
+  raw_waveform_dir: /labs/hulab/UCSF
+  raw_ehr_dir: /labs/hulab/UCSF/rdb_new
+  offset_xlsx: /labs/hulab/UCSF/encounter_date_offset_table_ver_Apr2024.xlsx
+  flowsheet_rowdim_csv: /labs/hulab/UCSF/rdb_database/FLOWSHEETROWDIM_New/FLOWSHEETROWDIM_New.csv
+  ca_eventtime_csv: /labs/hulab/mxwang/data/ucsf_EHR/bedanalysis_waveformExtraction/Output_new/ValidWaveTime_allEnc_eventtime.csv
+  intermediate_dir: /labs/hulab/mxwang/Physio_Data/workzone/outputs/ucsf
+  output_dir: /opt/localdata100tb/physio_data/ucsf

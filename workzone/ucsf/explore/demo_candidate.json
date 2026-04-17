@@ -1,0 +1,261 @@
+{
+  "n_candidates": 30,
+  "top_5": [
+    {
+      "Patient_ID_GE": "214688354794344",
+      "Patient_ID": "214688334614038",
+      "Encounter_ID": "703726390376687",
+      "Wynton_folder": "2017-03-deid",
+      "offset": 284,
+      "offset_GE": 296,
+      "offset_delta_days": 12,
+      "encounter_start": "2016-06-16 00:00:00",
+      "LOS_days": 10,
+      "vital_flag": 1,
+      "adibin_count": 29,
+      "vital_count": 23,
+      "vital_suffixes": [
+        "AR1-D",
+        "AR1-M",
+        "AR1-R",
+        "AR1-S",
+        "CUFF",
+        "HR",
+        "NBP-D",
+        "NBP-M",
+        "NBP-S",
+        "PVC",
+        "RESP",
+        "SPO2-%",
+        "SPO2-R",
+        "TMP-1"
+      ],
+      "has_arterial": true,
+      "bed_subdirs": [
+        "9ICU_12-DE214688354794344",
+        "9ICU_12-DE214688354794344_1"
+      ],
+      "pat_dir": "/labs/hulab/UCSF/2017-03-deid/DE214688354794344",
+      "wave_cycles": [
+        {
+          "WaveCycleUID": 38286,
+          "UnitBed": "9ICU_12",
+          "BedTransfer_In": "06/05/2016 02:30:00 PM",
+          "BedTransfer_Out": "06/10/2016 11:59:00 PM",
+          "WaveStartTime": "06/05/2016 02:33:13 PM",
+          "WaveStopTime": "06/09/2016 02:24:44 PM",
+          "n_rows_in_MRN_Mapping": 5
+        },
+        {
+          "WaveCycleUID": 38394,
+          "UnitBed": "9ICU_12",
+          "BedTransfer_In": "06/08/2016 11:59:00 PM",
+          "BedTransfer_Out": "06/10/2016 11:59:00 PM",
+          "WaveStartTime": "06/09/2016 04:49:46 PM",
+          "WaveStopTime": "06/11/2016 10:28:10 PM",
+          "n_rows_in_MRN_Mapping": 1
+        }
+      ]
+    },
+    {
+      "Patient_ID_GE": "747223141294381",
+      "Patient_ID": "747223121114075",
+      "Encounter_ID": "641031906940043",
+      "Wynton_folder": "2017-03-deid",
+      "offset": 321,
+      "offset_GE": 333,
+      "offset_delta_days": 12,
+      "encounter_start": "2016-04-17 00:00:00",
+      "LOS_days": 13,
+      "vital_flag": 1,
+      "adibin_count": 26,
+      "vital_count": 20,
+      "vital_suffixes": [
+        "AR1-D",
+        "AR1-M",
+        "AR1-R",
+        "AR1-S",
+        "CUFF",
+        "CVP2",
+        "HR",
+        "NBP-D",
+        "NBP-M",
+        "NBP-S",
+        "PVC",
+        "RESP",
+        "SPO2-%",
+        "SPO2-R",
+        "ST-I",
+        "ST-II",
+        "ST-III",
+        "ST-V1",
+        "TMP-1",
+        "TMP-2"
+      ],
+      "has_arterial": true,
+      "bed_subdirs": [
+        "10ICC_13-DE747223141294381"
+      ],
+      "pat_dir": "/labs/hulab/UCSF/2017-03-deid/DE747223141294381"
+    },
+    {
+      "Patient_ID_GE": "969040437292716",
+      "Patient_ID": "969040417112410",
+      "Encounter_ID": "764567616861314",
+      "Wynton_folder": "2017-10-deid",
+      "offset": 281,
+      "offset_GE": 293,
+      "offset_delta_days": 12,
+      "encounter_start": "2016-12-30 00:00:00",
+      "LOS_days": 6,
+      "vital_flag": 1,
+      "adibin_count": 25,
+      "vital_count": 13,
+      "vital_suffixes": [
+        "AR1-D",
+        "AR1-M",
+        "AR1-R",
+        "AR1-S",
+        "CUFF",
+        "HR",
+        "NBP-D",
+        "NBP-M",
+        "NBP-S",
+        "PVC",
+        "RESP",
+        "SPO2-%",
+        "SPO2-R"
+      ],
+      "has_arterial": true,
+      "bed_subdirs": [
+        "11NICU_13-DE969040437292716"
+      ],
+      "pat_dir": "/labs/hulab/UCSF/2017-10-deid/DE969040437292716"
+    },
+    {
+      "Patient_ID_GE": "299830937914959",
+      "Patient_ID": "299830917734653",
+      "Encounter_ID": "993134058546275",
+      "Wynton_folder": "2016-10-deid",
+      "offset": 151,
+      "offset_GE": 163,
+      "offset_delta_days": 12,
+      "encounter_start": "2016-05-22 00:00:00",
+      "LOS_days": 4,
+      "vital_flag": 1,
+      "adibin_count": 23,
+      "vital_count": 26,
+      "vital_suffixes": [
+        "AR1-D",
+        "AR1-M",
+        "AR1-R",
+        "AR1-S",
+        "CUFF",
+        "HR",
+        "NBP-D",
+        "NBP-M",
+        "NBP-S",
+        "PVC",
+        "RESP",
+        "SPO2-%",
+        "SPO2-R"
+      ],
+      "has_arterial": true,
+      "bed_subdirs": [
+        "11NICU_5-DE299830937914959",
+        "11NICU_5-DE299830937914959_1"
+      ],
+      "pat_dir": "/labs/hulab/UCSF/2016-10-deid/DE299830937914959"
+    },
+    {
+      "Patient_ID_GE": "56577667285165",
+      "Patient_ID": "56577647104859",
+      "Encounter_ID": "330513356719166",
+      "Wynton_folder": "2017-08-deid",
+      "offset": 57,
+      "offset_GE": 69,
+      "offset_delta_days": 12,
+      "encounter_start": "2017-06-27 00:00:00",
+      "LOS_days": 2,
+      "vital_flag": 1,
+      "adibin_count": 20,
+      "vital_count": 19,
+      "vital_suffixes": [
+        "AR1-D",
+        "AR1-M",
+        "AR1-R",
+        "AR1-S",
+        "CUFF",
+        "HR",
+        "NBP-D",
+        "NBP-M",
+        "NBP-S",
+        "PVC",
+        "RESP",
+        "SPO2-%",
+        "SPO2-R"
+      ],
+      "has_arterial": true,
+      "bed_subdirs": [
+        "8NICU_8-DE56577667285165"
+      ],
+      "pat_dir": "/labs/hulab/UCSF/2017-08-deid/DE56577667285165"
+    }
+  ],
+  "pick": {
+    "Patient_ID_GE": "214688354794344",
+    "Patient_ID": "214688334614038",
+    "Encounter_ID": "703726390376687",
+    "Wynton_folder": "2017-03-deid",
+    "offset": 284,
+    "offset_GE": 296,
+    "offset_delta_days": 12,
+    "encounter_start": "2016-06-16 00:00:00",
+    "LOS_days": 10,
+    "vital_flag": 1,
+    "adibin_count": 29,
+    "vital_count": 23,
+    "vital_suffixes": [
+      "AR1-D",
+      "AR1-M",
+      "AR1-R",
+      "AR1-S",
+      "CUFF",
+      "HR",
+      "NBP-D",
+      "NBP-M",
+      "NBP-S",
+      "PVC",
+      "RESP",
+      "SPO2-%",
+      "SPO2-R",
+      "TMP-1"
+    ],
+    "has_arterial": true,
+    "bed_subdirs": [
+      "9ICU_12-DE214688354794344",
+      "9ICU_12-DE214688354794344_1"
+    ],
+    "pat_dir": "/labs/hulab/UCSF/2017-03-deid/DE214688354794344",
+    "wave_cycles": [
+      {
+        "WaveCycleUID": 38286,
+        "UnitBed": "9ICU_12",
+        "BedTransfer_In": "06/05/2016 02:30:00 PM",
+        "BedTransfer_Out": "06/10/2016 11:59:00 PM",
+        "WaveStartTime": "06/05/2016 02:33:13 PM",
+        "WaveStopTime": "06/09/2016 02:24:44 PM",
+        "n_rows_in_MRN_Mapping": 5
+      },
+      {
+        "WaveCycleUID": 38394,
+        "UnitBed": "9ICU_12",
+        "BedTransfer_In": "06/08/2016 11:59:00 PM",
+        "BedTransfer_Out": "06/10/2016 11:59:00 PM",
+        "WaveStartTime": "06/09/2016 04:49:46 PM",
+        "WaveStopTime": "06/11/2016 10:28:10 PM",
+        "n_rows_in_MRN_Mapping": 1
+      }
+    ]
+  }
+}

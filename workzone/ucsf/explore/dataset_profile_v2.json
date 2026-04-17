@@ -1,0 +1,1866 @@
+{
+  "flowsheet_rowdim": {
+    "total_rowdim_rows": 101275,
+    "candidate_matches": {
+      "HR": [
+        {
+          "FlowsheetRowKey": "1479",
+          "Name": "R OR POSTOP CALL PAIN 24 HR CONTROL",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1504",
+          "Name": "UCSF R PACU DISCHARGE CRITERIA - BP  AND HR",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2119",
+          "Name": "UCSF R ANE FETAL HEART RATE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "2120",
+          "Name": "UCSF R ANE FETAL HEART RATE FETUS B",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "2121",
+          "Name": "UCSF R ANE FETAL HEART RATE FETUS C",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "2278",
+          "Name": "UCSF R ANE EKG HEART RATE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "3916",
+          "Name": "R OB AP1 HEART RATE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "3924",
+          "Name": "R OB AP5 HEART RATE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "4359",
+          "Name": "R OB AP10 HEART RATE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "4388",
+          "Name": "R OB AP15 HEART RATE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        }
+      ],
+      "SpO2": [
+        {
+          "FlowsheetRowKey": "2",
+          "Name": "PULSE OXIMETRY",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "775",
+          "Name": "R IP CAR SEAT PULSE OXIMETRY",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "984",
+          "Name": "PULSE OXIMETRY [COMPILED RECORD] [FLOWSHEET AGE^Child] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "1007",
+          "Name": "PULSE OXIMETRY [COMPILED RECORD] [FLOWSHEET AGE^Adult] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "1018",
+          "Name": "PULSE OXIMETRY [COMPILED RECORD] [FLOWSHEET AGE^Teen] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "1921",
+          "Name": "PULSE OXIMETRY [COMPILED RECORD] [FLOWSHEET AGE ADULT]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "2059",
+          "Name": "PULSE OXIMETRY [COMPILED RECORD] [FLOWSHEET AGE TEEN]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "2279",
+          "Name": "UCSF R ANE PULSE RATE PULSE OXIMETRY",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "2281",
+          "Name": "UCSF R ANE SPO2 -1",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "2282",
+          "Name": "UCSF R ANE SPO2 -2",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        }
+      ],
+      "RR": [
+        {
+          "FlowsheetRowKey": "774",
+          "Name": "R IP CAR SEAT RESPIRATORY RATE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "breaths per minute"
+        },
+        {
+          "FlowsheetRowKey": "1920",
+          "Name": "RESPIRATIONS [COMPILED RECORD] [FLOWSHEET AGE ADULT]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2001",
+          "Name": "RESPIRATIONS [COMPILED RECORD] [FLOWSHEET AGE TEEN]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2004",
+          "Name": "R SEDATION RESPIRATION",
+          "Abbreviation": "GIRES",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2283",
+          "Name": "UCSF R ANE RESPIRATORY RATE - EKG",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "2299",
+          "Name": "UCSF R ANE RESPIRATORY RATE CO2  GAS ANALYZER",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "bpm"
+        },
+        {
+          "FlowsheetRowKey": "2369",
+          "Name": "RESPIRATIONS [COMPILED RECORD] [FLOWSHEET AGE INFANT]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2452",
+          "Name": "RESPIRATIONS [COMPILED RECORD] [FLOWSHEET AGE NEONATE]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2453",
+          "Name": "RESPIRATIONS [COMPILED RECORD] [FLOWSHEET AGE TODDLER]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2458",
+          "Name": "RESPIRATIONS [COMPILED RECORD] [FLOWSHEET AGE CHILD]",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        }
+      ],
+      "Temperature": [
+        {
+          "FlowsheetRowKey": "995",
+          "Name": "TEMPERATURE (RETIRED)",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "F"
+        },
+        {
+          "FlowsheetRowKey": "1473",
+          "Name": "R OR POSTOP CALL FEVER TEMP",
+          "Abbreviation": "",
+          "ValueType": "Temperature",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1741",
+          "Name": "UCSF R PACU ENDO DISCHARGE CRITERIA - TEMP",
+          "Abbreviation": "Temp",
+          "ValueType": "Temperature",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1981",
+          "Name": "TEMP SOURCE [COMPILED RECORD] [FLOWSHEET AGE ADULT]",
+          "Abbreviation": "",
+          "ValueType": "Category Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1984",
+          "Name": "R GI SKIN COLOR/TEMPERATURE",
+          "Abbreviation": "GITEM",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2013",
+          "Name": "R GI POST-OP SKIN COLOR/TEMPERATURE",
+          "Abbreviation": "GIPST",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2033",
+          "Name": "R SKIN CONDITION/TEMP [OVERRIDE RECORD] [FLT ID^10710008]",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2093",
+          "Name": "UCSF R ANE ESOPHAGEAL TEMPERATURE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2094",
+          "Name": "UCSF R ANE NASOPHARYNGEAL TEMPERATURE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "2095",
+          "Name": "UCSF R ANE TYMPANIC TEMPERATURE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        }
+      ],
+      "NBPs": [
+        {
+          "FlowsheetRowKey": "8491",
+          "Name": "R SBP",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17191",
+          "Name": "R RRT CHANGE IN SBP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "36352",
+          "Name": "R RT (ADULT) VENTILATOR DAILY SCREEN SBP>90 AND <160MMHG",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "89121",
+          "Name": "SBP",
+          "Abbreviation": "",
+          "ValueType": "STOR String Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "95684",
+          "Name": "ELEVATED SBP",
+          "Abbreviation": "",
+          "ValueType": "STOR String Type",
+          "Unit": ""
+        }
+      ],
+      "NBPd": [
+        {
+          "FlowsheetRowKey": "60896",
+          "Name": "ELEVATED DBP",
+          "Abbreviation": "",
+          "ValueType": "STOR String Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "100098",
+          "Name": "R OB MFTI DBP PALPABLE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        }
+      ],
+      "NBPm": [
+        {
+          "FlowsheetRowKey": "15332",
+          "Name": "R UCSF AMB VAD MAP",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "15449",
+          "Name": "R DEVICE SVR USING NBP MEAN",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "dyne*sec/cm5"
+        },
+        {
+          "FlowsheetRowKey": "16478",
+          "Name": "R MAP A-LINE",
+          "Abbreviation": "MAP",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "16489",
+          "Name": "R MAP",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "17503",
+          "Name": "R RAP MAP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17504",
+          "Name": "R LAP MAP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17506",
+          "Name": "R PAP MAP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17508",
+          "Name": "R SP MAP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17509",
+          "Name": "R RAP 2 MAP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "19958",
+          "Name": "RT MAP MEASURED_IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        }
+      ],
+      "ABPs": [],
+      "ABPd": [],
+      "ABPm": [
+        {
+          "FlowsheetRowKey": "9311",
+          "Name": "R DEVICE SVR USING ABP MEAN",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "dyne*sec/cm5"
+        }
+      ],
+      "CVP": [
+        {
+          "FlowsheetRowKey": "2147",
+          "Name": "R ANE CENTRAL VENOUS PRESSURE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "2289",
+          "Name": "UCSF R ANE CENTRAL VENOUS PRESSURE",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "9255",
+          "Name": "R DEVICE CVP MEAN",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "10092",
+          "Name": "G PCC/ADULT CVP IP_CD_UCSF [OVERRIDE RECORD] [FLT ID^31000]",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "15451",
+          "Name": "R MODEL R CENTRAL VENOUS SATURATION COMPLEX",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "16490",
+          "Name": "R CENTRAL VENOUS PRESSURE 1",
+          "Abbreviation": "CVP",
+          "ValueType": "Numeric Type",
+          "Unit": "mmHg"
+        },
+        {
+          "FlowsheetRowKey": "16494",
+          "Name": "R CENTRAL VENOUS SATURATION COMPLEX",
+          "Abbreviation": "ScvO2",
+          "ValueType": "Numeric Type",
+          "Unit": "%"
+        },
+        {
+          "FlowsheetRowKey": "16890",
+          "Name": "G PCC/ADULT CVP IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "19173",
+          "Name": "R CENTRAL VENOUS PRESSURE WAVE FORM IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "19174",
+          "Name": "R CENTRAL VENOUS PRESSURE 2 WAVE FORM IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        }
+      ],
+      "Height": [
+        {
+          "FlowsheetRowKey": "5",
+          "Name": "HEIGHT [COMPILED RECORD] [FLOWSHEET AGE^Infant] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Patient Height",
+          "Unit": "inches"
+        },
+        {
+          "FlowsheetRowKey": "291",
+          "Name": "R OB OP FALL HEIGHT",
+          "Abbreviation": "",
+          "ValueType": "String Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "653",
+          "Name": "G OB HEIGHT WEIGHT",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1516",
+          "Name": "UCSF R OR HEIGHT METHOD",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1523",
+          "Name": "UCSF G ENDO HEIGHT/WEIGHT",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1717",
+          "Name": "UCSF G OR HEIGHT/WEIGHT WITH BMI AND BSA",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1898",
+          "Name": "UCSF R OR HEIGHT AND WEIGHT TRIGGER ROW",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1960",
+          "Name": "HEIGHT",
+          "Abbreviation": "",
+          "ValueType": "Patient Height",
+          "Unit": "inches"
+        },
+        {
+          "FlowsheetRowKey": "2390",
+          "Name": "HEIGHT [COMPILED RECORD] [FLOWSHEET AGE INFANT]",
+          "Abbreviation": "",
+          "ValueType": "Patient Height",
+          "Unit": "inches"
+        },
+        {
+          "FlowsheetRowKey": "2469",
+          "Name": "HEIGHT [COMPILED RECORD] [FLOWSHEET AGE NEONATE]",
+          "Abbreviation": "",
+          "ValueType": "Patient Height",
+          "Unit": "inches"
+        }
+      ],
+      "Weight": [
+        {
+          "FlowsheetRowKey": "653",
+          "Name": "G OB HEIGHT WEIGHT",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1061",
+          "Name": "WEIGHT/SCALE [COMPILED RECORD] [FLOWSHEET AGE^Infant] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Patient Weight",
+          "Unit": "ounces"
+        },
+        {
+          "FlowsheetRowKey": "1072",
+          "Name": "WEIGHT/SCALE [COMPILED RECORD] [FLOWSHEET AGE^Toddler] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Patient Weight",
+          "Unit": "ounces"
+        },
+        {
+          "FlowsheetRowKey": "1093",
+          "Name": "WEIGHT/SCALE [COMPILED RECORD] [FLOWSHEET AGE^Child] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Patient Weight",
+          "Unit": "ounces"
+        },
+        {
+          "FlowsheetRowKey": "1105",
+          "Name": "WEIGHT/SCALE [COMPILED RECORD] [FLOWSHEET AGE^Teen] [2/7/07  2:28 PM]",
+          "Abbreviation": "",
+          "ValueType": "Patient Weight",
+          "Unit": "ounces"
+        },
+        {
+          "FlowsheetRowKey": "1380",
+          "Name": "G AMB UCSF CC WEIGHT",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1517",
+          "Name": "UCSF R OR WEIGHT METHOD",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1523",
+          "Name": "UCSF G ENDO HEIGHT/WEIGHT",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1717",
+          "Name": "UCSF G OR HEIGHT/WEIGHT WITH BMI AND BSA",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "1898",
+          "Name": "UCSF R OR HEIGHT AND WEIGHT TRIGGER ROW",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        }
+      ],
+      "GCS": [
+        {
+          "FlowsheetRowKey": "8492",
+          "Name": "R CONVERT GCS",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8550",
+          "Name": "R CPN GLASGOW COMA SCALE EYE OPENING",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8554",
+          "Name": "R CPN GLASGOW COMA SCALE BEST MOTOR RESPONSE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8566",
+          "Name": "R PEDSCPN GLASGOW COMA SCALE (AGE 6 MONTHS TO 2 YEARS) EYE OPENING",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8567",
+          "Name": "R PEDSCPN GLASGOW COMA SCALE (AGE 6 MONTHS TO 2 YEARS) BEST MOTOR RESPONSE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8568",
+          "Name": "R PEDSCPN GLASGOW COMA SCALE (AGE 6 MONTHS TO 2 YEARS) BEST AUDITORY/VISUAL STIMULI RESPONSE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8569",
+          "Name": "G PEDSCPN GLASGOW COMA SCALE (AGE 6 MONTHS TO 2 YEARS) GROUP",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8570",
+          "Name": "R PEDSCPN GLASGOW COMA SCALE (AGE GREATER THAN 2 YEARS) EYE OPENING",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8571",
+          "Name": "R PEDSCPN GLASGOW COMA SCALE (AGE GREATER THAN 2 YEARS) BEST MOTOR RESPONSE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "8572",
+          "Name": "R PEDSCPN GLASGOW COMA SCALE SCORE (AGE 6 MONTHS TO 2 YEARS)",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        }
+      ],
+      "pain": [
+        {
+          "FlowsheetRowKey": "638",
+          "Name": "R OB LABOR PAIN SCORE",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "9258",
+          "Name": "PAIN SCORE (CATEGORY LIST)",
+          "Abbreviation": "",
+          "ValueType": "Category Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "16993",
+          "Name": "G PEDS DYS FLACC PAIN SCORE IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17035",
+          "Name": "G PEDS SLP FLACC PAIN SCORE IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17734",
+          "Name": "G PEDS PT FLACC PAIN SCORE IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "17815",
+          "Name": "G PEDS OT FLACC PAIN SCORE",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "18007",
+          "Name": "G OT INFANT FLACC PAIN SCORE IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "18412",
+          "Name": "R IP PAIN SCORE_IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Custom List",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "18433",
+          "Name": "R ICN N-PASS PAIN SCORE_IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "Numeric Type",
+          "Unit": ""
+        },
+        {
+          "FlowsheetRowKey": "23345",
+          "Name": "G INFANT FLACC PAIN SCORE IP_CD_UCSF",
+          "Abbreviation": "",
+          "ValueType": "*Unspecified",
+          "Unit": ""
+        }
+      ]
+    }
+  },
+  "top_flowsheet_rowkeys_resolved": [
+    {
+      "key": "2281",
+      "count_in_sample": 13642,
+      "name": "UCSF R ANE SPO2 -1",
+      "abbr": "",
+      "unit": "%",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "2",
+      "count_in_sample": 13087,
+      "name": "PULSE OXIMETRY",
+      "abbr": "",
+      "unit": "%",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "2280",
+      "count_in_sample": 10885,
+      "name": "UCSF R ANE PULSE RATE ARTERIAL LINE",
+      "abbr": "",
+      "unit": "bpm",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "2278",
+      "count_in_sample": 3801,
+      "name": "UCSF R ANE EKG HEART RATE",
+      "abbr": "",
+      "unit": "bpm",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "2279",
+      "count_in_sample": 1672,
+      "name": "UCSF R ANE PULSE RATE PULSE OXIMETRY",
+      "abbr": "",
+      "unit": "bpm",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "1960",
+      "count_in_sample": 1364,
+      "name": "HEIGHT",
+      "abbr": "",
+      "unit": "inches",
+      "value_type": "Patient Height"
+    },
+    {
+      "key": "1961",
+      "count_in_sample": 451,
+      "name": "PATIENT OBSERVATIONS",
+      "abbr": "OBSERV",
+      "unit": "",
+      "value_type": "String Type"
+    },
+    {
+      "key": "93",
+      "count_in_sample": 237,
+      "name": "NON BEHAVIORAL RESTRAINT STATUS TRACK (READ ONLY)",
+      "abbr": "STATUS",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "2007",
+      "count_in_sample": 224,
+      "name": "R PASSING FLATUS",
+      "abbr": "GIPFL",
+      "unit": "",
+      "value_type": "Category Type"
+    },
+    {
+      "key": "1415",
+      "count_in_sample": 132,
+      "name": "UCSF R OR PRE-OP CHECKLIST COMPLETED",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1420",
+      "count_in_sample": 125,
+      "name": "UCSF R OR PT FAMILY INFO ADULT NAME",
+      "abbr": "",
+      "unit": "",
+      "value_type": "String Type"
+    },
+    {
+      "key": "1657",
+      "count_in_sample": 121,
+      "name": "UCSF R OR PROVIDER SERVICE",
+      "abbr": "",
+      "unit": "",
+      "value_type": "String Type"
+    },
+    {
+      "key": "1421",
+      "count_in_sample": 107,
+      "name": "UCSF R OR PT FAMILY INFO PHONE NUMBER",
+      "abbr": "",
+      "unit": "",
+      "value_type": "String Type"
+    },
+    {
+      "key": "77",
+      "count_in_sample": 106,
+      "name": "R THERAPY OWNED MOBILITY EQUIP_IP_CD_UCSF",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1559",
+      "count_in_sample": 90,
+      "name": "UCSF R PACU NEURO (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "749",
+      "count_in_sample": 88,
+      "name": "R LAST SOLID FOOD CONSUMPTION",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Date"
+    },
+    {
+      "key": "1427",
+      "count_in_sample": 84,
+      "name": "UCSF R OR LAST CLEAR LIQUID CONSUMPTION DATE",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Date"
+    },
+    {
+      "key": "1428",
+      "count_in_sample": 84,
+      "name": "UCSF R OR LAST CLEAR LIQUID CONSUMPTION TIME",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Time"
+    },
+    {
+      "key": "1423",
+      "count_in_sample": 79,
+      "name": "UCSF R OR PT FAMILY INFO BELONGINGS LOCATION",
+      "abbr": "",
+      "unit": "",
+      "value_type": "String Type"
+    },
+    {
+      "key": "1556",
+      "count_in_sample": 79,
+      "name": "UCSF R PACU RESPIRATORY (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1558",
+      "count_in_sample": 70,
+      "name": "UCSF R PACU INTEGUMENTARY (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1560",
+      "count_in_sample": 70,
+      "name": "UCSF R PACU CARDIAC (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1433",
+      "count_in_sample": 69,
+      "name": "UCSF R OR ABUSE SCREENING",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1437",
+      "count_in_sample": 67,
+      "name": "UCSF R OR LAST VOIDED DATE",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Date"
+    },
+    {
+      "key": "1536",
+      "count_in_sample": 67,
+      "name": "UCSF R PACU HEENT (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1438",
+      "count_in_sample": 66,
+      "name": "UCSF R OR LAST VOIDED TIME",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Time"
+    },
+    {
+      "key": "1809",
+      "count_in_sample": 64,
+      "name": "UCSF R RN SEDATION OR MEDS - VERSED",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "2039",
+      "count_in_sample": 64,
+      "name": "UCSF R ANE CONTINUOUS INFUSION VOLUME",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Numeric Type"
+    },
+    {
+      "key": "1575",
+      "count_in_sample": 63,
+      "name": "UCSF R PACU GASTROINTESTINAL SIMPLE (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1424",
+      "count_in_sample": 62,
+      "name": "UCSF R OR PT FAMILY INFO PROPERTY RECORD",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1504",
+      "count_in_sample": 58,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - BP  AND HR",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1505",
+      "count_in_sample": 57,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - LOC",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1506",
+      "count_in_sample": 57,
+      "name": "UCSF PACU DISCHARGE CRITERIA - DRESSINGS/WOUNDS",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1507",
+      "count_in_sample": 57,
+      "name": "UCSF PACU DISCHARGE CRITERIA - N/V",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1508",
+      "count_in_sample": 57,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - ASSISTIVE DEVICES",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1513",
+      "count_in_sample": 57,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - INSTRUCTIONS",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1514",
+      "count_in_sample": 57,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - ORDERS",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1509",
+      "count_in_sample": 56,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - PAIN",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1512",
+      "count_in_sample": 56,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - IV LINES",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1515",
+      "count_in_sample": 56,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - DOCUMENTATION",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1562",
+      "count_in_sample": 56,
+      "name": "UCSF R PACU GU (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1510",
+      "count_in_sample": 55,
+      "name": "UCSF R PACU DISCHARGE CRITERIA - VOIDING",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1511",
+      "count_in_sample": 55,
+      "name": "UCSF R PACU DISCHARGE CRITERIA -  TUBES/DRAINES",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1661",
+      "count_in_sample": 53,
+      "name": "R PACU PSYCHOSOCIAL (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1577",
+      "count_in_sample": 53,
+      "name": "UCSF R MOD ALDRETE LOC",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1561",
+      "count_in_sample": 51,
+      "name": "UCSF R PACU MUSCULOSKELETAL (WDL)",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1893",
+      "count_in_sample": 47,
+      "name": "UCSF R OR VALIDATE PROCEDURE",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "2062",
+      "count_in_sample": 47,
+      "name": "UCSF R ANE BLOOD GAS SOURCE",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "1434",
+      "count_in_sample": 45,
+      "name": "UCSF R OR SUICIDE RISK ASSESSMENT CONDUCTED",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Custom List"
+    },
+    {
+      "key": "2066",
+      "count_in_sample": 43,
+      "name": "UCSF R ANE BLOOD GAS PH",
+      "abbr": "",
+      "unit": "",
+      "value_type": "Numeric Type"
+    }
+  ],
+  "offset_analysis": {
+    "n_rows": 27903,
+    "columns": [
+      "Encounter_ID",
+      "Patient_ID",
+      "Patient_ID_GE",
+      "Wynton_folder",
+      "Encounter_Start_time",
+      "Encounter_LOS",
+      "offset",
+      "offset_GE",
+      "alarm_time",
+      "bed_transferin_time",
+      "bin_file_time",
+      "vital_flag"
+    ],
+    "first_3_rows": [
+      {
+        "Encounter_ID": 142794642131776,
+        "Patient_ID": 895178695674986,
+        "Patient_ID_GE": 895178715855292,
+        "Wynton_folder": "2015-09-deid",
+        "Encounter_Start_time": "2015-03-10 00:00:00",
+        "Encounter_LOS": 22,
+        "offset": 177,
+        "offset_GE": 189,
+        "alarm_time": "2015-09-05 15:27:24",
+        "bed_transferin_time": "2015-02-28 15:18:00",
+        "bin_file_time": "2015-02-28 14:27:26",
+        "vital_flag": 0
+      },
+      {
+        "Encounter_ID": 223242914769799,
+        "Patient_ID": 46623916830868,
+        "Patient_ID_GE": 46623937011174,
+        "Wynton_folder": "2015-08-deid",
+        "Encounter_Start_time": "2014-12-30 00:00:00",
+        "Encounter_LOS": 6,
+        "offset": 227,
+        "offset_GE": 239,
+        "alarm_time": "2015-08-14 14:32:46",
+        "bed_transferin_time": "2014-12-18 14:32:00",
+        "bin_file_time": "2014-12-18 13:32:00",
+        "vital_flag": 0
+      },
+      {
+        "Encounter_ID": 774450310505927,
+        "Patient_ID": 718519793823361,
+        "Patient_ID_GE": 718519814003667,
+        "Wynton_folder": "2015-07-deid",
+        "Encounter_Start_time": "2014-09-12 00:00:00",
+        "Encounter_LOS": 2,
+        "offset": 319,
+        "offset_GE": 331,
+        "alarm_time": "2015-07-28 20:32:32",
+        "bed_transferin_time": "2014-08-31 20:30:00",
+        "bin_file_time": "2014-08-31 20:32:33",
+        "vital_flag": 0
+      }
+    ],
+    "offset_stats": {
+      "n_non_null": 27903,
+      "min": "0",
+      "max": "364",
+      "dtype": "int64",
+      "sample_unique": [
+        "177",
+        "227",
+        "319",
+        "343",
+        "22",
+        "225",
+        "288",
+        "231",
+        "291",
+        "302"
+      ]
+    },
+    "offset_GE_stats": {
+      "n_non_null": 27903,
+      "min": "12",
+      "max": "376",
+      "dtype": "int64",
+      "sample_unique": [
+        "189",
+        "239",
+        "331",
+        "355",
+        "34",
+        "237",
+        "300",
+        "243",
+        "303",
+        "314"
+      ]
+    },
+    "offset_equals_offset_GE": {
+      "n_pairs": 27903,
+      "n_equal": 0
+    },
+    "vital_flag_counts": {
+      "0": 19642,
+      "1": 8261
+    },
+    "rows_per_year": {
+      "2013": 4242,
+      "2014": 5064,
+      "2015": 5478,
+      "2016": 5408,
+      "2017": 5261,
+      "2018": 2450
+    },
+    "rows_per_2018_month": {
+      "2018-01-deid": 468,
+      "2018-02-deid": 404,
+      "2018-03-deid": 397,
+      "2018-04-deid": 410,
+      "2018-05-deid": 373,
+      "2018-06-deid": 195,
+      "2018-06-deid-1": 151,
+      "2018-07-deid": 8,
+      "2018-08-deid": 7,
+      "2018-09-deid": 11,
+      "2018-10-deid": 10,
+      "2018-11-deid": 9,
+      "2018-12-deid": 7
+    },
+    "encounter_start_min": "2012-03-09 00:00:00",
+    "encounter_start_max": "2018-12-01 00:00:00"
+  },
+  "top_loinc": {
+    "shards_scanned": 5,
+    "rows_seen": 50000,
+    "top_loinc": [
+      {
+        "loinc": "\"*Unspeci\"",
+        "count": 50000,
+        "loinc_name": "\"\""
+      }
+    ],
+    "top_common_name": [
+      {
+        "common_name": " CR",
+        "count": 7949
+      },
+      {
+        "common_name": " TP",
+        "count": 3059
+      },
+      {
+        "common_name": "\"Glucose",
+        "count": 1671
+      },
+      {
+        "common_name": "\"HEMATOCRIT\"",
+        "count": 1102
+      },
+      {
+        "common_name": "\"HEMOGLOBIN\"",
+        "count": 1100
+      },
+      {
+        "common_name": "\"PLATELETCOUNT\"",
+        "count": 1094
+      },
+      {
+        "common_name": "\"RBCCOUNT\"",
+        "count": 1092
+      },
+      {
+        "common_name": "\"MCHC\"",
+        "count": 1092
+      },
+      {
+        "common_name": "\"MCV\"",
+        "count": 1090
+      },
+      {
+        "common_name": "\"WBCCOUNT\"",
+        "count": 1087
+      },
+      {
+        "common_name": "\"MCH\"",
+        "count": 1084
+      },
+      {
+        "common_name": "\"Magnesium",
+        "count": 858
+      },
+      {
+        "common_name": "\"TRANSFUSIONSTATUS\"",
+        "count": 628
+      },
+      {
+        "common_name": "\"UNIT NUMBER\"",
+        "count": 627
+      },
+      {
+        "common_name": "\"UDIV\"",
+        "count": 627
+      },
+      {
+        "common_name": "\"Phosphorus",
+        "count": 614
+      },
+      {
+        "common_name": "\"PT\"",
+        "count": 576
+      },
+      {
+        "common_name": "\"INT'LNORMALIZRATIO\"",
+        "count": 572
+      },
+      {
+        "common_name": "\"PCO2\"",
+        "count": 530
+      },
+      {
+        "common_name": "\"FIO2\"",
+        "count": 528
+      },
+      {
+        "common_name": "\"PO2\"",
+        "count": 526
+      },
+      {
+        "common_name": " UA\"",
+        "count": 470
+      },
+      {
+        "common_name": "\"LYMPHOCYTEABSCNT\"",
+        "count": 415
+      },
+      {
+        "common_name": "\"NEUTROPHILABSOLUTECOUNT\"",
+        "count": 414
+      },
+      {
+        "common_name": "\"MONOCYTEABSCOUNT\"",
+        "count": 414
+      },
+      {
+        "common_name": "\"EOSINOPHILABSCT\"",
+        "count": 412
+      },
+      {
+        "common_name": "\"ACTIVATEDPARTIALTHROMBOPLASTINTIME\"",
+        "count": 411
+      },
+      {
+        "common_name": "\"BASOPHILABSCOUNT\"",
+        "count": 408
+      },
+      {
+        "common_name": "\"Status of Unit\"",
+        "count": 402
+      },
+      {
+        "common_name": "\"Bilirubin",
+        "count": 385
+      },
+      {
+        "common_name": "\"Q-TINTERVAL\"",
+        "count": 377
+      },
+      {
+        "common_name": "\"SAMPLETYPE\"",
+        "count": 359
+      },
+      {
+        "common_name": "\"BASEEXCESS/DEFICIT\"",
+        "count": 353
+      },
+      {
+        "common_name": "\"BICARBONATE\"",
+        "count": 352
+      },
+      {
+        "common_name": " Blood\"",
+        "count": 351
+      },
+      {
+        "common_name": "\"OXYGENSATURATION\"",
+        "count": 349
+      },
+      {
+        "common_name": "\"ALT\"",
+        "count": 343
+      },
+      {
+        "common_name": "\"AST\"",
+        "count": 341
+      },
+      {
+        "common_name": "\"CULTURECOMMENT\"",
+        "count": 335
+      },
+      {
+        "common_name": "\"LAB3000\"",
+        "count": 335
+      },
+      {
+        "common_name": "\"REPORTSTATUS\"",
+        "count": 333
+      },
+      {
+        "common_name": "\"ALK PHOS\"",
+        "count": 331
+      },
+      {
+        "common_name": "\"Potassium",
+        "count": 303
+      },
+      {
+        "common_name": "\"eGFR if non-African American\"",
+        "count": 269
+      },
+      {
+        "common_name": "\"Sodium",
+        "count": 268
+      },
+      {
+        "common_name": "\"Creatinine\"",
+        "count": 268
+      },
+      {
+        "common_name": "\"eGFR if African Amer\"",
+        "count": 268
+      },
+      {
+        "common_name": "\"BLOODCOMPONENTTYPE\"",
+        "count": 266
+      },
+      {
+        "common_name": "\"CULTURERESULT\"",
+        "count": 248
+      },
+      {
+        "common_name": "\"CALCULATEDTAXIS\"",
+        "count": 245
+      }
+    ]
+  },
+  "top_medications": {
+    "shards_scanned": 5,
+    "rows_seen": 50000,
+    "top_generic_names": [
+      [
+        "\"\"",
+        4014
+      ],
+      [
+        "\"sodium chloride 0.9 % intravenous solution\"",
+        1235
+      ],
+      [
+        "\"sodium chloride 0.9 % (flush) injection syringe\"",
+        1199
+      ],
+      [
+        "\"magnesium sulfate 1 gram/100 mL in dextrose 5 % intravenous piggyback\"",
+        1050
+      ],
+      [
+        "\"fentaNYL (PF) 50 mcg/mL injection solution\"",
+        1037
+      ],
+      [
+        "\"ondansetron HCl (PF) 4 mg/2 mL injection solution\"",
+        952
+      ],
+      [
+        "\"potassium chloride 10 mEq/100mL in sterile water intravenous piggyback\"",
+        943
+      ],
+      [
+        "\"sodium chloride 0.9 % IV\"",
+        742
+      ],
+      [
+        "\"midazolam 1 mg/mL injection solution\"",
+        698
+      ],
+      [
+        "\"HYDROmorphone 0.6 mg/0.6 mL in 0.9 % sod. chloride intravenous syringe\"",
+        690
+      ],
+      [
+        "\"oxyCODONE 5 mg tablet\"",
+        640
+      ],
+      [
+        "DELAYED RELEASE\"",
+        634
+      ],
+      [
+        "\"propofol 10 mg/mL intravenous emulsion\"",
+        582
+      ],
+      [
+        "\"potassium chloride 20 mEq/50 mL in sterile water intravenous piggyback\"",
+        566
+      ],
+      [
+        " PORCINE (PF) 100 UNIT/ML INTRAVENOUS SYRINGE\"",
+        561
+      ],
+      [
+        "\"insulin aspart (U-100) 100 unit/mL (3 mL) subcutaneous pen\"",
+        526
+      ],
+      [
+        "\"diphenhydrAMINE 50 mg/mL injection solution\"",
+        494
+      ],
+      [
+        "EXTENDED RELEASE\"",
+        484
+      ],
+      [
+        "\"acetaminophen 500 mg tablet\"",
+        477
+      ],
+      [
+        "\"furosemide 10 mg/mL injection solution\"",
+        475
+      ],
+      [
+        "\"ondansetron HCl 4 mg tablet\"",
+        403
+      ],
+      [
+        "\"docusate sodium 250 mg capsule\"",
+        400
+      ],
+      [
+        "\"sennosides 8.6 mg tablet\"",
+        384
+      ],
+      [
+        "000 UNIT/ML INJECTION SOLUTION\"",
+        380
+      ],
+      [
+        "\"tacrolimus 1 mg capsule\"",
+        380
+      ],
+      [
+        "\"lidocaine (PF) 10 mg/mL (1 %) injection solution\"",
+        360
+      ],
+      [
+        "\"LORazepam 2 mg/mL injection syringe\"",
+        353
+      ],
+      [
+        "\"dextrose 50 % in water (D50W) intravenous solution\"",
+        348
+      ],
+      [
+        " HUMAN 5 % INTRAVENOUS SOLUTION\"",
+        341
+      ],
+      [
+        "\"glucose 4 gram chewable tablet\"",
+        340
+      ],
+      [
+        "\"magnesium sulfate 2 gram/100 mL in dextrose 5 % intravenous piggyback\"",
+        331
+      ],
+      [
+        "\"hydrocortisone sod succinate (PF) 100 mg/2 mL solution for injection\"",
+        318
+      ],
+      [
+        "\"lidocaine 10 mg/mL (1 %) injection solution\"",
+        307
+      ],
+      [
+        "\"LORazepam 1 mg tablet\"",
+        304
+      ],
+      [
+        "\"tacrolimus 0.5 mg capsule\"",
+        302
+      ],
+      [
+        "\"lactated Ringers intravenous solution\"",
+        298
+      ],
+      [
+        "\"albuterol sulfate 2.5 mg/3 mL (0.083 %) solution for nebulization\"",
+        275
+      ],
+      [
+        "\"acetaminophen 325 mg tablet\"",
+        269
+      ],
+      [
+        "\"insulin glargine (U-100) 100 unit/mL (3 mL) subcutaneous pen\"",
+        266
+      ],
+      [
+        "\"bisacodyl 10 mg rectal suppository\"",
+        251
+      ]
+    ],
+    "top_therapeutic_class": [
+      [
+        "\"ELECT/CALORIC/H2O\"",
+        9131
+      ],
+      [
+        "\"ANALGESICS\"",
+        5531
+      ],
+      [
+        "\"GASTROINTESTINAL\"",
+        4538
+      ],
+      [
+        "\"*Unspecified\"",
+        4014
+      ],
+      [
+        "\"ANESTHETICS\"",
+        2568
+      ],
+      [
+        "\"CARDIOVASCULAR\"",
+        2139
+      ],
+      [
+        "\"HORMONES\"",
+        1563
+      ],
+      [
+        "\"ANTIBIOTICS\"",
+        1475
+      ],
+      [
+        "\"ANTIASTHMATICS\"",
+        1167
+      ],
+      [
+        "\"DIURETICS\"",
+        1129
+      ],
+      [
+        "\"PSYCHOTHERAPEUTIC DRUGS\"",
+        1080
+      ],
+      [
+        "\"IMMUNOSUPPRESSANTS\"",
+        1048
+      ],
+      [
+        "\"AUTONOMIC DRUGS\"",
+        983
+      ],
+      [
+        "\"ANTIHYPERGLYCEMICS\"",
+        952
+      ],
+      [
+        "\"ANTIHISTAMINES\"",
+        905
+      ],
+      [
+        "\"CARDIAC DRUGS\"",
+        696
+      ],
+      [
+        "\"ANTICOAGULANTS\"",
+        658
+      ],
+      [
+        "\"VITAMINS\"",
+        625
+      ],
+      [
+        "\"heparin",
+        567
+      ],
+      [
+        "\"SEDATIVE/HYPNOTICS\"",
+        506
+      ]
+    ],
+    "top_routes": [
+      [
+        "\"Oral\"",
+        11656
+      ],
+      [
+        "\"Intravenous\"",
+        7903
+      ],
+      [
+        "\"Injection\"",
+        7374
+      ],
+      [
+        "\"*Unspecified\"",
+        5244
+      ],
+      [
+        "\"Solution\"",
+        2674
+      ],
+      [
+        "\"Tablet\"",
+        2343
+      ],
+      [
+        "\"Parenteral Solution\"",
+        1285
+      ],
+      [
+        "\"Subcutaneous\"",
+        1117
+      ],
+      [
+        " Short Acting\"",
+        772
+      ],
+      [
+        "\"1 mg/mL\"",
+        688
+      ],
+      [
+        "\"10 mg/mL\"",
+        639
+      ],
+      [
+        " Chewable\"",
+        594
+      ],
+      [
+        "\"100 unit/mL\"",
+        561
+      ],
+      [
+        "\"1",
+        516
+      ],
+      [
+        "\"Syringe\"",
+        407
+      ],
+      [
+        "\"5 %\"",
+        341
+      ],
+      [
+        "\"Topical (Top)\"",
+        325
+      ],
+      [
+        "\"Suppository\"",
+        325
+      ],
+      [
+        "\"30 mg\"",
+        316
+      ],
+      [
+        "\"Heparins\"",
+        295
+      ]
+    ]
+  }
+}

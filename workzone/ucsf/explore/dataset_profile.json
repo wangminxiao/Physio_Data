@@ -1,0 +1,1511 @@
+{
+  "ucsf_root": "/labs/hulab/UCSF",
+  "wynton_folders": {
+    "n_folders": 70,
+    "folders": [
+      "2013-03-deid",
+      "2013-04-deid",
+      "2013-05-deid",
+      "2013-06-deid",
+      "2013-07-deid",
+      "2013-08-deid",
+      "2013-09-deid",
+      "2013-10-deid",
+      "2013-11-deid",
+      "2013-12-deid",
+      "2014-01-deid",
+      "2014-02-deid",
+      "2014-03-deid",
+      "2014-04-deid",
+      "2014-05-deid",
+      "2014-06-deid",
+      "2014-07-deid",
+      "2014-08-deid",
+      "2014-09-deid",
+      "2014-10-deid",
+      "2014-11-deid",
+      "2014-12-deid",
+      "2015-01-deid",
+      "2015-02-deid",
+      "2015-03-deid",
+      "2015-04-deid",
+      "2015-05-deid",
+      "2015-06-deid",
+      "2015-07-deid",
+      "2015-08-deid",
+      "2015-09-deid",
+      "2015-10-deid",
+      "2015-11-deid",
+      "2015-12-deid",
+      "2016-01-deid",
+      "2016-02-deid",
+      "2016-03-deid",
+      "2016-04-deid",
+      "2016-05-deid",
+      "2016-06-deid",
+      "2016-07-deid",
+      "2016-08-deid",
+      "2016-09-deid",
+      "2016-10-deid",
+      "2016-11-deid",
+      "2016-12-deid",
+      "2017-01-deid",
+      "2017-02-deid",
+      "2017-03-deid",
+      "2017-04-deid",
+      "2017-05-deid",
+      "2017-06-deid",
+      "2017-07-deid",
+      "2017-08-deid",
+      "2017-09-deid",
+      "2017-10-deid",
+      "2017-11-deid",
+      "2017-12-deid",
+      "2018-01-deid",
+      "2018-02-deid",
+      "2018-03-deid",
+      "2018-04-deid",
+      "2018-05-deid",
+      "2018-06-deid",
+      "2018-07-deid",
+      "2018-08-deid",
+      "2018-09-deid",
+      "2018-10-deid",
+      "2018-11-deid",
+      "2018-12-deid"
+    ],
+    "total_de_dirs": 26021,
+    "per_folder": {
+      "2013-03-deid": {
+        "n_patients": 390
+      },
+      "2013-04-deid": {
+        "n_patients": 368
+      },
+      "2013-05-deid": {
+        "n_patients": 397
+      },
+      "2013-06-deid": {
+        "n_patients": 407
+      },
+      "2013-07-deid": {
+        "n_patients": 418
+      },
+      "2013-08-deid": {
+        "n_patients": 402
+      },
+      "2013-09-deid": {
+        "n_patients": 395
+      },
+      "2013-10-deid": {
+        "n_patients": 408
+      },
+      "2013-11-deid": {
+        "n_patients": 402
+      },
+      "2013-12-deid": {
+        "n_patients": 380
+      },
+      "2014-01-deid": {
+        "n_patients": 436
+      },
+      "2014-02-deid": {
+        "n_patients": 382
+      },
+      "2014-03-deid": {
+        "n_patients": 381
+      },
+      "2014-04-deid": {
+        "n_patients": 384
+      },
+      "2014-05-deid": {
+        "n_patients": 383
+      },
+      "2014-06-deid": {
+        "n_patients": 405
+      },
+      "2014-07-deid": {
+        "n_patients": 396
+      },
+      "2014-08-deid": {
+        "n_patients": 410
+      },
+      "2014-09-deid": {
+        "n_patients": 386
+      },
+      "2014-10-deid": {
+        "n_patients": 414
+      },
+      "2014-11-deid": {
+        "n_patients": 372
+      },
+      "2014-12-deid": {
+        "n_patients": 418
+      },
+      "2015-01-deid": {
+        "n_patients": 424
+      },
+      "2015-02-deid": {
+        "n_patients": 406
+      },
+      "2015-03-deid": {
+        "n_patients": 431
+      },
+      "2015-04-deid": {
+        "n_patients": 423
+      },
+      "2015-05-deid": {
+        "n_patients": 419
+      },
+      "2015-06-deid": {
+        "n_patients": 453
+      },
+      "2015-07-deid": {
+        "n_patients": 444
+      },
+      "2015-08-deid": {
+        "n_patients": 430
+      },
+      "2015-09-deid": {
+        "n_patients": 421
+      },
+      "2015-10-deid": {
+        "n_patients": 429
+      },
+      "2015-11-deid": {
+        "n_patients": 417
+      },
+      "2015-12-deid": {
+        "n_patients": 433
+      },
+      "2016-01-deid": {
+        "n_patients": 444
+      },
+      "2016-02-deid": {
+        "n_patients": 391
+      },
+      "2016-03-deid": {
+        "n_patients": 439
+      },
+      "2016-04-deid": {
+        "n_patients": 405
+      },
+      "2016-05-deid": {
+        "n_patients": 441
+      },
+      "2016-06-deid": {
+        "n_patients": 458
+      },
+      "2016-07-deid": {
+        "n_patients": 410
+      },
+      "2016-08-deid": {
+        "n_patients": 437
+      },
+      "2016-09-deid": {
+        "n_patients": 402
+      },
+      "2016-10-deid": {
+        "n_patients": 415
+      },
+      "2016-11-deid": {
+        "n_patients": 381
+      },
+      "2016-12-deid": {
+        "n_patients": 403
+      },
+      "2017-01-deid": {
+        "n_patients": 419
+      },
+      "2017-02-deid": {
+        "n_patients": 431
+      },
+      "2017-03-deid": {
+        "n_patients": 454
+      },
+      "2017-04-deid": {
+        "n_patients": 385
+      },
+      "2017-05-deid": {
+        "n_patients": 412
+      },
+      "2017-06-deid": {
+        "n_patients": 410
+      },
+      "2017-07-deid": {
+        "n_patients": 405
+      },
+      "2017-08-deid": {
+        "n_patients": 453
+      },
+      "2017-09-deid": {
+        "n_patients": 392
+      },
+      "2017-10-deid": {
+        "n_patients": 416
+      },
+      "2017-11-deid": {
+        "n_patients": 405
+      },
+      "2017-12-deid": {
+        "n_patients": 364
+      },
+      "2018-01-deid": {
+        "n_patients": 442
+      },
+      "2018-02-deid": {
+        "n_patients": 383
+      },
+      "2018-03-deid": {
+        "n_patients": 375
+      },
+      "2018-04-deid": {
+        "n_patients": 393
+      },
+      "2018-05-deid": {
+        "n_patients": 357
+      },
+      "2018-06-deid": {
+        "n_patients": 186
+      },
+      "2018-07-deid": {
+        "n_patients": 8
+      },
+      "2018-08-deid": {
+        "n_patients": 7
+      },
+      "2018-09-deid": {
+        "n_patients": 9
+      },
+      "2018-10-deid": {
+        "n_patients": 10
+      },
+      "2018-11-deid": {
+        "n_patients": 9
+      },
+      "2018-12-deid": {
+        "n_patients": 6
+      }
+    }
+  },
+  "vital_suffixes_observed": [
+    [
+      "HR",
+      18
+    ],
+    [
+      "NBP-D",
+      18
+    ],
+    [
+      "NBP-M",
+      18
+    ],
+    [
+      "NBP-S",
+      18
+    ],
+    [
+      "CUFF",
+      18
+    ],
+    [
+      "RESP",
+      17
+    ],
+    [
+      "PVC",
+      17
+    ],
+    [
+      "SPO2-%",
+      17
+    ],
+    [
+      "SPO2-R",
+      17
+    ],
+    [
+      "AR1-M",
+      9
+    ],
+    [
+      "AR1-D",
+      9
+    ],
+    [
+      "AR1-R",
+      9
+    ],
+    [
+      "AR1-S",
+      9
+    ],
+    [
+      "TMP-1",
+      7
+    ],
+    [
+      "AR2-M",
+      4
+    ],
+    [
+      "AR2-R",
+      4
+    ],
+    [
+      "AR2-D",
+      4
+    ],
+    [
+      "AR2-S",
+      4
+    ],
+    [
+      "CVP2",
+      3
+    ],
+    [
+      "CVP1",
+      3
+    ],
+    [
+      "AR3-M",
+      2
+    ],
+    [
+      "AR3-R",
+      2
+    ],
+    [
+      "AR3-D",
+      2
+    ],
+    [
+      "AR3-S",
+      2
+    ],
+    [
+      "CVP3",
+      2
+    ],
+    [
+      "ST-I",
+      2
+    ],
+    [
+      "ST-II",
+      2
+    ],
+    [
+      "ST-III",
+      2
+    ],
+    [
+      "ST-V1",
+      2
+    ],
+    [
+      "SP2",
+      1
+    ],
+    [
+      "SP3",
+      1
+    ],
+    [
+      "PA2-D",
+      1
+    ],
+    [
+      "PA2-M",
+      1
+    ],
+    [
+      "PA2-S",
+      1
+    ],
+    [
+      "CPP1",
+      1
+    ],
+    [
+      "ICP1",
+      1
+    ],
+    [
+      "ST-V2",
+      1
+    ],
+    [
+      "ST-V3",
+      1
+    ],
+    [
+      "TMP-2",
+      1
+    ]
+  ],
+  "vital_suffix_per_patient_sample": {
+    "DE174730580456963": {},
+    "DE343683190334997": {},
+    "DE258581688784471": {
+      "HR": 3,
+      "RESP": 2,
+      "PVC": 2,
+      "SPO2-%": 2,
+      "SPO2-R": 2,
+      "NBP-D": 3,
+      "NBP-M": 3,
+      "NBP-S": 3,
+      "CUFF": 3
+    },
+    "DE396519783575496": {
+      "HR": 2,
+      "SPO2-%": 2,
+      "SPO2-R": 2,
+      "RESP": 2,
+      "PVC": 2,
+      "NBP-D": 2,
+      "NBP-M": 2,
+      "NBP-S": 2,
+      "AR1-M": 2,
+      "AR1-D": 2,
+      "AR1-R": 2,
+      "AR1-S": 2,
+      "CUFF": 2
+    },
+    "DE466633560292831": {},
+    "DE659548209671340": {
+      "HR": 4,
+      "RESP": 4,
+      "PVC": 4,
+      "SPO2-%": 4,
+      "SPO2-R": 4,
+      "NBP-D": 4,
+      "NBP-M": 4,
+      "NBP-S": 4,
+      "TMP-1": 4,
+      "CUFF": 4,
+      "AR1-M": 3,
+      "AR1-R": 3,
+      "AR1-S": 3,
+      "AR1-D": 3,
+      "CVP2": 3,
+      "CVP1": 2,
+      "AR2-M": 1,
+      "AR2-R": 1,
+      "AR2-D": 1,
+      "AR2-S": 1,
+      "AR3-M": 2,
+      "AR3-R": 2,
+      "AR3-D": 2,
+      "AR3-S": 2,
+      "SP2": 1,
+      "CVP3": 1,
+      "SP3": 1,
+      "PA2-D": 1,
+      "PA2-M": 1,
+      "PA2-S": 1,
+      "CPP1": 1,
+      "ICP1": 1
+    },
+    "DE602896083768866": {
+      "SPO2-R": 1,
+      "SPO2-%": 1,
+      "HR": 1,
+      "RESP": 1,
+      "PVC": 1,
+      "NBP-D": 1,
+      "NBP-M": 1,
+      "NBP-S": 1,
+      "CVP3": 1,
+      "AR1-M": 1,
+      "TMP-1": 1,
+      "AR1-R": 1,
+      "AR1-D": 1,
+      "AR1-S": 1,
+      "CUFF": 1,
+      "ST-I": 1,
+      "ST-II": 1,
+      "ST-III": 1,
+      "ST-V1": 1
+    },
+    "DE60325125389210": {
+      "HR": 1,
+      "RESP": 1,
+      "ST-I": 1,
+      "ST-II": 1,
+      "PVC": 1,
+      "ST-III": 1,
+      "ST-V1": 1,
+      "SPO2-%": 1,
+      "SPO2-R": 1,
+      "AR2-M": 1,
+      "AR2-S": 1,
+      "AR2-D": 1,
+      "AR2-R": 1,
+      "CVP1": 1,
+      "NBP-M": 1,
+      "NBP-D": 1,
+      "NBP-S": 1,
+      "ST-V2": 1,
+      "ST-V3": 1,
+      "CUFF": 1
+    },
+    "DE195629473932496": {
+      "HR": 4,
+      "RESP": 4,
+      "PVC": 4,
+      "SPO2-%": 4,
+      "SPO2-R": 4,
+      "NBP-D": 4,
+      "NBP-M": 4,
+      "NBP-S": 4,
+      "AR2-M": 1,
+      "AR2-R": 1,
+      "AR2-D": 1,
+      "AR2-S": 1,
+      "TMP-1": 1,
+      "TMP-2": 1,
+      "AR1-M": 2,
+      "AR1-D": 2,
+      "AR1-S": 2,
+      "AR1-R": 2,
+      "CUFF": 4
+    },
+    "DE235558914643189": {
+      "HR": 3,
+      "RESP": 3,
+      "PVC": 3,
+      "SPO2-%": 3,
+      "SPO2-R": 3,
+      "AR1-M": 1,
+      "AR1-D": 1,
+      "AR1-S": 1,
+      "AR1-R": 1,
+      "TMP-1": 1,
+      "NBP-D": 3,
+      "NBP-M": 3,
+      "NBP-S": 3,
+      "CUFF": 3,
+      "AR2-M": 1,
+      "AR2-D": 1,
+      "AR2-S": 1,
+      "AR2-R": 1
+    }
+  },
+  "adibin_probes": [
+    {
+      "path": "/labs/hulab/UCSF/2013-03-deid/DE174730580456963/10ICC_14-DE174730580456963/DE174730580456963_20120721013613_2527.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 76034160,
+      "duration_sec": 316809.0,
+      "start": "2012-07-21T01:36:13.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2013-09-deid/DE343683190334997/13ICU_8-DE343683190334997/DE343683190334997_20130907204352_7257.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 52244880,
+      "duration_sec": 217687.0,
+      "start": "2013-09-07T20:43:52.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2016-09-deid/DE258581688784471/13ICU_16-DE258581688784471/DE258581688784471_20160824083705_33713.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 34071360,
+      "duration_sec": 141964.0,
+      "start": "2016-08-24T08:37:05.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2015-12-deid/DE396519783575496/9ICU_10-DE396519783575496/DE396519783575496_20150904173856_27216.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 18816960,
+      "duration_sec": 78404.0,
+      "start": "2015-09-04T17:38:56.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2013-09-deid/DE466633560292831/9ICU_7-DE466633560292831/DE466633560292831_20130901084932_7097.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 2549520,
+      "duration_sec": 10623.0,
+      "start": "2013-09-01T08:49:32.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2014-06-deid/DE659548209671340/13ICU_8-DE659548209671340_1/DE659548209671340_20140530013300_13968.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 49026960,
+      "duration_sec": 204279.0,
+      "start": "2014-05-30T01:33:00.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2014-02-deid/DE602896083768866/10ICC_7-DE602896083768866/DE602896083768866_20130310151947_10635.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 15149760,
+      "duration_sec": 63124.0,
+      "start": "2013-03-10T15:19:47.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2014-03-deid/DE60325125389210/10ICC_5-DE60325125389210/DE60325125389210_20131222164916_11180.adibin",
+      "channels": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "AVR",
+        "AVL",
+        "AVF",
+        "CVP1",
+        "AR2",
+        "SPO2",
+        "RR"
+      ],
+      "fs_hz": 240.0,
+      "samples_per_channel": 16935840,
+      "duration_sec": 70566.0,
+      "start": "2013-12-22T16:49:16.000000"
+    }
+  ],
+  "vital_probes": [
+    {
+      "path": "/labs/hulab/UCSF/2013-03-deid/DE174730580456963/10ICC_14-DE174730580456963/DE174730580456963_20120724174018_2527_AR2-D.vital",
+      "suffix": "DE174730580456963_20120724174018_2527_AR2-D.vital",
+      "n_samples_in_file": 332067,
+      "first_5": [
+        [
+          50.0,
+          0.0
+        ],
+        [
+          49.0,
+          2.0
+        ],
+        [
+          48.0,
+          4.0
+        ],
+        [
+          49.0,
+          6.0
+        ],
+        [
+          40.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          50.0,
+          444.0
+        ],
+        [
+          50.0,
+          446.0
+        ],
+        [
+          51.0,
+          448.0
+        ],
+        [
+          51.0,
+          450.0
+        ],
+        [
+          51.0,
+          452.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": -42.0,
+      "val_max": 58.0,
+      "start": "2012-07-24T17:40:18.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2013-09-deid/DE343683190334997/13ICU_8-DE343683190334997/DE343683190334997_20130905195337_7257_AR1-D.vital",
+      "suffix": "DE343683190334997_20130905195337_7257_AR1-D.vital",
+      "n_samples_in_file": 79103,
+      "first_5": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.0
+        ],
+        [
+          30.0,
+          4.0
+        ],
+        [
+          48.0,
+          6.0
+        ],
+        [
+          47.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          47.0,
+          484.0
+        ],
+        [
+          46.0,
+          486.0
+        ],
+        [
+          47.0,
+          488.0
+        ],
+        [
+          46.0,
+          490.0
+        ],
+        [
+          47.0,
+          492.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": -60.0,
+      "val_max": 65.0,
+      "start": "2013-09-05T19:53:37.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2016-09-deid/DE258581688784471/13ICU_16-DE258581688784471/DE258581688784471_20160824083641_33713_CUFF.vital",
+      "suffix": "CUFF",
+      "n_samples_in_file": 3682,
+      "first_5": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1410.0
+        ],
+        [
+          0.0,
+          1412.0
+        ],
+        [
+          7.0,
+          1414.0
+        ],
+        [
+          22.0,
+          1416.0
+        ]
+      ],
+      "last_5": [
+        [
+          1.0,
+          37568.0
+        ],
+        [
+          4.0,
+          37570.0
+        ],
+        [
+          18.0,
+          37572.0
+        ],
+        [
+          45.0,
+          37574.0
+        ],
+        [
+          87.0,
+          37576.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 0.0,
+      "val_max": 140.0,
+      "start": "2016-08-24T08:36:41.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2016-09-deid/DE258581688784471/13ICU_14-DE258581688784471/DE258581688784471_20160830235901_33860_HR.vital",
+      "suffix": "HR",
+      "n_samples_in_file": 58026,
+      "first_5": [
+        [
+          103.0,
+          0.0
+        ],
+        [
+          103.0,
+          2.0
+        ],
+        [
+          103.0,
+          4.0
+        ],
+        [
+          103.0,
+          6.0
+        ],
+        [
+          103.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          99.0,
+          390.0
+        ],
+        [
+          99.0,
+          392.0
+        ],
+        [
+          99.0,
+          394.0
+        ],
+        [
+          98.0,
+          396.0
+        ],
+        [
+          98.0,
+          398.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 98.0,
+      "val_max": 107.0,
+      "start": "2016-08-30T23:59:01.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2016-09-deid/DE258581688784471/13ICU_16-DE258581688784471_1/DE258581688784471_20160824083227_33522_NBP-D.vital",
+      "suffix": "NBP-D",
+      "n_samples_in_file": 76,
+      "first_5": [
+        [
+          67.0,
+          0.0
+        ],
+        [
+          67.0,
+          2.0
+        ],
+        [
+          67.0,
+          4.0
+        ],
+        [
+          67.0,
+          6.0
+        ],
+        [
+          67.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          67.0,
+          142.0
+        ],
+        [
+          67.0,
+          144.0
+        ],
+        [
+          67.0,
+          146.0
+        ],
+        [
+          67.0,
+          148.0
+        ],
+        [
+          67.0,
+          150.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 67.0,
+      "val_max": 67.0,
+      "start": "2016-08-24T08:32:27.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2015-12-deid/DE396519783575496/9ICU_10-DE396519783575496/DE396519783575496_20150903205415_27216_AR1-D.vital",
+      "suffix": "AR1-D",
+      "n_samples_in_file": 2755,
+      "first_5": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.0
+        ],
+        [
+          2.0,
+          4.0
+        ],
+        [
+          2.0,
+          6.0
+        ],
+        [
+          332.0,
+          12.0
+        ]
+      ],
+      "last_5": [
+        [
+          66.0,
+          570.0
+        ],
+        [
+          66.0,
+          572.0
+        ],
+        [
+          65.0,
+          574.0
+        ],
+        [
+          66.0,
+          576.0
+        ],
+        [
+          66.0,
+          578.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 0.0,
+      "val_max": 332.0,
+      "start": "2015-09-03T20:54:15.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2015-12-deid/DE396519783575496/8NICU_1-DE396519783575496/DE396519783575496_20150922175928_27729_AR1-M.vital",
+      "suffix": "AR1-M",
+      "n_samples_in_file": 1434,
+      "first_5": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.0
+        ],
+        [
+          0.0,
+          4.0
+        ],
+        [
+          0.0,
+          6.0
+        ],
+        [
+          0.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          0.0,
+          392.0
+        ],
+        [
+          0.0,
+          394.0
+        ],
+        [
+          0.0,
+          396.0
+        ],
+        [
+          0.0,
+          398.0
+        ],
+        [
+          0.0,
+          400.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": -6.0,
+      "val_max": 0.0,
+      "start": "2015-09-22T17:59:28.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2013-09-deid/DE466633560292831/9ICU_7-DE466633560292831/DE466633560292831_20130901090028_7097_CUFF.vital",
+      "suffix": "DE466633560292831_20130901090028_7097_CUFF.vital",
+      "n_samples_in_file": 51,
+      "first_5": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          2.0
+        ],
+        [
+          15.0,
+          4.0
+        ],
+        [
+          41.0,
+          6.0
+        ],
+        [
+          91.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          145.0,
+          7231.0
+        ],
+        [
+          159.0,
+          7233.0
+        ],
+        [
+          144.0,
+          7235.0
+        ],
+        [
+          130.0,
+          7237.0
+        ],
+        [
+          131.0,
+          7239.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 0.0,
+      "val_max": 159.0,
+      "start": "2013-09-01T09:00:28.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2014-06-deid/DE659548209671340/13ICU_8-DE659548209671340_1/DE659548209671340_20140526080131_13968_NBP-M.vital",
+      "suffix": "NBP-M",
+      "n_samples_in_file": 255949,
+      "first_5": [
+        [
+          73.0,
+          0.0
+        ],
+        [
+          73.0,
+          2.0
+        ],
+        [
+          73.0,
+          4.0
+        ],
+        [
+          73.0,
+          6.0
+        ],
+        [
+          73.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          73.0,
+          390.0
+        ],
+        [
+          73.0,
+          392.0
+        ],
+        [
+          73.0,
+          394.0
+        ],
+        [
+          73.0,
+          396.0
+        ],
+        [
+          73.0,
+          398.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 73.0,
+      "val_max": 73.0,
+      "start": "2014-05-26T08:01:31.000000"
+    },
+    {
+      "path": "/labs/hulab/UCSF/2014-06-deid/DE659548209671340/13ICU_8-DE659548209671340_2/DE659548209671340_20140516182126_13759_AR1-R.vital",
+      "suffix": "AR1-R",
+      "n_samples_in_file": 162035,
+      "first_5": [
+        [
+          96.0,
+          0.0
+        ],
+        [
+          92.0,
+          2.0
+        ],
+        [
+          114.0,
+          4.0
+        ],
+        [
+          109.0,
+          6.0
+        ],
+        [
+          95.0,
+          8.0
+        ]
+      ],
+      "last_5": [
+        [
+          92.0,
+          392.0
+        ],
+        [
+          91.0,
+          394.0
+        ],
+        [
+          92.0,
+          396.0
+        ],
+        [
+          91.0,
+          398.0
+        ],
+        [
+          92.0,
+          400.0
+        ]
+      ],
+      "median_dt_sec": 2.0,
+      "val_min": 71.0,
+      "val_max": 114.0,
+      "start": "2014-05-16T18:21:26.000000"
+    }
+  ],
+  "ehr_tables": {
+    "Filtered_Lab_New": {
+      "n_shards": 4054,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/Filtered_Lab_New/2012_0.txt",
+      "header": "Lab_Order_Date,LOINC_Code,Lab_ID,Lab_Order_Time,Lab_Result_Date,Lab_Result_Time,Lab_Collection_Date,Lab_Collection_Time,Lab_Value,Lab_Unit,Lab_Result_Abnormal,Lab_Procedure_Name,Lab_Procedure_Category,Lab_Procedure_Code,Lab_Component_ID,Lab_Name,Lab_Common_Name,Lab_Type,Lab_Result_Status,LOINC_Level_1,LOINC_Level_2,LOINC_Level_3,LOINC_Name,Lab_Encounter_ID,Lab_Encounter_Is_Inpatient,Lab_Encounter_Type,Lab_Visit_Type,Lab_Age,Lab_Order_Year,Lab_Result_Year,Lab_Collection_Year,Patient_ID,cohort,"
+    },
+    "Filtered_Medication_Orders_New": {
+      "n_shards": 782,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/Filtered_Medication_Orders_New/2012_0.txt",
+      "header": "Medication_Order_Ordered_Date,Medication_Order_ID,Medication_Order_Ordered_Time,Medication_Order_Start_Date,Medication_Order_Start_Time,Medication_Order_End_Date,Medication_Order_End_Time,Medication_Order_Discontinued_Da,Medication_Order_Discontinued_Ti,Medication_Order_Quantity,Medication_Order_Minimum_Dose,Medication_Order_Maximum_Dose,Medication_Order_Calculated_Mini,Medication_Order_Calculated_Maxi,Medication_Order_Refills_Written,Medication_ID,Medication_Name,Medication_Generic_Name,Medication_Therapeutic_Class,Medication_Pharmaceutical_Class,Medication_Pharmaceutical_Subcla,Medication_Dea_Class,Medication_Strength,Medication_Form,Medication_Route,Medication_Order_Class,Medication_Order_Mode,Medication_Controlled,Medication_Orders_Encounter_ID,Medication_Orders_Encounter_Is_I,Medication_Orders_Encounter_Type,Medication_Orders_Visit_Type,Medication_Order_Age,Medication_Ordered_Year,Medication_Start_Year,Patient_ID,cohort,"
+    },
+    "Filtered_Diagnoses_New": {
+      "n_shards": 1018,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/Filtered_Diagnoses_New/2012_0.txt",
+      "header": "Diagnosis_Start_Date,Diagnosis_Key,ICD9_Code,ICD10_Code,Diagnosis_Event_Key,Diagnosis_End_Date,Diagnosis_Hospital_Diagnosis,Diagnosis_Emergency_Department_D,Diagnosis_Chronic,Diagnosis_Event_Type,Diagnosis_Name,Diagnosis_ID,Diagnosis_Type,Diagnosis_Status,Diagnosis_Present_On_Admission,ICD10_Level_1,ICD10_Level_2,ICD10_Level_3,ICD10_Level_4,ICD10_Level_5,ICD10_Level_6,ICD10_Name,ICD9_Level_1,ICD9_Level_2,ICD9_Level_3,ICD9_Level_4,ICD9_Level_5,ICD9_Name,Primary_Coded_Diagnosis,Principal_Problem_Diagnosis,Visit_Primary_Diagnosis,Diagnoses_Encounter_ID,Diagnoses_Encounter_Is_Inpatient,Diagnoses_Encounter_Type,Diagnoses_Visit_Type,Diagnosis_Age,Diagnosis_Year,Patient_ID,cohort,"
+    },
+    "Filtered_Encounters_New": {
+      "n_shards": 447,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/Filtered_Encounters_New/2012_0.txt",
+      "header": "_EncounterDate,_EncounterKey,Encounter_ID,Encounter_Type,Visit_Type,VisitKey,Visit_Length_In_Minutes,Hospital_Admission_ID,Encounter_Hospital_Admission_Dat,Encounter_Admission_Time,_EncounterDischargeDate,Encounter_Discharge_Time,Encounter_LOS_in_Days,Encounter_LOS_in_Hours,Encounter_AdmissionConfirmationS,Encounter_Admission_Type,Encounter_Admission_Source,Encounter_Admission_Patient_Clas,Encounter_HospitalService,Encounter_DRG_Name,Encounter_DRG_Type,Encounter_DRG_Code,Encounter_Discharge_Disposition,Encounter_Is_Inpatient,Encounter_Is_Walk_In,Encounter_Age,Patient_ID,cohort,"
+    },
+    "Filtered_Billing_New": {
+      "n_shards": 6107,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/Filtered_Billing_New/2012_0.txt",
+      "header": "Billing_Service_Date,Billing_Procedure_Code,BillingProcedureKey,Billing_Transaction_ID,Billing_Transaction_Type,Billing_Procedure_HCPCS_Code,Billing_Procedure_Name,Billing_CPT_Level_1,Billing_CPT_Level_2,Billing_CPT_Level_3,Billing_CPT_Level_4,Billing_CPT_Level_5,Billing_CPT_Level_6,Billing_CPT_Level_7,Billing_CPT_Name,Billing_Encounter_ID,Billing_Encounter_Is_Inpatient,Billing_Encounter_Type,Billing_Visit_Type,Billing_Age,Billing_Year,Patient_ID,cohort,"
+    },
+    "Filtered_Procedure_Orders_New": {
+      "n_shards": 3508,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/Filtered_Procedure_Orders_New/2012_01_0.txt",
+      "header": "Procedure_Order_Date,Procedure_ORD_Code,Procedure_HCPCS_Code,Procedure_CPT_Code,Procedure_ID,_ProcedureOrderKey,Procedure_Order_ID,Procedure_DepartmentKey,Procedure_Ordering_Employee,Procedure_Ordering_ProviderKey,Procedure_Order_AuthorizedByProv,Procedure_Order_Time,Procedure_Name,Procedure_Category,Procedure_Code,Procedure_Revenue_Code,Procedure_ADA_Code,Procedure_CPT_Level_1,Procedure_CPT_Level_2,Procedure_CPT_Level_3,Procedure_CPT_Level_4,Procedure_CPT_Level_5,Procedure_CPT_Level_6,Procedure_CPT_Level_7,Procedure_CPT_Name,Procedure_HCPCS_Level_1,Procedure_HCPCS_Level_2,Procedure_HCPCS_Level_3,Procedure_HCPCS_Level_4,Procedure_HCPCS_Name,Procedure_ORD_Level_1,Procedure_ORD_Level_2,Procedure_ORD_Level_3,Procedure_ORD_Name,Procedure_Type,Procedure_Class,Procedure_Mode,Procedure_Source,Procedure_Status,Procedure_Orders_Encounter_ID,Procedure_Orders_Encounter_Is_In,Procedure_Orders_Encounter_Type,Procedure_Orders_Visit_Type,Procedure_Order_Age,Procedure_Order_Year,Patient_ID,cohort,"
+    },
+    "FLOWSHEETVALUEFACT": {
+      "n_shards": 49725,
+      "first_shard": "/labs/hulab/UCSF/rdb_new/FLOWSHEETVALUEFACT/2012_01_0.txt",
+      "header": "FlowsheetRowKey,Value,Occurrence,Count,FlowDate,FlowTime,encounter_ID,patient_ID,fsd,line,cohort,U_ID,"
+    }
+  },
+  "flowsheet_rowkeys_sample": {
+    "shards_scanned": 3,
+    "rows_seen": 30000,
+    "unique_rowkeys": 223,
+    "top_rowkeys": [
+      [
+        "2",
+        13087
+      ],
+      [
+        "2281",
+        4159
+      ],
+      [
+        "2278",
+        3771
+      ],
+      [
+        "2279",
+        1672
+      ],
+      [
+        "1960",
+        1364
+      ],
+      [
+        "1961",
+        451
+      ],
+      [
+        "2280",
+        398
+      ],
+      [
+        "93",
+        237
+      ],
+      [
+        "2007",
+        224
+      ],
+      [
+        "1415",
+        132
+      ],
+      [
+        "1420",
+        125
+      ],
+      [
+        "1657",
+        121
+      ],
+      [
+        "1421",
+        107
+      ],
+      [
+        "77",
+        106
+      ],
+      [
+        "1559",
+        90
+      ],
+      [
+        "749",
+        88
+      ],
+      [
+        "1427",
+        84
+      ],
+      [
+        "1428",
+        84
+      ],
+      [
+        "1423",
+        79
+      ],
+      [
+        "1556",
+        79
+      ],
+      [
+        "1558",
+        70
+      ],
+      [
+        "1560",
+        70
+      ],
+      [
+        "1433",
+        69
+      ],
+      [
+        "1437",
+        67
+      ],
+      [
+        "1536",
+        67
+      ],
+      [
+        "1438",
+        66
+      ],
+      [
+        "1809",
+        64
+      ],
+      [
+        "2039",
+        64
+      ],
+      [
+        "1575",
+        63
+      ],
+      [
+        "1424",
+        62
+      ],
+      [
+        "1504",
+        58
+      ],
+      [
+        "1505",
+        57
+      ],
+      [
+        "1506",
+        57
+      ],
+      [
+        "1507",
+        57
+      ],
+      [
+        "1508",
+        57
+      ],
+      [
+        "1513",
+        57
+      ],
+      [
+        "1514",
+        57
+      ],
+      [
+        "1509",
+        56
+      ],
+      [
+        "1512",
+        56
+      ],
+      [
+        "1515",
+        56
+      ]
+    ]
+  },
+  "offset_table": {
+    "path": "/labs/hulab/UCSF/encounter_date_offset_table_ver_Apr2024.xlsx",
+    "n_rows": 27903,
+    "columns": [
+      "Encounter_ID",
+      "Patient_ID",
+      "Patient_ID_GE",
+      "Wynton_folder",
+      "Encounter_Start_time",
+      "Encounter_LOS",
+      "offset",
+      "offset_GE",
+      "alarm_time",
+      "bed_transferin_time",
+      "bin_file_time",
+      "vital_flag"
+    ],
+    "n_unique_patient_id_ge": 22089,
+    "n_unique_encounter_id": 27841,
+    "n_unique_patient_id": 22089,
+    "wynton_folders_in_table": [
+      "2013-03-deid",
+      "2013-04-deid",
+      "2013-05-deid",
+      "2013-06-deid",
+      "2013-07-deid"
+    ],
+    "n_wynton_folders_in_table": 71
+  }
+}
