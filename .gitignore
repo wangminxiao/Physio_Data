@@ -11,6 +11,7 @@ workzone/logs/*.log
 !workzone/logs/*.summary.txt
 workzone/outputs/**/*.parquet
 workzone/outputs/**/*.csv
+workzone/*/explore/demo_*/
 
 # Python
 __pycache__/
