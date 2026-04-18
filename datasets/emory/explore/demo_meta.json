@@ -1,0 +1,62 @@
+{
+  "entity_id": "1827183_359559206",
+  "empi_nbr": 1827183,
+  "encounter_nbr": 359559206,
+  "wfdb_record": "B035-0564111269",
+  "source_dataset": "emory_sepsis",
+  "n_segments": 960,
+  "segment_duration_sec": 30,
+  "total_duration_hours": 8.0,
+  "wave_start_utc_ms": 1564111269000,
+  "wave_end_utc_ms": 1564140069000,
+  "episode_start_utc_ms": 1564111269000,
+  "episode_end_utc_ms": 1564140069000,
+  "channels": {
+    "PLETH40": {
+      "sample_rate_hz": 40,
+      "shape": [
+        960,
+        1200
+      ],
+      "dtype": "float16",
+      "source_channel": "SPO2",
+      "source_fs_hz": 240
+    },
+    "II120": {
+      "sample_rate_hz": 120,
+      "shape": [
+        960,
+        3600
+      ],
+      "dtype": "float16",
+      "source_channel": "II",
+      "source_fs_hz": 240
+    }
+  },
+  "ehr_layout_version": 2,
+  "n_baseline": 0,
+  "n_recent": 0,
+  "n_events": 16158,
+  "n_future": 0,
+  "context_window_ms": 86400000,
+  "baseline_cap_ms": 2592000000,
+  "future_cap_ms": 604800000,
+  "var_ids_used_in_demo": [
+    0,
+    3,
+    5,
+    7,
+    9,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    150,
+    151,
+    152
+  ],
+  "note": "DEMO extraction \u2014 only first 8h segment (_0000) of full 25-day record used; var_id mapping is placeholder."
+}

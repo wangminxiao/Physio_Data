@@ -1,0 +1,149 @@
+{
+  "name": "emory",
+  "onboarding_date": "2026-04-17",
+  "cohort_start": "sepsis task list (uniq_combine)",
+  "raw_format": {
+    "waveforms": {
+      "type": "WFDB multisegment (Philips monitor export)",
+      "root_path": "/labs/collab/Waveform_Data/Waveform_Data/{cohort_prefix}/{wfdb_record}/",
+      "files": {
+        "top_level_header": "{record}.hea",
+        "waveform_segments": "{record}_0XXX.{hea,mat}",
+        "dense_numerics": "{record}_0n.{hea,mat}",
+        "annotations": ".qrs*, .abpsqi, .ecgsqi*, .ppgsqi, .af, .afsvm, .vf, .wabp (out-of-scope)"
+      },
+      "sample_rates_verified_on_B035-0564111269": {
+        "waveform_fs_hz": 240,
+        "numerics_fs_hz": 0.5
+      },
+      "typical_waveform_channels": ["I", "II", "III", "V", "SPO2", "RR"],
+      "typical_numeric_channels_in_0n": [
+        "HR", "ST-II", "ST-I", "ST-V", "ST-III", "ST-AVF", "ST-AVL", "CUFF", "APNEA",
+        "ST-V1", "ST-AVR", "RESP", "PVC", "SPO2-%", "SPO2-R",
+        "NBP-S", "NBP-D", "NBP-M", "CO2-EX", "CO2-IN", "CO2-RR",
+        "AR2-S", "AR2-D", "AR2-M", "AR2-R", "ST-V6"
+      ],
+      "date_shift": "base_datetime + relativedelta(years=30), treat as UTC",
+      "segment_duration_typical_sec": 28800,
+      "segments_per_record_example": 80
+    },
+    "events": {
+      "type": "CSV (comma-separated, LF)",
+      "root_path": "/labs/hulab/Emory_EHR/CDW_Pull_ICU_Data_Siva_version/",
+      "time_format": "MM/DD/YYYY HH:MM:SS",
+      "timezone_of_raw_strings": "America/New_York (naive)",
+      "canonical_time_storage": "int64 epoch ms UTC",
+      "tables": {
+        "JGSEPSIS_ENCOUNTER.csv": {
+          "key_cols": ["ENCOUNTER_NBR", "PAT_ID"],
+          "important_cols": ["AGE", "HOSPITAL_ADMISSION_DATE_TIME", "HOSPITAL_DISCHARGE_DATE_TIME", "DIAGNOSIS_ICD10_CD", "INSURANCE_STATUS", "ENCOUNTER_TYPE"],
+          "notes": "995,598 encounters; superset of waveform cohort"
+        },
+        "JGSEPSIS_DEMOGRAPHICS.csv": {
+          "key_cols": ["PAT_ID"],
+          "important_cols": ["GENDER", "DOB", "RACE", "ETHNICITY", "GENDER_CODE", "RACE_CODE", "ETHNICITY_CODE"],
+          "notes": "Does NOT contain INSURANCE (that is in ENCOUNTER table)"
+        },
+        "JGSEPSIS_VITALS2.csv": {
+          "key_cols": ["ENCOUNTER_NBR", "RECORDED_TIME"],
+          "important_cols": ["TEMPERATURE", "SBP_LINE", "DBP_LINE", "MAP_LINE", "SBP_CUFF", "DBP_CUFF", "MAP_CUFF", "PULSE", "UNASSISTED_RESP_RATE", "SPO2", "CVP", "END_TIDAL_CO2", "O2_FLOW_RATE", "DAILY_WEIGHT_KG", "HEIGHT_CM", "TEMPROUTE"],
+          "time_col": "RECORDED_TIME",
+          "size_gb": 5.0
+        },
+        "JGSEPSIS_LABS.csv": {
+          "key_cols": ["ENCOUNTER_NBR", "COMPONENT_ID", "LAB_RESULT_TIME"],
+          "important_cols": ["PROC_DESC", "COMPONENT", "LOINC_CODE", "COLLECTION_TIME", "LAB_RESULT_TIME", "LAB_RESULT", "RESULT_STATUS"],
+          "time_col_CORRECTED": "LAB_RESULT_TIME (NOT RESULT_TIME as old stp2 code assumed)",
+          "value_col_CORRECTED": "LAB_RESULT (NOT Component_value)",
+          "name_col_CORRECTED": "COMPONENT (NOT Component_name)",
+          "size_gb": 17.0
+        },
+        "JGSEPSIS_MEDS.csv": {"size_gb": 44.0, "notes": "deferred"},
+        "JGSEPSIS_VENT.csv": {"size_gb": 0.256},
+        "JGSEPSIS_FIO2.csv": {"size_gb": 0.017},
+        "JGSEPSIS_OXYGEN.txt": {"size_gb": 3.4},
+        "JGSEPSIS_INOUTS_ALL.txt": {"size_gb": 2.2},
+        "JGSEPSIS_OUTPUT.txt": {"size_gb": 1.9},
+        "JGSEPSIS_BEDLOCATION.csv": {"size_gb": 0.818},
+        "JGSEPSIS_DIAGNOSIS.csv": {"size_gb": 7.7},
+        "JGSEPSIS_CULTURES.csv": {"size_gb": 0.180},
+        "SBSEPSIS_RX.csv": {"size_gb": 1.6}
+      }
+    },
+    "cohort_and_labels": {
+      "whole_list": {
+        "path": "/labs/hulab/mxwang/data/sepsis/Wav/sepsis_cc_2025_06_13_all_collab.csv",
+        "rows": 1042708,
+        "unique_encounters": 64750,
+        "unique_patients_empi": 51904,
+        "unique_wfdb_records": 80804,
+        "types": ["case", "control", "sepsis_patient_but_not_sepsis_this_encounter"],
+        "columns": ["empi_nbr", "encounter_nbr", "wfdb_record", "sepsis_time_zero_dttm", "wfdb_start", "wfdb_end", "bed_location_start", "bed_location_end", "wfdb_len_seconds", "type", "wfdb_dir"]
+      },
+      "task_list": {
+        "path": "/labs/hulab/mxwang/data/sepsis/Wav/sepsis_cc_2025_06_13_all_collab_uniq_combine.csv",
+        "rows": 235612,
+        "unique_encounters": 11715,
+        "unique_wfdb_records": 15338,
+        "types": ["case", "control"],
+        "case_rows": 17558,
+        "control_rows": 218054,
+        "columns": ["row_index", "encounter_nbr", "wfdb_dir", "wfdb_record", "sepsis_time_zero_dttm", "valid_start", "valid_end", "valid_duration_hour", "valid_duration_sum", "valid_ratio", "type"],
+        "notes": "empi_nbr missing — must join back to whole list"
+      }
+    }
+  },
+  "entity_id_key": {
+    "format": "{empi_nbr}_{encounter_nbr}",
+    "signals": "encounter_nbr (derive empi_nbr via whole-list join)",
+    "events": "ENCOUNTER_NBR in every JGSEPSIS_* table",
+    "linkage": "whole_list.encounter_nbr == JGSEPSIS_*.ENCOUNTER_NBR; whole_list.empi_nbr -> EMPI (patient-level split key); JGSEPSIS_ENCOUNTER.PAT_ID -> JGSEPSIS_DEMOGRAPHICS.PAT_ID"
+  },
+  "channels_found": [
+    {"name": "I",    "source_rate_hz": 240, "target": "I120",     "target_rate_hz": 120},
+    {"name": "II",   "source_rate_hz": 240, "target": "II120",    "target_rate_hz": 120},
+    {"name": "III",  "source_rate_hz": 240, "target": "(drop)",   "target_rate_hz": null},
+    {"name": "V",    "source_rate_hz": 240, "target": "(drop)",   "target_rate_hz": null},
+    {"name": "SPO2", "source_rate_hz": 240, "target": "PLETH40",  "target_rate_hz": 40},
+    {"name": "RR",   "source_rate_hz": 240, "target": "(drop — use RESP from _0n)", "target_rate_hz": null}
+  ],
+  "candidate_event_variables": {
+    "from_JGSEPSIS_VITALS2": ["TEMPERATURE", "UNASSISTED_RESP_RATE", "SBP_CUFF", "DBP_CUFF", "MAP_CUFF", "SBP_LINE", "DBP_LINE", "MAP_LINE", "PULSE", "SPO2", "CVP", "END_TIDAL_CO2", "O2_FLOW_RATE"],
+    "from_JGSEPSIS_LABS": "broad: all COMPONENT_IDs (narrow to 10-20 in a later mapping; use LOINC for unambiguous identity)",
+    "from_WFDB_0n_numerics": ["HR", "SPO2-%", "SPO2-R", "NBP-S", "NBP-D", "NBP-M", "RESP", "CO2-EX", "CO2-IN", "CO2-RR", "PVC", "APNEA", "CUFF", "AR1-*", "AR2-*", "ART-S/M/D (when invasive present)"]
+  },
+  "n_entities_overlap_verified_sample": {
+    "encounter": 359559206,
+    "empi": 1827183,
+    "wfdb_record": "B035-0564111269",
+    "type": "case",
+    "sepsis_time_zero_utc": "2019-07-30T10:49:00Z (from task list)",
+    "valid_window_utc": "2019-07-26T03:21:09Z -> 2019-07-26T11:21:09Z (8h, ratio 0.983)",
+    "full_wave_span_utc": "2019-07-26T03:21:09Z -> 2019-08-20T02:56:15Z (~25d, 76 sub-segments in whole list)",
+    "admission_utc": "2019-07-25T23:12:00Z",
+    "discharge_utc": "2019-08-22T23:19:00Z",
+    "LOS_days": 28,
+    "patient_demographics": {"age": 72, "gender": "Female", "race": "African American or Black", "ethnicity": "Non-Hispanic or Latino", "dob": "1946-08-31"},
+    "primary_dx_icd10": "G40.201",
+    "primary_dx_desc": "Localization-related (focal) (partial) symptomatic epilepsy with status epilepticus",
+    "n_vitals_events_for_this_enc": 937,
+    "n_labs_events_for_this_enc": 748,
+    "n_unique_lab_components": 65
+  },
+  "time_format": {
+    "wfdb_base_datetime": "naive from header; apply +30 years, treat as UTC",
+    "ehr_csv_timestamps": "naive MM/DD/YYYY HH:MM:SS, America/New_York local",
+    "canonical_storage": "int64 epoch ms UTC"
+  },
+  "known_issues": [
+    "Old pipeline stp2 code uses wrong column names for LABS (RESULT_TIME -> LAB_RESULT_TIME, Component_value -> LAB_RESULT, Component_name -> COMPONENT). Do not port blindly.",
+    "Newer emory_vital_lib.py imports IPython.display.display at module level — will ImportError in headless env. Strip or guard.",
+    "emory_vital_lib demo notebook has fs=2 Hz in one cell; true _0n fs is 0.5 Hz per header — trust the header.",
+    "Top-level .hea has null sig_name (multisegment layout row); must read per-segment _0XXX.hea to get channel names.",
+    "WFDB segments include '~' gap markers in seg_name list; skip those during concatenation.",
+    "Waveform channel set varies by record — I/II/III/V/SPO2/RR in this example, but other records may have Pleth, ABP, ART, etc. Canonicalize via emory_vital_lib.canonicalize_sig_names before resample/segment.",
+    "Multiple encounters per patient (empi_nbr) exist; splits must group by empi_nbr to avoid leakage.",
+    "Dense numerics _0n channels can include ST-* (ECG morphology trends), PVC counts, APNEA flags — decide whether these become var_ids or are dropped."
+  ],
+  "next_step_0c_plan": "Extract encounter 359559206 end-to-end: load WFDB _0000 segment, resample SPO2 240->40 Hz, resample II 240->120 Hz, 30s windows, pull VITALS2+LABS for this ENCOUNTER_NBR, align by seg_idx, plot waveform + vital/lab event markers on shared UTC axis."
+}

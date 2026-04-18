@@ -1,0 +1,138 @@
+{
+  "encounter": 359559206,
+  "n_ehr_in_window": 680,
+  "n_0n_nbp_s_steps": 1864,
+  "nearest_step_dt_s": {
+    "median": 55.0,
+    "median_abs": 103.0,
+    "p05": -871.0,
+    "p50": 55.0,
+    "p95": 531.5999999999995
+  },
+  "next_step_after_ehr_dt_s": {
+    "median": 107.0,
+    "p05": 41.0,
+    "p50": 107.0,
+    "p95": 1853.4,
+    "n": 679
+  },
+  "value_diff_at_next_step": {
+    "median": 0.0,
+    "median_abs": 0.0,
+    "p05": -18.0,
+    "p95": 15.100000000000023,
+    "n": 679
+  },
+  "sample_first_10_rows": [
+    {
+      "ehr_t_ms": 1564113600000,
+      "ehr_value": 124.0,
+      "nearest_step_dt_s": 1513.0,
+      "nearest_step_value": 128.0,
+      "next_step_after_ehr_dt_s": 1513.0,
+      "next_step_after_ehr_value": 128.0,
+      "prev_step_before_ehr_dt_s": -1763.0,
+      "prev_step_before_ehr_value": 166.0,
+      "value_diff_next_step": 4.0
+    },
+    {
+      "ehr_t_ms": 1564114260000,
+      "ehr_value": 158.0,
+      "nearest_step_dt_s": 853.0,
+      "nearest_step_value": 128.0,
+      "next_step_after_ehr_dt_s": 853.0,
+      "next_step_after_ehr_value": 128.0,
+      "prev_step_before_ehr_dt_s": -2423.0,
+      "prev_step_before_ehr_value": 166.0,
+      "value_diff_next_step": -30.0
+    },
+    {
+      "ehr_t_ms": 1564117200000,
+      "ehr_value": 124.0,
+      "nearest_step_dt_s": 493.0,
+      "nearest_step_value": 121.0,
+      "next_step_after_ehr_dt_s": 493.0,
+      "next_step_after_ehr_value": 121.0,
+      "prev_step_before_ehr_dt_s": -687.0,
+      "prev_step_before_ehr_value": 124.0,
+      "value_diff_next_step": -3.0
+    },
+    {
+      "ehr_t_ms": 1564120800000,
+      "ehr_value": 77.0,
+      "nearest_step_dt_s": -35.0,
+      "nearest_step_value": 76.0,
+      "next_step_after_ehr_dt_s": 73.0,
+      "next_step_after_ehr_value": 77.0,
+      "prev_step_before_ehr_dt_s": -35.0,
+      "prev_step_before_ehr_value": 76.0,
+      "value_diff_next_step": 0.0
+    },
+    {
+      "ehr_t_ms": 1564122600000,
+      "ehr_value": 102.0,
+      "nearest_step_dt_s": 489.0,
+      "nearest_step_value": 102.0,
+      "next_step_after_ehr_dt_s": 489.0,
+      "next_step_after_ehr_value": 102.0,
+      "prev_step_before_ehr_dt_s": -1307.0,
+      "prev_step_before_ehr_value": 119.0,
+      "value_diff_next_step": 0.0
+    },
+    {
+      "ehr_t_ms": 1564124400000,
+      "ehr_value": 100.0,
+      "nearest_step_dt_s": 485.0,
+      "nearest_step_value": 100.0,
+      "next_step_after_ehr_dt_s": 485.0,
+      "next_step_after_ehr_value": 100.0,
+      "prev_step_before_ehr_dt_s": -1311.0,
+      "prev_step_before_ehr_value": 102.0,
+      "value_diff_next_step": 0.0
+    },
+    {
+      "ehr_t_ms": 1564128000000,
+      "ehr_value": 104.0,
+      "nearest_step_dt_s": 493.0,
+      "nearest_step_value": 104.0,
+      "next_step_after_ehr_dt_s": 493.0,
+      "next_step_after_ehr_value": 104.0,
+      "prev_step_before_ehr_dt_s": -1247.0,
+      "prev_step_before_ehr_value": 125.0,
+      "value_diff_next_step": 0.0
+    },
+    {
+      "ehr_t_ms": 1564131600000,
+      "ehr_value": 100.0,
+      "nearest_step_dt_s": 553.0,
+      "nearest_step_value": 100.0,
+      "next_step_after_ehr_dt_s": 553.0,
+      "next_step_after_ehr_value": 100.0,
+      "prev_step_before_ehr_dt_s": -1321.0,
+      "prev_step_before_ehr_value": 101.0,
+      "value_diff_next_step": 0.0
+    },
+    {
+      "ehr_t_ms": 1564135200000,
+      "ehr_value": 116.0,
+      "nearest_step_dt_s": 477.0,
+      "nearest_step_value": 116.0,
+      "next_step_after_ehr_dt_s": 477.0,
+      "next_step_after_ehr_value": 116.0,
+      "prev_step_before_ehr_dt_s": -969.0,
+      "prev_step_before_ehr_value": 117.0,
+      "value_diff_next_step": 0.0
+    },
+    {
+      "ehr_t_ms": 1564138800000,
+      "ehr_value": 94.0,
+      "nearest_step_dt_s": 553.0,
+      "nearest_step_value": 121.0,
+      "next_step_after_ehr_dt_s": 553.0,
+      "next_step_after_ehr_value": 121.0,
+      "prev_step_before_ehr_dt_s": -1319.0,
+      "prev_step_before_ehr_value": 94.0,
+      "value_diff_next_step": 27.0
+    }
+  ]
+}

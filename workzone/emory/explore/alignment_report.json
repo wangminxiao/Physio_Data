@@ -1,0 +1,302 @@
+{
+  "encounter_nbr": 359559206,
+  "empi_nbr": 1827183,
+  "wfdb_record": "B035-0564111269",
+  "sources": {
+    "list_csv": {
+      "whole_wfdb_start_min_with_Z": "2019-07-26T03:21:09Z",
+      "whole_wfdb_end_max_with_Z": "2019-08-20T02:56:15Z",
+      "task_valid_start_naive": "2019-07-26T03:21:09.000000",
+      "task_valid_end_naive": "2019-07-26T11:21:09.000000",
+      "task_sepsis_time_zero_naive": "2019-07-30T10:49:00.000000",
+      "type": "case",
+      "valid_ratio": 0.983
+    },
+    "wfdb_headers": {
+      "top_base_datetime_naive": "1989-07-26 03:21:09",
+      "top_base_plus30y_naive": "2019-07-26 03:21:09",
+      "top_base_plus30y_as_UTC_iso": "2019-07-26T03:21:09+00:00",
+      "top_base_plus30y_as_NY_then_UTC_iso": "2019-07-26T07:21:09+00:00",
+      "top_sig_len": 518041440,
+      "top_fs": 240,
+      "seg0_sig_name": [
+        "I",
+        "II",
+        "III",
+        "V",
+        "SPO2",
+        "RR"
+      ],
+      "seg0_sig_len": 6912000,
+      "seg0_fs": 240,
+      "seg0_adc_gain": [
+        409.836,
+        409.836,
+        409.836,
+        409.836,
+        200.0,
+        200.0
+      ],
+      "_0n_sig_name": [
+        "HR",
+        "ST-II",
+        "ST-I",
+        "ST-V",
+        "ST-III",
+        "ST-AVF",
+        "ST-AVL",
+        "CUFF",
+        "APNEA",
+        "ST-V1",
+        "ST-AVR",
+        "RESP",
+        "PVC",
+        "SPO2-%",
+        "SPO2-R",
+        "NBP-S",
+        "NBP-D",
+        "NBP-M",
+        "CO2-EX",
+        "CO2-IN",
+        "CO2-RR",
+        "AR2-S",
+        "AR2-D",
+        "AR2-M",
+        "AR2-R",
+        "ST-V6"
+      ],
+      "_0n_sig_len": 1079254,
+      "_0n_fs": 0.5,
+      "_0n_adc_gain": [
+        10.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        10.0,
+        10.0,
+        100.0,
+        100.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        100.0
+      ]
+    },
+    "wave_start_under_H1_utc_iso": "2019-07-26T03:21:09+00:00",
+    "wave_end_under_H1_utc_iso": "2019-08-20T02:56:17+00:00",
+    "wave_start_under_H2_utc_iso": "2019-07-26T07:21:09+00:00",
+    "wave_end_under_H2_utc_iso": "2019-08-20T06:56:17+00:00",
+    "sepsis_time_zero_naive": "2019-07-30T10:49:00.000000",
+    "sepsis_time_zero_as_UTC_iso": "2019-07-30T10:49:00+00:00",
+    "sepsis_time_zero_as_NY_then_UTC_iso": "2019-07-30T14:49:00+00:00",
+    "ehr_vitals_t_range_utc": [
+      "2019-07-25 19:26:00+00:00",
+      "2019-08-22 21:20:00+00:00"
+    ],
+    "ehr_sbp_cuff_count": 701,
+    "ehr_dbp_cuff_count": 701,
+    "ehr_map_cuff_count": 698,
+    "0n_NBP_S_observed_count": 1039949
+  },
+  "alignment_test_nbp_sbp": {
+    "H1_wfdb_as_UTC": {
+      "n": 680,
+      "delta_min_median": -0.016666666666666666,
+      "delta_min_median_abs": 0.016666666666666666,
+      "delta_min_p05": -0.016666666666666666,
+      "delta_min_p50": -0.016666666666666666,
+      "delta_min_p95": -0.016666666666666666,
+      "value_diff_median": 0.0,
+      "value_diff_median_abs": 5.0
+    },
+    "H2_wfdb_as_NY_local": {
+      "n": 674,
+      "delta_min_median": -0.016666666666666666,
+      "delta_min_median_abs": 0.016666666666666666,
+      "delta_min_p05": -0.016666666666666666,
+      "delta_min_p50": -0.016666666666666666,
+      "delta_min_p95": -0.016666666666666666,
+      "value_diff_median": -2.0,
+      "value_diff_median_abs": 16.0
+    },
+    "winning_hypothesis": "H2",
+    "sample_matches_H1": [
+      {
+        "ehr_t_ms": 1564113600000,
+        "wfdb_t_ms": 1564113599000,
+        "delta_ms": -1000,
+        "ehr_value": 124.0,
+        "wfdb_value": 166.0,
+        "value_diff": 42.0
+      },
+      {
+        "ehr_t_ms": 1564114260000,
+        "wfdb_t_ms": 1564114063000,
+        "delta_ms": -197000,
+        "ehr_value": 158.0,
+        "wfdb_value": 166.0,
+        "value_diff": 8.0
+      },
+      {
+        "ehr_t_ms": 1564117200000,
+        "wfdb_t_ms": 1564117199000,
+        "delta_ms": -1000,
+        "ehr_value": 124.0,
+        "wfdb_value": 124.0,
+        "value_diff": 0.0
+      },
+      {
+        "ehr_t_ms": 1564120800000,
+        "wfdb_t_ms": 1564120799000,
+        "delta_ms": -1000,
+        "ehr_value": 77.0,
+        "wfdb_value": 76.0,
+        "value_diff": -1.0
+      },
+      {
+        "ehr_t_ms": 1564122600000,
+        "wfdb_t_ms": 1564122599000,
+        "delta_ms": -1000,
+        "ehr_value": 102.0,
+        "wfdb_value": 119.0,
+        "value_diff": 17.0
+      },
+      {
+        "ehr_t_ms": 1564124400000,
+        "wfdb_t_ms": 1564124399000,
+        "delta_ms": -1000,
+        "ehr_value": 100.0,
+        "wfdb_value": 102.0,
+        "value_diff": 2.0
+      },
+      {
+        "ehr_t_ms": 1564128000000,
+        "wfdb_t_ms": 1564127999000,
+        "delta_ms": -1000,
+        "ehr_value": 104.0,
+        "wfdb_value": 125.0,
+        "value_diff": 21.0
+      },
+      {
+        "ehr_t_ms": 1564131600000,
+        "wfdb_t_ms": 1564131613000,
+        "delta_ms": 13000,
+        "ehr_value": 100.0,
+        "wfdb_value": 101.0,
+        "value_diff": 1.0
+      },
+      {
+        "ehr_t_ms": 1564135200000,
+        "wfdb_t_ms": 1564135199000,
+        "delta_ms": -1000,
+        "ehr_value": 116.0,
+        "wfdb_value": 117.0,
+        "value_diff": 1.0
+      },
+      {
+        "ehr_t_ms": 1564138800000,
+        "wfdb_t_ms": 1564138799000,
+        "delta_ms": -1000,
+        "ehr_value": 94.0,
+        "wfdb_value": 94.0,
+        "value_diff": 0.0
+      }
+    ],
+    "sample_matches_H2": [
+      {
+        "ehr_t_ms": 1564128000000,
+        "wfdb_t_ms": 1564127999000,
+        "delta_ms": -1000,
+        "ehr_value": 104.0,
+        "wfdb_value": 166.0,
+        "value_diff": 62.0
+      },
+      {
+        "ehr_t_ms": 1564131600000,
+        "wfdb_t_ms": 1564131599000,
+        "delta_ms": -1000,
+        "ehr_value": 100.0,
+        "wfdb_value": 124.0,
+        "value_diff": 24.0
+      },
+      {
+        "ehr_t_ms": 1564135200000,
+        "wfdb_t_ms": 1564135199000,
+        "delta_ms": -1000,
+        "ehr_value": 116.0,
+        "wfdb_value": 76.0,
+        "value_diff": -40.0
+      },
+      {
+        "ehr_t_ms": 1564138800000,
+        "wfdb_t_ms": 1564138799000,
+        "delta_ms": -1000,
+        "ehr_value": 94.0,
+        "wfdb_value": 102.0,
+        "value_diff": 8.0
+      },
+      {
+        "ehr_t_ms": 1564142400000,
+        "wfdb_t_ms": 1564142399000,
+        "delta_ms": -1000,
+        "ehr_value": 106.0,
+        "wfdb_value": 125.0,
+        "value_diff": 19.0
+      },
+      {
+        "ehr_t_ms": 1564146000000,
+        "wfdb_t_ms": 1564146013000,
+        "delta_ms": 13000,
+        "ehr_value": 105.0,
+        "wfdb_value": 101.0,
+        "value_diff": -4.0
+      },
+      {
+        "ehr_t_ms": 1564149600000,
+        "wfdb_t_ms": 1564149599000,
+        "delta_ms": -1000,
+        "ehr_value": 102.0,
+        "wfdb_value": 117.0,
+        "value_diff": 15.0
+      },
+      {
+        "ehr_t_ms": 1564153200000,
+        "wfdb_t_ms": 1564153199000,
+        "delta_ms": -1000,
+        "ehr_value": 100.0,
+        "wfdb_value": 94.0,
+        "value_diff": -6.0
+      },
+      {
+        "ehr_t_ms": 1564156800000,
+        "wfdb_t_ms": 1564156799000,
+        "delta_ms": -1000,
+        "ehr_value": 123.0,
+        "wfdb_value": 95.0,
+        "value_diff": -28.0
+      },
+      {
+        "ehr_t_ms": 1564160400000,
+        "wfdb_t_ms": 1564160399000,
+        "delta_ms": -1000,
+        "ehr_value": 113.0,
+        "wfdb_value": 95.0,
+        "value_diff": -18.0
+      }
+    ]
+  }
+}
