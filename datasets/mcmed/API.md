@@ -44,28 +44,37 @@ timezone conversion. **No +30 y shift** (that is Emory-specific).
 
 ### Labs (from `labs.csv` `Component_name`)
 
-| Component_name         | var_id | Canonical name |
-|------------------------|-------:|----------------|
-| POTASSIUM              | 0      | Potassium      |
-| CALCIUM                | 1      | Calcium        |
-| SODIUM                 | 2      | Sodium         |
-| GLUCOSE                | 3      | Glucose        |
-| LACTIC ACID / LACTATE  | 4      | Lactate        |
-| CREATININE             | 5      | Creatinine     |
-| BILIRUBIN TOTAL        | 6      | Bilirubin      |
-| PLATELET COUNT         | 7      | Platelets      |
-| WBC                    | 8      | WBC            |
-| HEMOGLOBIN             | 9      | Hemoglobin     |
-| INR                    | 10     | INR            |
-| BUN                    | 11     | BUN            |
-| ALBUMIN                | 12     | Albumin        |
-| HCO3 / POC:HCO3        | 16     | HCO3           |
-| AST                    | 17     | AST            |
-| ALT                    | 18     | ALT            |
+Names calibrated against the MC_MED `labs.csv` top-50 frequency list (see
+`workzone/mcmed/stage_d_labs.py` `COMPONENT_TO_VAR_ID` for the full mapping).
+
+| Component_name (as MC_MED writes it)    | var_id | Canonical name |
+|-----------------------------------------|-------:|----------------|
+| `POTASSIUM`                             | 0      | Potassium      |
+| `CALCIUM`                               | 1      | Calcium        |
+| `SODIUM`                                | 2      | Sodium         |
+| `GLUCOSE`                               | 3      | Glucose        |
+| `LACTATE` / `LACTIC ACID` / `POC:LACTATE, ISTAT` | 4 | Lactate  |
+| `CREATININE`                            | 5      | Creatinine     |
+| `BILIRUBIN, TOTAL`                      | 6      | Bilirubin      |
+| `PLATELET COUNT (PLT)`                  | 7      | Platelets      |
+| `WHITE BLOOD CELLS (WBC)` / `WBC`       | 8      | WBC            |
+| `HEMOGLOBIN (HGB)`                      | 9      | Hemoglobin     |
+| `INR`                                   | 10     | INR            |
+| `BLOOD UREA NITROGEN (BUN)` / `BUN`     | 11     | BUN            |
+| `ALBUMIN`                               | 12     | Albumin        |
+| `CO2` (BMP) / `POC:HCO3` / `HCO3`       | 16     | HCO3           |
+| `AST (SGOT)` / `AST`                    | 17     | AST            |
+| `ALT (SGPT)` / `ALT`                    | 18     | ALT            |
 
 Event timestamp = `Result_time`. Non-numeric / out-of-physio-range values dropped.
 Extensible: add new rows to the registry's `mcmed_lab_components` field and extend
 the `COMPONENT_TO_VAR_ID` dict in `workzone/mcmed/stage_d_labs.py`.
+
+**ED labs are front-loaded.** Typical MC_MED visit: labs drawn within the first hour
+of arrival, resulted ~30–60 min later; waveform recording often starts after rooming.
+Most lab events therefore land in **`ehr_recent.npy`** (the pre-waveform 24 h
+partition), with smaller counts in `ehr_events.npy` (during-waveform). Training code
+that wants lab history as context features should read `ehr_recent.npy`.
 
 ### Vitals (from `numerics.csv` `Measure`)
 

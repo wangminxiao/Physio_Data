@@ -35,26 +35,50 @@ COMBINED_PARQUET = f"{OUTPUTS_DIR}/stage_d_labs_combined.parquet"
 SUMMARY_JSON = f"{OUTPUTS_DIR}/stage_d_summary.json"
 LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mcmed/logs"
 
-# labs.Component_name -> var_registry id (core + common extensions).
+# labs.Component_name -> var_registry id. Names calibrated against the actual
+# MC_MED labs.csv top-50 frequency list (see datasets/mcmed/API.md §Labs).
 COMPONENT_TO_VAR_ID = {
+    # 0 Potassium
     "POTASSIUM": 0,
+    # 1 Calcium (total, not ionized/corrected)
     "CALCIUM":   1,
+    # 2 Sodium
     "SODIUM":    2,
+    # 3 Glucose
     "GLUCOSE":   3,
-    "LACTIC ACID": 4,
-    "LACTATE":   4,
+    # 4 Lactate
+    "LACTATE":            4,
+    "LACTIC ACID":        4,
+    "POC:LACTATE, ISTAT": 4,
+    # 5 Creatinine
     "CREATININE": 5,
-    "BILIRUBIN TOTAL": 6,
-    "PLATELET COUNT": 7,
-    "WBC":       8,
-    "HEMOGLOBIN": 9,
-    "INR":       10,
-    "BUN":       11,
-    "ALBUMIN":   12,
-    "POC:HCO3":  16,
-    "HCO3":      16,
-    "AST":       17,
-    "ALT":       18,
+    # 6 Bilirubin (total) - MC_MED uses comma
+    "BILIRUBIN, TOTAL": 6,
+    # 7 Platelets - MC_MED uses "(PLT)" suffix
+    "PLATELET COUNT (PLT)": 7,
+    # 8 WBC
+    "WHITE BLOOD CELLS (WBC)": 8,
+    "WBC":                     8,
+    # 9 Hemoglobin - MC_MED uses "(HGB)" suffix
+    "HEMOGLOBIN (HGB)": 9,
+    # 10 INR
+    "INR": 10,
+    # 11 BUN - MC_MED writes full name + abbreviation
+    "BLOOD UREA NITROGEN (BUN)": 11,
+    "BUN":                       11,
+    # 12 Albumin
+    "ALBUMIN": 12,
+    # 16 HCO3 - MC_MED BMP uses "CO2" (total CO2, functionally HCO3); blood-gas
+    # panels use POC:HCO3
+    "CO2":      16,
+    "POC:HCO3": 16,
+    "HCO3":     16,
+    # 17 AST - MC_MED suffixes "(SGOT)"
+    "AST (SGOT)": 17,
+    "AST":        17,
+    # 18 ALT - MC_MED suffixes "(SGPT)"
+    "ALT (SGPT)": 18,
+    "ALT":        18,
 }
 # physio bounds from var_registry (duplicated here to avoid worker registry load)
 PHYSIO_RANGE = {
