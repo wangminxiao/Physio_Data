@@ -23,16 +23,18 @@ peer dataset at `datasets/mover/` with its own API.
 
 ## Waveform → LOG_ID attribution (non-trivial)
 
-XML filename: `{16-hex-MRN}{CB|IP}-{YYYY-MM-DD-HH-MM-SS-mmm}Z.xml`
-- First 16 chars = MRN (directly matches `EPIC_MRN_PAT_ID.csv` MRN column).
+XML filename: `{16-hex-PAT_ID}{CB|IP}-{YYYY-MM-DD-HH-MM-SS-mmm}Z.xml`
+- First 16 chars = **PAT_ID** (the patient-level key in `EPIC_MRN_PAT_ID.csv`, NOT the MRN). Verified empirically: 30/30 sample XML prefixes are in the crosswalk `PAT_ID` column, 0/30 match the `MRN` column. The raw files' directory naming calls these "MRN"-like but they're actually de-identified PAT_IDs.
 - `CB` or `IP` = outpatient/inpatient class (informational).
 - Timestamp is UTC (`Z` suffix) at 3-decimal millisecond precision.
 
 Attribution algorithm (Stage A):
-1. For each XML, parse filename → (MRN, file_datetime_utc).
-2. Look up MRN in crosswalk → candidate LOG_IDs (one MRN often has multiple encounters over time).
-3. Pick the LOG_ID whose anesthesia window `[AN_START_DATETIME − 1h, AN_STOP_DATETIME + 1h]` contains the file timestamp.
-4. If no match, drop the XML (non-OR data — ICU, unrelated).
+1. For each XML, parse filename → (PAT_ID, file_datetime_utc).
+2. Look up PAT_ID in crosswalk → candidate LOG_IDs (one PAT_ID often has multiple encounters over time — 65k LOG_IDs / 40k unique PAT_IDs ≈ 1.66 encounters/patient).
+3. Keep the (XML, LOG_ID) pair only when `file_datetime` falls in `[AN_START_DATETIME − 1h, AN_STOP_DATETIME + 1h]`.
+4. XMLs outside every encounter's AN window are dropped (non-OR data — ICU, unrelated).
+
+First full run: 926,147 XMLs → 2,628,786 (XML × LOG_ID) candidate pairs → 880,225 pairs in an AN window → **34,437 LOG_IDs** with at least 1 attributed XML (median 20 XMLs each).
 
 ## XML decoder
 

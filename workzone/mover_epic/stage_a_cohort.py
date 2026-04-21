@@ -52,13 +52,16 @@ FNAME_RE = re.compile(
 
 
 def filename_to_ms(name: str) -> tuple[str, str, int] | None:
+    """Return (pat_id_16hex, class, file_ms). XML filename prefix is PAT_ID
+    (not MRN as naming in the raw files might suggest) - verified 30/30
+    membership in the crosswalk PAT_ID column."""
     m = FNAME_RE.match(name)
     if not m:
         return None
-    mrn, cls, y, mo, d, h, mi, s, ms = m.groups()
+    pat_id, cls, y, mo, d, h, mi, s, ms = m.groups()
     dt = datetime(int(y), int(mo), int(d), int(h), int(mi), int(s),
                   int(ms) * 1000, tzinfo=UTC)
-    return mrn, cls, int(dt.timestamp() * 1000)
+    return pat_id, cls, int(dt.timestamp() * 1000)
 
 
 def pt_local_to_utc_ms(col: str) -> pl.Expr:
@@ -72,7 +75,7 @@ def pt_local_to_utc_ms(col: str) -> pl.Expr:
 
 
 def enumerate_xmls() -> pl.DataFrame:
-    """Walk all 3 EPIC wave roots, yield (mrn, class, file_ms, path)."""
+    """Walk all 3 EPIC wave roots, yield (pat_id, class, file_ms, path)."""
     rows = []
     for root_s in WAVE_DIRS:
         root = Path(root_s)
@@ -83,11 +86,11 @@ def enumerate_xmls() -> pl.DataFrame:
             parsed = filename_to_ms(p.name)
             if parsed is None:
                 continue
-            mrn, cls, file_ms = parsed
-            rows.append({"mrn": mrn, "class": cls, "file_ms": file_ms,
+            pat_id, cls, file_ms = parsed
+            rows.append({"pat_id": pat_id, "class": cls, "file_ms": file_ms,
                          "path": str(p)})
     return pl.DataFrame(rows, schema={
-        "mrn": pl.Utf8, "class": pl.Utf8, "file_ms": pl.Int64, "path": pl.Utf8,
+        "pat_id": pl.Utf8, "class": pl.Utf8, "file_ms": pl.Int64, "path": pl.Utf8,
     })
 
 
@@ -137,10 +140,12 @@ def main():
     xmls = enumerate_xmls()
     print(f"    total XMLs indexed: {xmls.height:,}  elapsed={time.time()-t1:.1f}s")
 
-    # Join XML.mrn -> crosswalk.MRN (one MRN -> many LOG_IDs)
+    # Join XML.pat_id -> crosswalk.PAT_ID (one PAT_ID -> many LOG_IDs; one
+    # patient can have multiple surgical encounters). Crosswalk: 65k rows /
+    # 39k unique PAT_IDs -> ~1.7 encounters per patient on average.
     xml_joined = xmls.join(xwalk.rename({"MRN": "mrn", "LOG_ID": "log_id",
                                          "PAT_ID": "pat_id"}),
-                           on="mrn", how="inner")
+                           on="pat_id", how="inner")
     print(f"[A] XMLs matched to at least one LOG_ID: {xml_joined.height:,}")
 
     # For each candidate (XML, LOG_ID), keep only when file_ms in
