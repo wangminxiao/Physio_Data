@@ -50,14 +50,19 @@ SEG_SEC = 30
 PLETH_FS = 40
 II_FS = 120
 PLETH_SRC_FS = 100
-II_SRC_FS = 300
+II_SRC_FS = 300       # ECG1 (preferred, monitor-parsed) native rate
+II_SRC_FS_ALT = 180   # GE_ECG (fallback, native GE device stream) native rate
 SEG_LEN_PLETH = SEG_SEC * PLETH_FS   # 1200
 SEG_LEN_II = SEG_SEC * II_FS         # 3600
-MIN_SECONDS_PRESENT = 24             # 24/30 seconds covered (80%)
-MAX_NAN_RATIO = 0.20
+# v2 anchor: require ALL 30 seconds of a window present to pass (strict).
+# v1 used 24/30 (80 %) which kept intermittent-sentinel sessions and produced
+# visible 1-s gaps in the canonical output.
+MIN_SECONDS_PRESENT = 30
+MAX_NAN_RATIO = 0.05   # residual tolerance for resample-boundary NaN
 DEFAULT_WORKERS = 16
 
-WANTED_CHANNELS = {"PLETH", "ECG1"}
+# PLETH anchor + two ECG sources (ECG1 preferred, GE_ECG fallback).
+WANTED_CHANNELS = {"PLETH", "ECG1", "GE_ECG"}
 
 
 def pid_suffix(pid: str) -> str:
@@ -98,11 +103,12 @@ def decode_wave(b64_str: str, gain: float, offset: float,
 
 
 def parse_xml_file(path: Path) -> dict:
-    """Return {'PLETH': {cpc_ms: samples}, 'ECG1': {cpc_ms: samples}}.
+    """Return {'PLETH': {cpc_ms: samples}, 'ECG1': {cpc_ms: samples},
+              'GE_ECG': {cpc_ms: samples}}.
 
     Uses iterparse + element clearing so 6 MB XMLs don't blow memory.
     """
-    out = {"PLETH": {}, "ECG1": {}}
+    out = {"PLETH": {}, "ECG1": {}, "GE_ECG": {}}
     try:
         ctx = ET.iterparse(str(path), events=("start", "end"))
     except Exception:
@@ -215,7 +221,7 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
     if all((out_dir / f).exists() for f in required):
         try:
             m = json.loads(meta_path.read_text())
-            if m.get("stage_b_version", 0) >= 1:
+            if m.get("stage_b_version", 0) >= 2:
                 return {"entity_id": pid, "status": "resumed",
                         "n_seg": int(m.get("n_segments", 0))}
         except Exception:
@@ -229,13 +235,15 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
         return {"entity_id": pid, "status": "no_xmls"}
 
     pleth_map: dict[int, np.ndarray] = {}
-    ecg_map: dict[int, np.ndarray] = {}
+    ecg1_map: dict[int, np.ndarray] = {}
+    ge_ecg_map: dict[int, np.ndarray] = {}
     n_xml_parsed = n_xml_fail = 0
     for p in xml_paths:
         try:
             parsed = parse_xml_file(p)
             pleth_map.update(parsed["PLETH"])
-            ecg_map.update(parsed["ECG1"])
+            ecg1_map.update(parsed["ECG1"])
+            ge_ecg_map.update(parsed["GE_ECG"])
             n_xml_parsed += 1
         except Exception:
             n_xml_fail += 1
@@ -248,7 +256,6 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
     all_secs = sorted(pleth_map.keys())
     first_ms = all_secs[0]
     last_ms = all_secs[-1]
-    # Window starts every 30 s from first_ms (rounded to second)
     win_starts = list(range(first_ms, last_ms + 1, SEG_SEC * 1000))
 
     pleth_blocks = []
@@ -256,6 +263,9 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
     time_ms_list = []
     n_dropped_coverage = 0
     n_dropped_nan = 0
+    n_ii_from_ecg1 = 0
+    n_ii_from_ge   = 0
+    n_ii_missing   = 0
 
     for t_start in win_starts:
         p_win, p_sec = _align_window(pleth_map, t_start, PLETH_SRC_FS, SEG_LEN_PLETH)
@@ -266,10 +276,18 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
         if nan_frac > MAX_NAN_RATIO:
             n_dropped_nan += 1
             continue
-        ii_win, i_sec = _align_window(ecg_map, t_start, II_SRC_FS, SEG_LEN_II)
-        if i_sec < MIN_SECONDS_PRESENT:
-            # Too sparse II: emit all-NaN for this window
-            ii_win = np.full(SEG_LEN_II, np.nan, dtype=np.float32)
+        # ECG: try ECG1 first (300 Hz), else GE_ECG (180 Hz), else NaN
+        ii_win, i_sec = _align_window(ecg1_map, t_start, II_SRC_FS, SEG_LEN_II)
+        if i_sec >= MIN_SECONDS_PRESENT:
+            n_ii_from_ecg1 += 1
+        else:
+            ii_win2, i_sec2 = _align_window(ge_ecg_map, t_start, II_SRC_FS_ALT, SEG_LEN_II)
+            if i_sec2 >= MIN_SECONDS_PRESENT:
+                ii_win = ii_win2
+                n_ii_from_ge += 1
+            else:
+                ii_win = np.full(SEG_LEN_II, np.nan, dtype=np.float32)
+                n_ii_missing += 1
         pleth_blocks.append(p_win)
         ii_blocks.append(ii_win)
         time_ms_list.append(t_start)
@@ -306,10 +324,12 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
         "channels": {
             "PLETH40": {"sample_rate_hz": PLETH_FS, "shape": list(pleth40.shape),
                         "dtype": "float16",
-                        "source": f"SIS XML PLETH @ {PLETH_SRC_FS} Hz, resample_poly(2,5)"},
+                        "source": f"SIS XML PLETH @ {PLETH_SRC_FS} Hz, resample_poly(2,5); strict 30/30 sec coverage"},
             "II120":   {"sample_rate_hz": II_FS, "shape": list(ii120.shape),
                         "dtype": "float16",
-                        "source": f"SIS XML ECG1 @ {II_SRC_FS} Hz, resample_poly(2,5); NaN-filled when coverage<80%"},
+                        "source": f"SIS XML ECG1 @ {II_SRC_FS} Hz preferred (resample_poly(2,5)); "
+                                  f"GE_ECG @ {II_SRC_FS_ALT} Hz fallback (resample_poly(2,3)); "
+                                  f"NaN when neither source has full 30 s coverage"},
         },
         "n_xml_files_listed":  len(xml_paths),
         "n_xml_files_parsed":  n_xml_parsed,
@@ -317,11 +337,15 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
         "n_windows_dropped_coverage": n_dropped_coverage,
         "n_windows_dropped_nan":      n_dropped_nan,
         "n_windows_with_ii":          n_ii_with_data,
+        "n_windows_ii_from_ecg1": n_ii_from_ecg1,
+        "n_windows_ii_from_ge_ecg": n_ii_from_ge,
+        "n_windows_ii_missing":   n_ii_missing,
+        "has_ii":          n_ii_with_data > 0,
         "max_nan_ratio":   MAX_NAN_RATIO,
         "min_seconds_present": MIN_SECONDS_PRESENT,
         "or_start_ms":     int(row["or_start_ms"]) if row.get("or_start_ms") is not None else None,
         "or_end_ms":       int(row["or_end_ms"])   if row.get("or_end_ms")   is not None else None,
-        "stage_b_version": 1,
+        "stage_b_version": 2,
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     return {"entity_id": pid, "status": "ok", "n_seg": int(pleth40.shape[0]),
