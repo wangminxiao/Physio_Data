@@ -50,19 +50,27 @@ SEG_SEC = 30
 PLETH_FS = 40
 II_FS = 120
 PLETH_SRC_FS = 100
-II_SRC_FS = 300       # ECG1 (preferred, monitor-parsed) native rate
-II_SRC_FS_ALT = 180   # GE_ECG (fallback, native GE device stream) native rate
+II_SRC_FS = 300       # ECG1 (monitor-parsed) native rate
 SEG_LEN_PLETH = SEG_SEC * PLETH_FS   # 1200
 SEG_LEN_II = SEG_SEC * II_FS         # 3600
-# v2 anchor: require ALL 30 seconds of a window present to pass (strict).
-# v1 used 24/30 (80 %) which kept intermittent-sentinel sessions and produced
-# visible 1-s gaps in the canonical output.
-MIN_SECONDS_PRESENT = 30
-MAX_NAN_RATIO = 0.05   # residual tolerance for resample-boundary NaN
+
+# v3 windowing policy: keep every 30-s window with >=1 s of real PLETH; NaN-fill
+# any missing-second region in both channels. The per-window second count is
+# saved as coverage_s.npy so training can pick its own quality bar.
+MIN_SECONDS_PRESENT = 1        # window-level: keep anything with any data
+MIN_CLEAN_WINDOWS   = 5        # entity-level: require >=5 fully-clean (30/30) windows
+MAX_NAN_RATIO = 1.0            # permissive at storage time; training filters via coverage_s
 DEFAULT_WORKERS = 16
 
-# PLETH anchor + two ECG sources (ECG1 preferred, GE_ECG fallback).
-WANTED_CHANNELS = {"PLETH", "ECG1", "GE_ECG"}
+# v3 channel policy: Stream-A filter (see parse_xml_file). Only PLETH + ECG1
+# from Stream A are used; GE_ECG was a v2 no-op since Stream B's
+# fractional-second cpc timestamps never matched our whole-second per_sec_map.
+WANTED_CHANNELS = {"PLETH", "ECG1"}
+
+# Per UCI's waveform_decode.py, INVP1 / GE_ART gains in the XML are incorrect
+# and must be overridden. Dormant for now (we don't extract those channels) but
+# retained so an ABP125 extension won't silently mis-scale.
+CHANNEL_GAIN_OVERRIDE = {"INVP1": 0.01, "GE_ART": 0.25}
 
 
 def pid_suffix(pid: str) -> str:
@@ -103,12 +111,14 @@ def decode_wave(b64_str: str, gain: float, offset: float,
 
 
 def parse_xml_file(path: Path) -> dict:
-    """Return {'PLETH': {cpc_ms: samples}, 'ECG1': {cpc_ms: samples},
-              'GE_ECG': {cpc_ms: samples}}.
+    """Return {'PLETH': {cpc_ms: samples}, 'ECG1': {cpc_ms: samples}}.
 
-    Uses iterparse + element clearing so 6 MB XMLs don't blow memory.
+    v3 only processes Stream A: `<measurements>` blocks that contain a
+    `<m name="POLLTIME">` child. Stream B (GE native, fractional cpc
+    timestamps, no POLLTIME) is skipped explicitly. Uses iterparse +
+    element clearing so 6 MB XMLs don't blow memory.
     """
-    out = {"PLETH": {}, "ECG1": {}, "GE_ECG": {}}
+    out = {"PLETH": {}, "ECG1": {}}
     try:
         ctx = ET.iterparse(str(path), events=("start", "end"))
     except Exception:
@@ -116,7 +126,7 @@ def parse_xml_file(path: Path) -> dict:
     cur_cpc_ms = None
     for event, elem in ctx:
         # Capture cpc datetime on START event — end events fire bottom-up so
-        # <mg> children end before their parent <cpc>; if we read datetime on
+        # <measurements> ends before its parent <cpc>; if we read datetime on
         # cpc-end we'd only have it after children already processed.
         if event == "start" and elem.tag == "cpc":
             dt_s = elem.attrib.get("datetime")
@@ -130,39 +140,59 @@ def parse_xml_file(path: Path) -> dict:
             continue
         if elem.tag == "cpc":
             elem.clear()
-        elif elem.tag == "mg":
-            name = elem.get("name")
-            if name in WANTED_CHANNELS and cur_cpc_ms is not None:
-                wave = offset = gain = None
-                points = None
-                vmin = vmax = None
-                for m in elem.findall("m"):
-                    n = m.attrib.get("name")
-                    if n == "Wave":
-                        wave = m.text
-                    elif n == "Gain":
-                        try: gain = float(m.text)
-                        except (TypeError, ValueError): gain = None
-                    elif n == "Offset":
-                        try: offset = float(m.text)
-                        except (TypeError, ValueError): offset = None
-                    elif n == "Points":
-                        try: points = int(m.text)
-                        except (TypeError, ValueError): points = None
-                    elif n == "Min":
-                        try: vmin = float(m.text)
-                        except (TypeError, ValueError): vmin = None
-                    elif n == "Max":
-                        try: vmax = float(m.text)
-                        except (TypeError, ValueError): vmax = None
-                if wave and gain is not None and offset is not None and points:
-                    try:
-                        samples = decode_wave(wave, gain, offset, vmin, vmax)
-                        if len(samples) == points:
-                            out[name][cur_cpc_ms] = samples
-                    except Exception:
-                        pass
+            continue
+        if elem.tag != "measurements":
+            continue
+        # Stream-A filter: only process measurements blocks that have POLLTIME.
+        # Stream B (GE_ECG / GE_ART, fractional-second cpc timestamps) carries
+        # no POLLTIME and isn't useful in the per-second-keyed alignment.
+        polltime_present = False
+        for m in elem.findall("m"):
+            if m.attrib.get("name") == "POLLTIME" and m.text:
+                polltime_present = True
+                break
+        if not polltime_present or cur_cpc_ms is None:
             elem.clear()
+            continue
+        # Extract all wanted <mg> children of this measurements block.
+        for mg in elem.findall("mg"):
+            name = mg.get("name")
+            if name not in WANTED_CHANNELS:
+                continue
+            wave = offset = gain = None
+            points = None
+            vmin = vmax = None
+            for m in mg.findall("m"):
+                n = m.attrib.get("name")
+                if n == "Wave":
+                    wave = m.text
+                elif n == "Gain":
+                    try: gain = float(m.text)
+                    except (TypeError, ValueError): gain = None
+                elif n == "Offset":
+                    try: offset = float(m.text)
+                    except (TypeError, ValueError): offset = None
+                elif n == "Points":
+                    try: points = int(m.text)
+                    except (TypeError, ValueError): points = None
+                elif n == "Min":
+                    try: vmin = float(m.text)
+                    except (TypeError, ValueError): vmin = None
+                elif n == "Max":
+                    try: vmax = float(m.text)
+                    except (TypeError, ValueError): vmax = None
+            # Apply UCI's per-channel gain overrides where applicable (dormant
+            # for PLETH/ECG1 but future-proof for ABP extraction).
+            if name in CHANNEL_GAIN_OVERRIDE:
+                gain = CHANNEL_GAIN_OVERRIDE[name]
+            if wave and gain is not None and offset is not None and points:
+                try:
+                    samples = decode_wave(wave, gain, offset, vmin, vmax)
+                    if len(samples) == points:
+                        out[name][cur_cpc_ms] = samples
+                except Exception:
+                    pass
+        elem.clear()
     return out
 
 
@@ -217,11 +247,12 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
     out_dir = Path(out_root) / pid
     meta_path = out_dir / "meta.json"
 
-    required = ["PLETH40.npy", "II120.npy", "time_ms.npy", "meta.json"]
+    required = ["PLETH40.npy", "II120.npy", "time_ms.npy", "meta.json",
+                "coverage_s.npy"]
     if all((out_dir / f).exists() for f in required):
         try:
             m = json.loads(meta_path.read_text())
-            if m.get("stage_b_version", 0) >= 2:
+            if m.get("stage_b_version", 0) >= 3:
                 return {"entity_id": pid, "status": "resumed",
                         "n_seg": int(m.get("n_segments", 0))}
         except Exception:
@@ -236,14 +267,12 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
 
     pleth_map: dict[int, np.ndarray] = {}
     ecg1_map: dict[int, np.ndarray] = {}
-    ge_ecg_map: dict[int, np.ndarray] = {}
     n_xml_parsed = n_xml_fail = 0
     for p in xml_paths:
         try:
             parsed = parse_xml_file(p)
             pleth_map.update(parsed["PLETH"])
             ecg1_map.update(parsed["ECG1"])
-            ge_ecg_map.update(parsed["GE_ECG"])
             n_xml_parsed += 1
         except Exception:
             n_xml_fail += 1
@@ -252,7 +281,7 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
         return {"entity_id": pid, "status": "no_pleth_blocks",
                 "n_xmls": len(xml_paths), "n_xml_fail": n_xml_fail}
 
-    # Enumerate 30 s windows aligned to the first PLETH cpc second
+    # Enumerate 30 s windows aligned to the first PLETH cpc second.
     all_secs = sorted(pleth_map.keys())
     first_ms = all_secs[0]
     last_ms = all_secs[-1]
@@ -260,49 +289,46 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
 
     pleth_blocks = []
     ii_blocks = []
-    time_ms_list = []
-    n_dropped_coverage = 0
-    n_dropped_nan = 0
-    n_ii_from_ecg1 = 0
-    n_ii_from_ge   = 0
-    n_ii_missing   = 0
+    time_ms_list: list[int] = []
+    coverage_s_list: list[int] = []   # per-window PLETH seconds present (0..30)
+    ii_coverage_s_list: list[int] = [] # per-window ECG1 seconds present (0..30)
+    n_dropped_empty = 0
+    n_ii_with_any = 0
 
     for t_start in win_starts:
         p_win, p_sec = _align_window(pleth_map, t_start, PLETH_SRC_FS, SEG_LEN_PLETH)
         if p_sec < MIN_SECONDS_PRESENT:
-            n_dropped_coverage += 1
+            n_dropped_empty += 1
             continue
-        nan_frac = float(np.isnan(p_win).mean())
-        if nan_frac > MAX_NAN_RATIO:
-            n_dropped_nan += 1
-            continue
-        # ECG: try ECG1 first (300 Hz), else GE_ECG (180 Hz), else NaN
         ii_win, i_sec = _align_window(ecg1_map, t_start, II_SRC_FS, SEG_LEN_II)
-        if i_sec >= MIN_SECONDS_PRESENT:
-            n_ii_from_ecg1 += 1
-        else:
-            ii_win2, i_sec2 = _align_window(ge_ecg_map, t_start, II_SRC_FS_ALT, SEG_LEN_II)
-            if i_sec2 >= MIN_SECONDS_PRESENT:
-                ii_win = ii_win2
-                n_ii_from_ge += 1
-            else:
-                ii_win = np.full(SEG_LEN_II, np.nan, dtype=np.float32)
-                n_ii_missing += 1
+        if i_sec >= 1:
+            n_ii_with_any += 1
+        # _align_window returns all-NaN when i_sec == 0; keep as-is
         pleth_blocks.append(p_win)
         ii_blocks.append(ii_win)
         time_ms_list.append(t_start)
+        coverage_s_list.append(p_sec)
+        ii_coverage_s_list.append(i_sec)
 
     if not pleth_blocks:
         return {"entity_id": pid, "status": "no_valid_windows",
                 "n_xmls_parsed": n_xml_parsed,
-                "n_dropped_coverage": n_dropped_coverage,
-                "n_dropped_nan": n_dropped_nan}
+                "n_dropped_empty": n_dropped_empty}
+
+    coverage_s = np.asarray(coverage_s_list, dtype=np.uint8)
+    ii_coverage_s = np.asarray(ii_coverage_s_list, dtype=np.uint8)
+    n_clean_windows = int((coverage_s == SEG_SEC).sum())
+    if n_clean_windows < MIN_CLEAN_WINDOWS:
+        return {"entity_id": pid, "status": "too_few_clean_windows",
+                "n_xmls_parsed": n_xml_parsed,
+                "n_windows_kept": int(len(coverage_s)),
+                "n_clean_windows": n_clean_windows}
 
     pleth40 = np.ascontiguousarray(np.vstack(pleth_blocks).astype(np.float16))
     ii120 = np.ascontiguousarray(np.vstack(ii_blocks).astype(np.float16))
     time_ms = np.asarray(time_ms_list, dtype=np.int64)
     assert pleth40.flags["C_CONTIGUOUS"] and ii120.flags["C_CONTIGUOUS"]
-    assert pleth40.shape[0] == ii120.shape[0] == len(time_ms)
+    assert pleth40.shape[0] == ii120.shape[0] == len(time_ms) == len(coverage_s)
     assert pleth40.shape[1] == SEG_LEN_PLETH and ii120.shape[1] == SEG_LEN_II
     assert len(time_ms) == 1 or np.all(np.diff(time_ms) > 0)
 
@@ -310,8 +336,9 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
     np.save(out_dir / "PLETH40.npy", pleth40)
     np.save(out_dir / "II120.npy", ii120)
     np.save(out_dir / "time_ms.npy", time_ms)
+    np.save(out_dir / "coverage_s.npy", coverage_s)
+    np.save(out_dir / "ii_coverage_s.npy", ii_coverage_s)
 
-    n_ii_with_data = int(np.sum(~np.all(np.isnan(ii120), axis=1)))
     meta = {
         "entity_id": pid,
         "pid": pid,
@@ -324,34 +351,34 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
         "channels": {
             "PLETH40": {"sample_rate_hz": PLETH_FS, "shape": list(pleth40.shape),
                         "dtype": "float16",
-                        "source": f"SIS XML PLETH @ {PLETH_SRC_FS} Hz, resample_poly(2,5); strict 30/30 sec coverage"},
+                        "source": f"SIS XML PLETH (Stream-A only via POLLTIME filter) @ {PLETH_SRC_FS} Hz, resample_poly(2,5); NaN-filled per missing-second"},
             "II120":   {"sample_rate_hz": II_FS, "shape": list(ii120.shape),
                         "dtype": "float16",
-                        "source": f"SIS XML ECG1 @ {II_SRC_FS} Hz preferred (resample_poly(2,5)); "
-                                  f"GE_ECG @ {II_SRC_FS_ALT} Hz fallback (resample_poly(2,3)); "
-                                  f"NaN when neither source has full 30 s coverage"},
+                        "source": f"SIS XML ECG1 (Stream-A only) @ {II_SRC_FS} Hz, resample_poly(2,5); NaN-filled per missing-second"},
         },
         "n_xml_files_listed":  len(xml_paths),
         "n_xml_files_parsed":  n_xml_parsed,
         "n_xml_files_failed":  n_xml_fail,
-        "n_windows_dropped_coverage": n_dropped_coverage,
-        "n_windows_dropped_nan":      n_dropped_nan,
-        "n_windows_with_ii":          n_ii_with_data,
-        "n_windows_ii_from_ecg1": n_ii_from_ecg1,
-        "n_windows_ii_from_ge_ecg": n_ii_from_ge,
-        "n_windows_ii_missing":   n_ii_missing,
-        "has_ii":          n_ii_with_data > 0,
-        "max_nan_ratio":   MAX_NAN_RATIO,
+        "n_windows_dropped_empty":  n_dropped_empty,
+        "n_windows_with_ii_any":    n_ii_with_any,
+        "n_windows_clean_pleth":    n_clean_windows,
+        "n_windows_clean_ii":       int((ii_coverage_s == SEG_SEC).sum()),
+        "has_ii":          bool(n_ii_with_any > 0),
+        "coverage_file":   "coverage_s.npy",       # [N_seg] uint8, seconds of PLETH present per window
+        "ii_coverage_file": "ii_coverage_s.npy",   # [N_seg] uint8, seconds of ECG1 present per window
         "min_seconds_present": MIN_SECONDS_PRESENT,
+        "min_clean_windows":   MIN_CLEAN_WINDOWS,
+        "max_nan_ratio":   MAX_NAN_RATIO,
+        "stream_filter":   "polltime_only",
         "or_start_ms":     int(row["or_start_ms"]) if row.get("or_start_ms") is not None else None,
         "or_end_ms":       int(row["or_end_ms"])   if row.get("or_end_ms")   is not None else None,
-        "stage_b_version": 2,
+        "stage_b_version": 3,
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     return {"entity_id": pid, "status": "ok", "n_seg": int(pleth40.shape[0]),
-            "n_xmls": n_xml_parsed, "n_windows_with_ii": n_ii_with_data,
-            "n_dropped_coverage": n_dropped_coverage,
-            "n_dropped_nan": n_dropped_nan}
+            "n_xmls": n_xml_parsed, "n_windows_clean_pleth": n_clean_windows,
+            "n_windows_with_ii_any": n_ii_with_any,
+            "n_dropped_empty": n_dropped_empty}
 
 
 def _worker(args):
