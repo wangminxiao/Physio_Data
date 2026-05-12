@@ -285,20 +285,21 @@ def main():
 
     t_start = time.time()
 
-    # 1. Patient universe (= directories with the required files)
-    patient_ids: list[str] = []
+    # 1. Patient universe (all dirs with required files).
+    #    ALL such patients are scanned for the height/weight cache; --limit
+    #    only restricts which patients we aggregate + write rows for.
+    all_patient_ids: list[str] = []
     for d in sorted(OUT_ROOT.iterdir()):
         if not d.is_dir(): continue
         if not all((d / x).exists() for x in ("meta.json", "ehr_events.npy", "time_ms.npy")):
             continue
-        patient_ids.append(d.name)
-    if args.limit > 0:
-        patient_ids = patient_ids[:args.limit]
-    log.info(f"patients to process: {len(patient_ids)}")
+        all_patient_ids.append(d.name)
+    patient_ids = all_patient_ids[:args.limit] if args.limit > 0 else all_patient_ids
+    log.info(f"patients total={len(all_patient_ids)} to_aggregate={len(patient_ids)}")
 
-    # 2. t0 per patient
+    # 2. t0 per patient (over ALL patients, so cache covers full cohort)
     t0_map: dict[int, int] = {}
-    for pid in patient_ids:
+    for pid in all_patient_ids:
         try:
             tm = np.load(OUT_ROOT / pid / "time_ms.npy", mmap_mode="r")
             if tm.size:

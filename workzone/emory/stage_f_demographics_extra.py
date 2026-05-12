@@ -259,23 +259,24 @@ def main():
     t0 = time.time()
     out_root = Path(args.out_root)
 
-    # 1. Entity universe: directories that have meta.json AND ehr_events.npy
-    entity_ids = []
+    # 1. Entity universe: directories that have meta.json AND ehr_events.npy.
+    #    ALL such entities are scanned for the height/weight cache; --limit
+    #    only restricts which entities we aggregate + write rows for.
+    all_entity_ids: list[str] = []
     for d in sorted(out_root.iterdir()):
         if not d.is_dir(): continue
         if not (d / "meta.json").exists(): continue
         if not (d / "ehr_events.npy").exists(): continue
         if not (d / "time_ms.npy").exists(): continue
-        entity_ids.append(d.name)
-    if args.limit > 0:
-        entity_ids = entity_ids[:args.limit]
-    log.info(f"entities to process: {len(entity_ids)}")
+        all_entity_ids.append(d.name)
+    entity_ids = all_entity_ids[:args.limit] if args.limit > 0 else all_entity_ids
+    log.info(f"entities total={len(all_entity_ids)} to_aggregate={len(entity_ids)}")
 
-    # 2. Cohort + existing demographics (for admit_dx_icd10 re-emit)
+    # 2. Cohort lookup (admit_dx_icd10 re-emit)
     cohort = (
         pl.read_parquet(COHORT_PARQUET)
           .unique("entity_id", keep="first")
-          .filter(pl.col("entity_id").is_in(entity_ids))
+          .filter(pl.col("entity_id").is_in(all_entity_ids))
     )
     log.info(f"cohort rows matched: {cohort.height}")
     icd_lookup: dict[str, str] = {
@@ -283,16 +284,14 @@ def main():
         for r in cohort.iter_rows(named=True)
     }
 
-    # 3. t0 per entity (from time_ms.npy) — needed for height/weight pre-aggregation
+    # 3. t0 per entity (over ALL entities, so cache covers full cohort)
     t0_map: dict[int, int] = {}
-    entity_t0: dict[str, int] = {}
-    for eid in entity_ids:
+    for eid in all_entity_ids:
         tp = out_root / eid / "time_ms.npy"
         try:
             tm = np.load(tp, mmap_mode="r")
             if tm.size:
                 t0_val = int(tm[0])
-                entity_t0[eid] = t0_val
                 try:
                     enc = int(eid.split("_", 1)[1])
                     t0_map[enc] = t0_val
