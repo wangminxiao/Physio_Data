@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Post-stage: MIMIC-III demographics_extra.csv (augments demographics.csv).
+Post-stage: MIMIC-III demographics_4h.csv (augments demographics.csv).
 
 Adds first-4-hour aggregates anchored at the first segment time_ms of each
 admission, plus height/weight pulled from CHARTEVENTS / ADMISSIONS:
@@ -51,7 +51,7 @@ EHR_ROOT      = cfg["mimic3"]["raw_ehr_dir"]
 OUT_ROOT      = Path(cfg["mimic3"]["output_dir"])
 OUTPUTS_DIR   = REPO_ROOT / "workzone" / "outputs" / "mimic3"
 HW_CACHE      = OUTPUTS_DIR / "post_demographics_height_weight_cache.parquet"
-SUMMARY_JSON  = OUTPUTS_DIR / "post_demographics_extra_summary.json"
+SUMMARY_JSON  = OUTPUTS_DIR / "post_demographics_4h_summary.json"
 
 FOUR_HOURS_MS = 4 * 3600 * 1000
 
@@ -340,8 +340,8 @@ def main():
         if i % 500 == 0:
             log.info(f"  processed {i}/{len(patient_ids)}")
 
-    # 6. Emit demographics_extra.csv
-    out_csv = OUT_ROOT / "demographics_extra.csv"
+    # 6. Emit demographics_4h.csv
+    out_csv = OUT_ROOT / "demographics_4h.csv"
     cols = ["patient_id", "height_cm", "weight_kg",
             "avg_hr_4h", "avg_sbp_4h", "avg_dbp_4h", "avg_map_4h", "bp_source",
             "admission_diagnosis", "icd9_primary",
@@ -355,7 +355,7 @@ def main():
 
     elapsed = time.time() - t_start
     summary = {
-        "stage":                "post_demographics_extra",
+        "stage":                "post_demographics_4h",
         "ran_at_unix":          int(time.time()),
         "elapsed_sec":          round(elapsed, 1),
         "n_patients_processed": len(patient_ids),

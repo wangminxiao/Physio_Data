@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stage F-3 — Emory demographics_extra.csv (augments demographics.csv).
+Stage F-3 — Emory demographics_4h.csv (augments demographics.csv).
 
 Adds first-4-hour aggregates anchored at the first segment time_ms of each
 entity, plus height/weight pulled from JGSEPSIS_VITALS2:
@@ -45,7 +45,7 @@ OUT_ROOT = "/opt/localdata100tb/physio_data/emory"
 COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/emory/valid_wave_window.parquet"
 OUTPUTS_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/emory"
 HW_CACHE_PARQUET = f"{OUTPUTS_DIR}/stage_f_height_weight_cache.parquet"
-SUMMARY_JSON = f"{OUTPUTS_DIR}/stage_f_demographics_extra_summary.json"
+SUMMARY_JSON = f"{OUTPUTS_DIR}/stage_f_demographics_4h_summary.json"
 
 NY_TZ = "America/New_York"
 FOUR_HOURS_MS = 4 * 3600 * 1000
@@ -321,8 +321,8 @@ def main():
         if i % 500 == 0:
             log.info(f"  processed {i}/{len(entity_ids)}")
 
-    # 6. Emit demographics_extra.csv
-    out_csv = out_root / "demographics_extra.csv"
+    # 6. Emit demographics_4h.csv
+    out_csv = out_root / "demographics_4h.csv"
     cols = ["entity_id", "height_cm", "weight_kg",
             "avg_hr_4h", "avg_sbp_4h", "avg_dbp_4h", "avg_map_4h", "bp_source",
             "admit_dx_icd10",
@@ -343,7 +343,7 @@ def main():
     n_bp_cuff      = sum(1 for r in rows if r["bp_source"]  == "cuff")
 
     summary = {
-        "stage":                "f_demographics_extra",
+        "stage":                "f_demographics_4h",
         "ran_at_unix":          int(time.time()),
         "elapsed_sec":          round(elapsed, 1),
         "n_entities_processed": len(entity_ids),
