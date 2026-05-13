@@ -76,7 +76,7 @@ def plot_patient(patient_dir, detail_seg=None, detail_hour=None, out_path=None):
     patient_id = meta.get("patient_id", os.path.basename(patient_dir))
     n_seg = len(time_ms)
     ref_ms = int(time_ms[0])
-    stride_sec = meta.get("stride_sec", 25)
+    stride_sec = meta.get("stride_sec", 30)
 
     hours = time_ms_to_hours(time_ms, ref_ms)
     total_hours = hours[-1] + meta.get("segment_duration_sec", 30) / 3600

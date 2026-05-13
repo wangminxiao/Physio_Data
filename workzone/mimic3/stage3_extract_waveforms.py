@@ -5,14 +5,16 @@ Stage 3: Extract waveforms from raw WFDB records into canonical .npy format.
 PLETH-anchored alignment: only include WFDB segments where PLETH is present.
 Other channels (II) are NaN-filled when absent in a PLETH-present segment.
 Gaps between recording blocks are reflected in time_ms jumps (no NaN-fill).
-Segments use 30s windows with 5s overlap (25s stride).
+Segments use 30 s non-overlapping windows (30 s stride) — consistent with
+the other physio_data datasets (Emory, MC_MED, UCSF, MOVER/SIS,
+MOVER/EPIC, VitalDB).
 
 For each patient in the filtered inventory:
   1. Parse master header to get segment list + recording start time
   2. Match to hospital admission (HADM_ID) via ADMISSIONS table
   3. Read PLETH-anchored blocks (joint channel reading)
   4. Resample: PLETH 125Hz -> 40Hz, II 125Hz -> 120Hz
-  5. Segment into 30s overlapping windows (5s overlap)
+  5. Segment into 30 s non-overlapping windows (30 s stride)
   6. Build ehr_events.npy from labs + vitals filtered by HADM_ID
   7. Save as per-patient directory: {SUBJECT_ID}_{HADM_ID}/
 
@@ -55,8 +57,8 @@ PROCESSED_ROOT = cfg["mimic3"]["output_dir"]
 
 # Canonical format constants
 SEGMENT_DUR_SEC = 30
-OVERLAP_SEC = 5
-STRIDE_SEC = SEGMENT_DUR_SEC - OVERLAP_SEC  # 25
+OVERLAP_SEC = 0
+STRIDE_SEC = SEGMENT_DUR_SEC - OVERLAP_SEC  # 30 — matches the other datasets
 WAVEFORM_DTYPE = np.float16
 TIME_DTYPE = np.int64
 EHR_EVENT_DTYPE = np.dtype([
@@ -258,10 +260,10 @@ def resample_signal(signal, src_fs, target_fs):
 
 
 def segment_signal(signal, sample_rate, seg_dur_sec=SEGMENT_DUR_SEC, overlap_sec=OVERLAP_SEC):
-    """Split 1D signal into overlapping [N_seg, samples_per_seg] float16 segments.
+    """Split 1D signal into [N_seg, samples_per_seg] float16 segments.
 
-    Window: seg_dur_sec (30s)
-    Stride: seg_dur_sec - overlap_sec (25s)
+    Window: seg_dur_sec (30 s)
+    Stride: seg_dur_sec - overlap_sec (30 s; overlap defaults to 0)
     """
     samples_per_seg = int(sample_rate * seg_dur_sec)
     stride_samples = int(sample_rate * (seg_dur_sec - overlap_sec))
@@ -271,7 +273,7 @@ def segment_signal(signal, sample_rate, seg_dur_sec=SEGMENT_DUR_SEC, overlap_sec
 
     n_seg = (len(signal) - samples_per_seg) // stride_samples + 1
 
-    # as_strided creates overlapping views, ascontiguousarray copies to C-contiguous
+    # as_strided builds a view (may overlap when overlap_sec>0); ascontiguousarray copies to C-contiguous
     view = np.lib.stride_tricks.as_strided(
         signal,
         shape=(n_seg, samples_per_seg),
@@ -512,7 +514,7 @@ def process_patient(args):
         # 8. Count recording blocks (gaps show up as time_ms jumps > stride)
         if len(time_ms) > 1:
             diffs = np.diff(time_ms)
-            n_gaps = int(np.sum(diffs > STRIDE_SEC * 1000 * 1.5))  # >37.5s gap
+            n_gaps = int(np.sum(diffs > STRIDE_SEC * 1000 * 1.5))  # >45 s gap (1.5x stride)
         else:
             n_gaps = 0
 
