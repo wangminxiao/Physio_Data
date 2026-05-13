@@ -119,12 +119,17 @@ python workzone/mimic3/post_sepsis_trajectory.py
 
 # --- 7. Demographics ---
 echo ""
-echo "[9/10] post_demographics.py ..."
+echo "[9/11] post_demographics.py ..."
 python workzone/mimic3/post_demographics.py
+
+# --- 7b. Demographics_4h (height/weight + first-4h HR/BP aggregates) ---
+echo ""
+echo "[10/11] post_demographics_extra.py ..."
+python workzone/mimic3/post_demographics_extra.py
 
 # --- 8. Manifest + splits ---
 echo ""
-echo "[10/10] stage4_manifest_splits.py ..."
+echo "[11/11] stage4_manifest_splits.py ..."
 python workzone/mimic3/stage4_manifest_splits.py
 
 echo ""
@@ -135,6 +140,7 @@ echo "  Manifest:  ${OUTDIR}/manifest.json"
 echo "  Splits:    ${OUTDIR}/pretrain_splits.json"
 echo "  Sepsis:    ${OUTDIR}/tasks/sepsis/"
 echo "  Demog:     ${OUTDIR}/demographics.csv"
+echo "  Demog 4h:  ${OUTDIR}/demographics_4h.csv"
 echo ""
 echo "  Per-patient layout: {pid}/"
 echo "    PLETH40.npy  II120.npy  time_ms.npy"
