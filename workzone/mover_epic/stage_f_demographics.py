@@ -15,6 +15,16 @@ COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/val
 SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_f_demographics_summary.json"
 
 
+def _num(v, ndigits):
+    """Coerce to a rounded float; blank on null/non-numeric (never crash)."""
+    if v is None or v == "":
+        return ""
+    try:
+        return round(float(v), ndigits)
+    except (TypeError, ValueError):
+        return ""
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-root", default=OUT_ROOT)
@@ -53,8 +63,8 @@ def main():
             w.writerow([
                 row["entity_id"], row["log_id"], row.get("mrn") or "",
                 row.get("sex") or "", row.get("birth_date") or "",
-                round(float(row["height_cm"]), 1) if row.get("height_cm") is not None else "",
-                round(float(row["weight_kg"]), 2) if row.get("weight_kg") is not None else "",
+                _num(row.get("height_cm"), 1),
+                _num(row.get("weight_kg"), 2),
                 row.get("asa_rating") or "",
                 row.get("anes_type") or "",
                 row.get("patient_class_nm") or "",

@@ -50,6 +50,43 @@ FNAME_RE = re.compile(
     r"^([0-9a-f]{16})(CB|IP)-(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.xml$"
 )
 
+# EPIC raw HEIGHT is a feet-inches string ("5' 6", "5' 2.01", "6' .05"), NOT cm.
+# EPIC raw WEIGHT is in ounces (2880 oz = 180 lb = 81.6 kg), NOT kg.
+# Convert here so the parquet's height_cm / weight_kg columns are honest;
+# raw values are retained as height_raw / weight_oz.
+_HT_RE = re.compile(r"(\d+)\s*'\s*([\d.]+)")
+OZ_TO_KG = 0.0283495
+
+
+def height_to_cm(s) -> float | None:
+    """Parse feet-inches string -> cm. Inches may be decimal or have no leading
+    digit ('.05'). Falls back to plain-numeric cm. Guarded to 40-260 cm."""
+    if s is None:
+        return None
+    m = _HT_RE.search(str(s))
+    if m:
+        try:
+            cm = (float(m.group(1)) * 12.0 + float(m.group(2))) * 2.54
+        except ValueError:
+            return None
+        return round(cm, 1) if 40.0 <= cm <= 260.0 else None
+    try:
+        v = float(str(s).strip())
+    except (TypeError, ValueError):
+        return None
+    return round(v, 1) if 40.0 <= v <= 260.0 else None
+
+
+def weight_oz_to_kg(v) -> float | None:
+    """Ounces -> kg. Guarded to 0.5-400 kg."""
+    if v is None:
+        return None
+    try:
+        kg = float(v) * OZ_TO_KG
+    except (TypeError, ValueError):
+        return None
+    return round(kg, 2) if 0.5 <= kg <= 400.0 else None
+
 
 def filename_to_ms(name: str) -> tuple[str, str, int] | None:
     """Return (pat_id_16hex, class, file_ms). XML filename prefix is PAT_ID
@@ -118,19 +155,26 @@ def main():
         pt_local_to_utc_ms("AN_STOP_DATETIME").alias("an_stop_ms"),
     ]).rename({
         "LOG_ID": "log_id", "MRN": "mrn", "SEX": "sex",
-        "HEIGHT": "height_cm", "WEIGHT": "weight_kg",
+        "HEIGHT": "height_raw", "WEIGHT": "weight_oz",
         "ASA_RATING": "asa_rating", "PRIMARY_PROCEDURE_NM": "procedure",
         "PATIENT_CLASS_NM": "patient_class_nm",
         "ICU_ADMIN_FLAG": "icu_admin_flag", "LOS": "los_days",
         "BIRTH_DATE": "birth_date", "PRIMARY_ANES_TYPE_NM": "anes_type",
         "DISCH_DISP": "disch_disp",
-    }).select([
+    }).with_columns([
+        # EPIC HEIGHT is feet-inches text, WEIGHT is ounces -> real cm / kg.
+        pl.col("height_raw").map_elements(height_to_cm, return_dtype=pl.Float64)
+          .alias("height_cm"),
+        pl.col("weight_oz").map_elements(weight_oz_to_kg, return_dtype=pl.Float64)
+          .alias("weight_kg"),
+    ]).select([
         "log_id", "mrn",
         "hosp_admsn_ms", "hosp_disch_ms",
         "in_or_ms", "out_or_ms",
         "an_start_ms", "an_stop_ms",
         "los_days", "icu_admin_flag",
-        "birth_date", "height_cm", "weight_kg", "sex",
+        "birth_date", "height_raw", "weight_oz",
+        "height_cm", "weight_kg", "sex",
         "anes_type", "asa_rating", "patient_class_nm", "procedure",
         "disch_disp",
     ]).unique("log_id", keep="first")
