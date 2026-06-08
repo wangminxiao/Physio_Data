@@ -12,7 +12,7 @@ Scope: **EPIC only**, peer to `workzone/mover/` (SIS). Same canonical format.
 |-------|--------|-------|--------|-----------|
 | A | `stage_a_cohort.py` | `EPIC_MRN_PAT_ID.csv` + `EPIC_EMR/EMR/patient_information.csv` + file enumeration across 3 wave dirs | `valid_cohort.parquet` | ~15-30 min (XML enumeration) |
 | B | `stage_b_wave.py` (16 workers) | per-LOG_ID XML list | per-LOG_ID `PLETH40.npy` + `II120.npy` + `time_ms.npy` + `meta.json` | ~2-4 h |
-| C | `stage_c_flowsheets.py` | `flowsheets_cleaned/flowsheet_part*.csv` (142 GB, 1.44 B rows) | per-LOG_ID `vitals_events.npy` | ~2-4 h (phase 1 streaming) |
+| C | `stage_c_flowsheets.py` (v2: parses BP) | `flowsheets_cleaned/flowsheet_part*.csv` (142 GB, 1.44 B rows) | per-LOG_ID `vitals_events.npy` (HR/SpO2/RR/Temp/ETCO2 + SBP/DBP/MAP) | ~5 min (phase 1 streaming) |
 | D | `stage_d_labs.py` | `EPIC_EMR/EMR/patient_labs.csv` (29 M rows) | per-LOG_ID `labs_events.npy` | ~10-15 min |
 | E | `stage_e_assemble.py` (8 workers) | time_ms + vitals + labs | `ehr_{baseline,recent,events,future}.npy` | ~10-15 min |
 | F-2 | `stage_f_demographics.py` | cohort + meta | `demographics.csv` | < 1 min |
@@ -47,5 +47,5 @@ python ../common/build_estimation_task.py --root /opt/localdata100tb/physio_data
 - **Filename → LOG_ID**: XML filename prefix is the 16-hex MRN. Match via `EPIC_MRN_PAT_ID.csv` crosswalk, then pick the LOG_ID whose anesthesia window (`AN_START_DATETIME` ± 1 h buffer) contains the XML file's timestamp.
 - **XML schema = SIS**. Same `<cpcArchive><cpc><mg>...</mg></cpc>` structure; same decoder (base64 → int16 → sentinel-mask → gain+offset). About 40 % of EPIC XMLs are DATADOWN placeholders (empty `<measurements/>`) — correctly yield 0 blocks.
 - **PLETH prevalence similar to SIS** (~18-40 % of LOG_IDs have the PLETH channel; rest have only GE_ECG / GE_ART). Expected yield from the ~65,729 LOG_IDs ≈ 10-25k entities.
-- **BP parsing is deferred** — EPIC flowsheet stores BP as `"120/80"` strings which need splitting. Until then, F-3's `avg_sbp_4h` / `avg_dbp_4h` stay blank and `avg_map_4h` (cuff MAP, var 106) is the only BP figure; `bp_source` is `"cuff"` when present.
+- **BP is parsed (Stage C v2)** — EPIC flowsheet stores BP as `"120/80"` strings; Stage C splits them into SBP (104) / DBP (105) cuff, with arterial-line BP → 110/111/112. Cuff MAP (106) comes from the numeric `MAP (mmHg)` field. Coverage ≈ 54 % of entities (vs SIS 96 %); F-3 fills `avg_sbp_4h` / `avg_dbp_4h` / `avg_map_4h` accordingly.
 - **Splits are MRN-grouped** to avoid patient leakage (one MRN can have multiple LOG_IDs = multiple surgical encounters).

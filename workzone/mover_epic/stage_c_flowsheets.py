@@ -12,8 +12,9 @@ group - these cover HR/SpO2/RR/Temp/MAP/EtCO2.
 Phase 1 streams all 19 parts through polars into a single combined parquet.
 Phase 2 partitions by LOG_ID and writes per-entity vitals_events.npy.
 
-BP (systolic/diastolic as "120/80" string) is NOT parsed in v1 - need a
-separate extra stage for that.
+v2: BP (systolic/diastolic stored as "120/80" string) IS parsed - cuff/NIBP
+BP -> SBP(104)/DBP(105), arterial-line BP -> 110/111, arterial MAP -> 112.
+Cuff MAP(106) comes from the numeric "MAP (mmHg)" flowsheet field.
 """
 import argparse
 import glob
@@ -59,12 +60,32 @@ FLO_TO_VAR_ID = {
     ("ED Vitals", "Resp"):    102,
     ("ED Vitals", "Temp"):    103,
 }
+
+# BP is stored as a "systolic/diastolic" string (e.g. "120/80"). Split into two
+# events: (sbp_var, dbp_var). Cuff/NIBP -> 104/105, arterial line -> 110/111.
+BP_SPLIT_TO_VARS = {
+    ("Vital Signs", "BP"):                          (104, 105),  # cuff NIBP (dominant)
+    ("ED Vitals", "BP"):                            (104, 105),
+    ("Intake/Output", "BP"):                        (104, 105),
+    ("Drip Titration", "BP"):                       (104, 105),
+    ("Drip Titration", "Arterial Line BP (ART)"):   (110, 111),  # arterial line
+}
+# Single-value BP measurements (already numeric, no split).
+BP_SINGLE_TO_VAR = {
+    ("Drip Titration", "Arterial Line MAP (ART)"):  112,         # arterial MAP
+}
+
 PHYSIO_RANGE = {
     100: (10,  300),
     101: (20,  100),
     102: (1,    70),
     103: (25,   45),
-    106: (20,  250),
+    104: (30,  300),   # SBP cuff
+    105: (10,  200),   # DBP cuff
+    106: (20,  250),   # MAP cuff (already parsed from "MAP (mmHg)")
+    110: (40,  300),   # SBP arterial line
+    111: (20,  200),   # DBP arterial line
+    112: (30,  250),   # MAP arterial line
     116: (0,   120),
 }
 
@@ -85,6 +106,45 @@ def pt_local_to_utc_ms(col: str) -> pl.Expr:
     )
 
 
+_EMPTY_SCHEMA = {"log_id": pl.Utf8, "time_ms": pl.Int64,
+                 "var_id": pl.UInt16, "value": pl.Float32}
+_BP_RE = r"^(\d{2,3})/(\d{2,3})$"
+
+
+def _build_bp_events(bp: pl.DataFrame) -> pl.DataFrame:
+    """Split "systolic/diastolic" BP rows into (var_id, value) events.
+
+    bp columns: log_id, time_ms, flo_name_s, flo_display_name_s, meas_s.
+    Cuff "Vital Signs/ED/IO/Drip BP" -> 104/105; arterial line -> 110/111;
+    arterial MAP (single numeric) -> 112.
+    """
+    frames = []
+    for (fn, fdn), (svar, dvar) in BP_SPLIT_TO_VARS.items():
+        g = bp.filter((pl.col("flo_name_s") == fn) & (pl.col("flo_display_name_s") == fdn))
+        if g.height == 0:
+            continue
+        g = g.with_columns([
+            pl.col("meas_s").str.extract(_BP_RE, 1).cast(pl.Float64, strict=False).alias("sys"),
+            pl.col("meas_s").str.extract(_BP_RE, 2).cast(pl.Float64, strict=False).alias("dia"),
+        ]).filter(pl.col("sys").is_not_null() & pl.col("dia").is_not_null())
+        frames.append(g.select(["log_id", "time_ms",
+                                pl.lit(svar, dtype=pl.UInt16).alias("var_id"),
+                                pl.col("sys").cast(pl.Float32).alias("value")]))
+        frames.append(g.select(["log_id", "time_ms",
+                                pl.lit(dvar, dtype=pl.UInt16).alias("var_id"),
+                                pl.col("dia").cast(pl.Float32).alias("value")]))
+    for (fn, fdn), vid in BP_SINGLE_TO_VAR.items():
+        g = bp.filter((pl.col("flo_name_s") == fn) & (pl.col("flo_display_name_s") == fdn))
+        if g.height == 0:
+            continue
+        g = g.with_columns(pl.col("meas_s").cast(pl.Float64, strict=False).alias("v")) \
+             .filter(pl.col("v").is_not_null() & pl.col("v").is_finite())
+        frames.append(g.select(["log_id", "time_ms",
+                                pl.lit(vid, dtype=pl.UInt16).alias("var_id"),
+                                pl.col("v").cast(pl.Float32).alias("value")]))
+    return pl.concat(frames) if frames else pl.DataFrame(schema=_EMPTY_SCHEMA)
+
+
 def phase1(cohort_log_ids: list[str]) -> dict:
     parts = sorted(glob.glob(FLOWSHEET_GLOB))
     print(f"[C1] scanning {len(parts)} flowsheet parts (1.44B rows, 142 GB) ...")
@@ -100,12 +160,22 @@ def phase1(cohort_log_ids: list[str]) -> dict:
               .otherwise(var_id_expr)
         )
 
-    dfs = []
+    # BP rows have no FLO->var_id mapping (var_id is null) but match these keys;
+    # we keep them via meas_s and split them after collection.
+    bp_keys = list(BP_SPLIT_TO_VARS) + list(BP_SINGLE_TO_VAR)
+    bp_filter = None
+    for (fn, fdn) in bp_keys:
+        cond = (pl.col("flo_name_s") == fn) & (pl.col("flo_display_name_s") == fdn)
+        bp_filter = cond if bp_filter is None else bp_filter | cond
+
+    dfs, bp_dfs = [], []
     for part in parts:
         print(f"  scanning {Path(part).name}")
         lf = pl.scan_csv(part, low_memory=True, infer_schema_length=10000,
                          ignore_errors=True, null_values=["", "NA"])
-        sub = (
+        # Single scan per part: keep cohort rows that are either a mapped vital
+        # (var_id not null) or a BP row (matches bp_filter). meas_s kept raw.
+        collected = (
             lf.filter(pl.col("LOG_ID").is_in(cohort_log_ids))
               .select([
                   pl.col("LOG_ID").cast(pl.Utf8).alias("log_id"),
@@ -113,31 +183,31 @@ def phase1(cohort_log_ids: list[str]) -> dict:
                   pl.col("FLO_DISPLAY_NAME").cast(pl.Utf8).str.strip_chars()
                     .alias("flo_display_name_s"),
                   pt_local_to_utc_ms("RECORDED_TIME").alias("time_ms"),
-                  pl.col("MEAS_VALUE").cast(pl.Utf8).str.strip_chars()
-                    .cast(pl.Float64, strict=False).alias("value_f"),
+                  pl.col("MEAS_VALUE").cast(pl.Utf8).str.strip_chars().alias("meas_s"),
               ])
               .with_columns(var_id_expr.alias("var_id"))
               .filter(
-                  pl.col("var_id").is_not_null()
+                  (pl.col("var_id").is_not_null() | bp_filter)
                   & pl.col("time_ms").is_not_null()
-                  & pl.col("value_f").is_not_null()
-                  & pl.col("value_f").is_finite()
+                  & pl.col("meas_s").is_not_null()
               )
-              .select(["log_id", "time_ms", "var_id",
-                       pl.col("value_f").cast(pl.Float32).alias("value")])
               .collect(engine="streaming")
         )
-        print(f"    emitted rows: {sub.height}")
-        dfs.append(sub)
+        vit = (collected.filter(pl.col("var_id").is_not_null())
+                        .with_columns(pl.col("meas_s").cast(pl.Float64, strict=False).alias("value_f"))
+                        .filter(pl.col("value_f").is_not_null() & pl.col("value_f").is_finite())
+                        .select(["log_id", "time_ms", "var_id",
+                                 pl.col("value_f").cast(pl.Float32).alias("value")]))
+        bp_raw = collected.filter(pl.col("var_id").is_null()).select(
+            ["log_id", "time_ms", "flo_name_s", "flo_display_name_s", "meas_s"])
+        print(f"    vitals rows: {vit.height}   bp raw rows: {bp_raw.height}")
+        dfs.append(vit)
+        bp_dfs.append(bp_raw)
 
-    combined = pl.concat(dfs) if dfs else pl.DataFrame({"log_id": [],
-                                                        "time_ms": [],
-                                                        "var_id":  [],
-                                                        "value":   []},
-                                                       schema={"log_id": pl.Utf8,
-                                                               "time_ms": pl.Int64,
-                                                               "var_id":  pl.UInt16,
-                                                               "value":   pl.Float32})
+    combined = pl.concat(dfs) if dfs else pl.DataFrame(schema=_EMPTY_SCHEMA)
+    bp_all = pl.concat(bp_dfs) if bp_dfs else None
+    if bp_all is not None and bp_all.height:
+        combined = pl.concat([combined, _build_bp_events(bp_all)])
 
     # Apply physio range filter
     rng_expr = None
@@ -169,7 +239,7 @@ def phase2(cohort_df: pl.DataFrame, out_root: str, resume: bool) -> list[dict]:
         if not meta_path.exists():
             st["status"] = "no_stage_b"; statuses.append(st); continue
         meta = json.loads(meta_path.read_text())
-        if resume and events_path.exists() and meta.get("stage_c_version", 0) >= 1:
+        if resume and events_path.exists() and meta.get("stage_c_version", 0) >= 2:
             st["status"] = "resumed"
             st["n_events"] = int(meta.get("vitals", {}).get("n_events", 0))
             statuses.append(st); continue
@@ -191,7 +261,7 @@ def phase2(cohort_df: pl.DataFrame, out_root: str, resume: bool) -> list[dict]:
                           "per_var_count": per_var,
                           "source": "flowsheets_cleaned/flowsheet_part*.csv",
                           "time_convention": "Pacific->UTC ms"}
-        meta["stage_c_version"] = 1
+        meta["stage_c_version"] = 2
         meta_path.write_text(json.dumps(meta, indent=2, default=str))
         st["status"] = "ok" if events.shape[0] > 0 else "ok_empty"
         st["n_events"] = int(events.shape[0])
