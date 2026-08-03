@@ -69,11 +69,40 @@ if [[ "${MODE}" == "full" ]]; then
 fi
 
 echo "[push] EHR files updated by this extraction ..."
-"${RS[@]}" \
-  --include='*/' \
-  --include='ehr_hf.npy' --include='ehr_events.npy' --include='meta.json' \
-  --exclude='*' \
-  "${MIRROR}/" "${DREAM_HOST}:${DEST}/"
+if [[ "${MODE}" == "full" ]]; then
+  # Everything was just sent, so every entity dir exists; a plain filtered sync is safe.
+  "${RS[@]}" \
+    --include='*/' \
+    --include='ehr_hf.npy' --include='ehr_events.npy' --include='meta.json' \
+    --exclude='*' \
+    "${MIRROR}/" "${DREAM_HOST}:${DEST}/"
+else
+  # Sync ONLY entities DREAM already has. `--include='*/'` creates a directory for every
+  # mirror entity, so an entity DREAM lacks would end up holding ehr_hf.npy + ehr_events.npy
+  # + meta.json with no time_ms.npy and no waveform -- and seg_idx is meaningless without
+  # time_ms. An explicit intersection makes that impossible instead of merely unlikely.
+  L="${TMPDIR:-/tmp}/push_dream_$$.list"
+  trap 'rm -f "${L}" "${L}".* ; ssh -o ControlPath="${CTL}" -O exit "${DREAM_HOST}" 2>/dev/null || true' EXIT
+  "${SSH[@]}" "${DREAM_HOST}" "cd '${DEST}' && ls -d */time_ms.npy 2>/dev/null | cut -d/ -f1" \
+    | sort > "${L}.dream"
+  find "${MIRROR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort > "${L}.mirror"
+  comm -12 "${L}.dream" "${L}.mirror" > "${L}.both"
+  n_both=$(wc -l < "${L}.both"); n_mir=$(wc -l < "${L}.mirror"); n_dre=$(wc -l < "${L}.dream")
+  n_skip=$(comm -13 "${L}.dream" "${L}.mirror" | wc -l)
+  echo "[push]   mirror=${n_mir}  dream=${n_dre}  intersection=${n_both}"
+  if [[ "${n_skip}" -gt 0 ]]; then
+    echo "[push]   SKIPPING ${n_skip} entity(ies) absent from DREAM (would be waveform-less):"
+    comm -13 "${L}.dream" "${L}.mirror" | head -10 | sed 's/^/[push]     /'
+    [[ "${n_skip}" -gt 10 ]] && echo "[push]     ... and $((n_skip - 10)) more"
+  fi
+  if [[ "${n_both}" -eq 0 ]]; then
+    echo "[push] ERROR: no entity in common -- wrong DEST, or DREAM's store has a different layout." >&2
+    exit 1
+  fi
+  awk '{print $1"/ehr_hf.npy"; print $1"/ehr_events.npy"; print $1"/meta.json"}' \
+    "${L}.both" > "${L}"
+  "${RS[@]}" --files-from="${L}" "${MIRROR}/" "${DREAM_HOST}:${DEST}/"
+fi
 
 echo "[push] var_registry.json (ids 156-164, 207-212 are new; without it the new var_ids are unnamed) ..."
 "${RS[@]}" "${REG}" "${DREAM_HOST}:${DEST}/var_registry.json"
