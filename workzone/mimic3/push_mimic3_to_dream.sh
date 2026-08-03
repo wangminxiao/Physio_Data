@@ -9,22 +9,25 @@
 #     tmux new -s push          # the transfer outlives an SSH drop
 #     bash /labs/hulab/mxwang/Physio_Data/workzone/mimic3/push_mimic3_to_dream.sh
 #
-# MODES
-#   ehr   (default)  only what this extraction changed: ehr_hf.npy + ehr_events.npy +
-#                    meta.json. ~1.7 GB. Correct when DREAM already has the mimic3 store --
-#                    time_ms.npy and the waveform .npy are untouched by stage3b and are NOT
-#                    re-sent.
-#   full             the whole canonical store (waveforms included, ~40 GB) and THEN the
-#                    updated EHR on top. Use only if DREAM has no mimic3 store yet.
+# MODES  (MODE=auto by default -- probes the destination and picks)
+#   ehr    only what this extraction changed: ehr_hf.npy + ehr_events.npy + meta.json.
+#          ~1.7 GB. Correct when DREAM already has the mimic3 store -- time_ms.npy and the
+#          waveform .npy are untouched by stage3b and are NOT re-sent.
+#   full   the whole canonical store (waveforms included, ~40 GB) and THEN the updated EHR
+#          on top. Used when DREAM has no mimic3 store yet.
+#
+# auto picks `ehr` only if the destination already holds entity dirs WITH time_ms.npy. A
+# destination that exists but is empty still gets `full`, so a half-made directory cannot
+# silently produce an EHR-only store with no waveforms to align against.
 #
 # The EHR files come from the scratch mirror, not from the canonical store: the canonical
 # store was deliberately left untouched by this run, so it does NOT contain vars 156-164 or
 # 207-212. Sending the canonical EHR would silently ship the old channel set.
 set -euo pipefail
 
-MODE="${MODE:-ehr}"
+MODE="${MODE:-auto}"
 DREAM_HOST="${DREAM_HOST:-mwang80@dream.nursing.emory.edu}"
-DEST="${DEST:-/projects/mwang80/physio_data/mimic3}"     # <-- CONFIRM before the first run
+DEST="${DEST:-/projects/xhu40-cdsfm/physio_data/mimic3}"
 MIRROR="${MIRROR:-/labs/hulab/mxwang/tmp_local/mimic3}"
 CANON="${CANON:-/opt/localdata100tb/physio_data/mimic3}"
 REG="${REG:-/labs/hulab/mxwang/Physio_Data/indices/var_registry.json}"
@@ -34,8 +37,20 @@ REG="${REG:-/labs/hulab/mxwang/Physio_Data/indices/var_registry.json}"
 RS=(rsync -rltvz --partial --info=progress2 --human-readable)
 [[ -n "${DRY:-}" ]] && RS+=(--dry-run) && echo "*** DRY RUN ***"
 
-echo "[push] mode=${MODE}  ->  ${DREAM_HOST}:${DEST}"
 ssh -o ConnectTimeout=20 "${DREAM_HOST}" "mkdir -p '${DEST}'"
+
+if [[ "${MODE}" == "auto" ]]; then
+  n_ent=$(ssh "${DREAM_HOST}" "ls -d '${DEST}'/*/time_ms.npy 2>/dev/null | wc -l" || echo 0)
+  if [[ "${n_ent}" -gt 0 ]]; then
+    MODE=ehr
+    echo "[push] auto: destination has ${n_ent} entity dirs with time_ms.npy -> MODE=ehr"
+  else
+    MODE=full
+    echo "[push] auto: destination has no entity dirs with time_ms.npy -> MODE=full (~40 GB)"
+  fi
+fi
+
+echo "[push] mode=${MODE}  ->  ${DREAM_HOST}:${DEST}"
 
 if [[ "${MODE}" == "full" ]]; then
   echo "[push] 1/3 canonical store (waveforms + time_ms) ..."
@@ -54,11 +69,11 @@ echo "[push] var_registry.json (ids 156-164, 207-212 are new; without it the new
 "${RS[@]}" "${REG}" "${DREAM_HOST}:${DEST}/var_registry.json"
 
 echo "[push] done. Verify on DREAM:"
-cat <<'VERIFY'
+cat <<VERIFY
   python - <<'PY'
 import numpy as np, glob, json
 from collections import Counter
-root = "/projects/mwang80/physio_data/mimic3"
+root = "${DEST}"
 c = Counter()
 for d in sorted(glob.glob(root + "/*/"))[:300]:
     for f in ("ehr_hf.npy", "ehr_events.npy"):
