@@ -14,11 +14,20 @@ Reads  : entity time_ms.npy + meta.json['source_path','segment_duration_sec']
 Writes : entity ehr_hf.npy  (same EHR_EVENT_DTYPE)  -- canonical files UNTOUCHED.
 
 High-freq var_ids (distinct from CHARTEVENTS vitals 100/101/102/110/111/112):
-  150 HR_hf  151 SpO2_hf  152 RR_hf  153 ABPs_hf  154 ABPd_hf  155 ABPm_hf
+  150 HR_hf   151 SpO2_hf  152 RR_hf   153 ABPs_hf 154 ABPd_hf 155 ABPm_hf
+  156 PULSE   157 NBPs_hf  158 NBPd_hf 159 NBPm_hf 160 CVP_hf
+  161 PAPs_hf 162 PAPd_hf  163 PAPm_hf 164 PVCrate_hf
 Add these to var_registry.json before consuming.
 
+156-164 exist in the raw numerics but were never extracted because VARSPEC listed only six
+ids -- the pipeline's configuration, not the data, was the limit. CHARTEVENTS is a poor
+substitute for several of them: CVP is ~37% of subjects in numerics vs 5.5% in CHARTEVENTS.
+
+This run is ADDITIVE: ehr_hf.npy is fully rewritten (not appended), the computation is
+deterministic, so 150-155 reproduce byte-identically and only new ids appear.
+
 Consumer hook (NOT done here): PatientStore.ehr_hf() + merge into events at the
-densify call site in dataset.py when target_var_ids intersect 150..155.
+densify call site in dataset.py when target_var_ids intersect 150..164.
 """
 import os, json, glob, argparse
 from datetime import datetime
@@ -28,8 +37,17 @@ import multiprocessing as mp
 EHR_EVENT_DTYPE = np.dtype([('time_ms', 'int64'), ('seg_idx', 'int32'),
                             ('var_id', 'uint16'), ('value', 'float32')])
 
-VARSPEC = {150: (10, 300), 151: (20, 100), 152: (1, 70),      # id -> (physio_min, max)
-           153: (40, 300), 154: (20, 200), 155: (30, 250)}
+# id -> (physio_min, physio_max). Mirrors var_registry.json, which is the source of truth;
+# a channel whose values fall outside its range is DISCARDED, so a wrong bound loses data
+# silently. The 156+ bounds were set from measured percentiles over 400 subjects, not from
+# textbook ranges -- see the note on each registry entry.
+VARSPEC = {150: (10, 300), 151: (20, 100), 152: (1, 70),
+           153: (40, 300), 154: (20, 200), 155: (30, 250),
+           156: (10, 300),                                    # PULSE
+           157: (40, 300), 158: (20, 200), 159: (30, 250),    # NBP s/d/m (cuff)
+           160: (-5, 40),                                     # CVP: raw p99 is 343 -> tight
+           161: (5, 120), 162: (2, 60), 163: (5, 80),         # PAP s/d/m (Swan-Ganz)
+           164: (0, 200)}                                     # PVC rate; 0 is a real value
 MISSING = -32768                 # WFDB format-16 invalid sample
 TOL_MS  = 30_000                 # a monitor reading counts if within +/-30 s of the pair-end
 
@@ -42,6 +60,19 @@ def chan_to_var(name: str):
     if n in ('ABPSYS', 'ARTSYS'):    return 153     # ART == invasive arterial alias
     if n in ('ABPDIAS', 'ARTDIAS'):  return 154
     if n in ('ABPMEAN', 'ARTMEAN'):  return 155
+    if n == 'PULSE':                 return 156     # pleth-derived rate, not ECG HR
+    if n == 'NBPSYS':                return 157     # cuff; only valid while a cycle is fresh
+    if n == 'NBPDIAS':               return 158
+    if n == 'NBPMEAN':               return 159
+    if n == 'CVP':                   return 160
+    if n == 'PAPSYS':                return 161
+    if n == 'PAPDIAS':               return 162
+    if n == 'PAPMEAN':               return 163
+    if n == 'PVCRATEPERMINUTE':      return 164
+    # Deliberately NOT mapped: bare 'NBP'/'ABP' (ambiguous composite when the s/d/m triple is
+    # present), RhythmStatus/EctopicStatus (enum codes 63004-63062, not measurements -- range
+    # filtering is meaningless for them), CO (present but median 0.00 = mostly not measured),
+    # ST* (14 lead variants; lead heterogeneity is its own design problem).
     return None
 
 

@@ -3,12 +3,17 @@
 Stage 3b: Extract action variables and merge into existing ehr_events.npy.
 
 Adds var_ids 200-206 (vasopressors, fluids, FiO2, PEEP, mechvent, urine output)
-from CHARTEVENTS, INPUTEVENTS_MV, and OUTPUTEVENTS.
+and 207-212 (per-drug vasopressor rates) from CHARTEVENTS, INPUTEVENTS_MV, and OUTPUTEVENTS.
 
 This is an INCREMENTAL step: it reads each patient's existing ehr_events.npy,
 appends new action events, re-sorts, and re-saves. Waveform .npy files are untouched.
+Re-runs are idempotent -- merge_actions_for_patient() strips var_id 200-299 before merging.
 
-Run:  python workzone/mimic3/stage3b_extract_actions.py
+var 200 (NE-equivalent sum) is UNCHANGED by the 207-212 addition: VASOPRESSOR_ITEMS still
+holds exactly the same five drugs, so re-running reproduces it. Dobutamine (212) is
+extracted per-drug only and deliberately kept out of the sum, per var_registry.json.
+
+Run:  python workzone/mimic3/stage3b_extract_actions.py [--root DIR] [--limit N] [--dry-run]
 Depends on: stage 3 output (patient dirs with time_ms.npy + ehr_events.npy)
 """
 import os
@@ -55,6 +60,29 @@ VASOPRESSOR_ITEMS = {
     222315: {"drug": "Vasopressin",    "ne_factor": 0.0},     # special: binary
 }
 VASOPRESSOR_ITEMIDS = list(VASOPRESSOR_ITEMS.keys())
+
+# Per-drug channels (registry 207-212), emitted ALONGSIDE the NE-equivalent sum in var 200.
+# var 200 is deliberately left untouched -- VASOPRESSOR_ITEMS above is unchanged, so re-running
+# reproduces it exactly and this is purely additive.
+#
+# Why the split is needed: var 200 group_by's over STARTTIME and sums NE-eq across concurrent
+# drugs, discarding drug identity. Phenylephrine (pure alpha -> peripheral vasoconstriction,
+# the most direct route to a PPG effect) then becomes indistinguishable from dopamine
+# (beta/dopaminergic -> inotropy + chronotropy), and an equipotent drug SWITCH looks like no
+# change at all. That conflation breaks dose-graded analysis, where the whole argument is
+# "identical charting process, graded physiological effect".
+#
+# Values are RAW rates in each drug's native unit (per the registry), not NE-equivalents, so
+# no information is destroyed; ne_factor lives in the registry for anyone who wants the sum.
+PER_DRUG_VAR = {221906: 207,    # Norepinephrine   mcg/kg/min
+                221289: 208,    # Epinephrine      mcg/kg/min
+                221749: 209,    # Phenylephrine    mcg/min
+                221662: 210,    # Dopamine         mcg/kg/min
+                222315: 211,    # Vasopressin      units/hr
+                221653: 212}    # Dobutamine       mcg/kg/min -- inotrope, EXCLUDED from var 200
+# Generous per-unit sanity caps: these reject transcription garbage, not clinical extremes.
+PER_DRUG_MAX = {207: 100.0, 208: 100.0, 209: 1000.0, 210: 100.0, 211: 10.0, 212: 100.0}
+STOP_GAP_MS = 5 * 60 * 1000     # an infusion that resumes within 5 min was not really stopped
 
 # Crystalloid fluid ITEMIDs (INPUTEVENTS_MV)
 FLUID_ITEMIDS = [225158, 225828, 225166]  # NS, LR, D5W
@@ -120,6 +148,74 @@ def extract_fio2_peep():
     log.info(f"  FiO2: {df.filter(pl.col('var_id')==203).height:,} events")
     log.info(f"  PEEP: {df.filter(pl.col('var_id')==204).height:,} events")
     return df
+
+
+def extract_vasopressors_per_drug():
+    """Per-drug raw infusion rates (vars 207-212), including explicit STOP events.
+
+    Two things this does that the NE-equivalent path (var 200) does not:
+
+    1. Keeps drug identity -- see PER_DRUG_VAR.
+    2. Emits value=0.0 at ENDTIME when an infusion actually stops. The var 200 path filters
+       `RATE > 0`, so a stop is represented only by ABSENCE of later rows. That is fine for a
+       carry-forward state variable but wrong for change-point work, where a wean is as clean
+       a haemodynamic transition as a start -- and there are more weans than starts. A stop is
+       only emitted if the same drug does not resume within STOP_GAP_MS, so dose titrations
+       charted as back-to-back intervals are not mistaken for stop/start pairs.
+    """
+    log.info("\n=== Extracting Per-Drug Vasopressor Rates (vars 207-212) ===")
+    input_path = os.path.join(EHR_ROOT, "INPUTEVENTS_MV.csv.gz")
+    if not os.path.exists(input_path):
+        input_path = os.path.join(EHR_ROOT, "INPUTEVENTS_MV.csv")
+
+    df = pl.scan_csv(input_path, infer_schema_length=1000).filter(
+        pl.col("ITEMID").is_in(list(PER_DRUG_VAR.keys())) &
+        pl.col("RATE").is_not_null() &
+        pl.col("RATE").is_not_nan() &
+        (pl.col("RATE") > 0) &
+        (pl.col("STATUSDESCRIPTION") != "Rewritten")
+    ).select(["SUBJECT_ID", "HADM_ID", "ITEMID", "STARTTIME", "ENDTIME", "RATE"]).collect()
+    log.info(f"  Loaded {len(df)} per-drug rows")
+
+    var_map = pl.DataFrame({"ITEMID": list(PER_DRUG_VAR.keys()),
+                            "var_id": list(PER_DRUG_VAR.values())})
+    df = df.join(var_map, on="ITEMID", how="inner").with_columns([
+        pl.col("STARTTIME").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S").alias("t_start"),
+        pl.col("ENDTIME").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S").alias("t_end"),
+    ])
+
+    cap = pl.DataFrame({"var_id": list(PER_DRUG_MAX.keys()),
+                        "rate_max": list(PER_DRUG_MAX.values())})
+    df = df.join(cap, on="var_id", how="inner").filter(pl.col("RATE") <= pl.col("rate_max"))
+
+    # START rows: the rate as charted
+    starts = df.select([
+        "SUBJECT_ID", "HADM_ID", "var_id",
+        pl.col("t_start").alias("charttime_dt"),
+        pl.col("RATE").alias("VALUENUM"),
+    ])
+
+    # STOP rows: value 0 at t_end, only when the same drug does not resume promptly
+    df = df.sort(["SUBJECT_ID", "HADM_ID", "var_id", "t_start"])
+    nxt = pl.col("t_start").shift(-1).over(["SUBJECT_ID", "HADM_ID", "var_id"])
+    stops = df.with_columns(nxt.alias("t_next")).filter(
+        pl.col("t_next").is_null() |
+        ((pl.col("t_next") - pl.col("t_end")).dt.total_milliseconds() > STOP_GAP_MS)
+    ).select([
+        "SUBJECT_ID", "HADM_ID", "var_id",
+        pl.col("t_end").alias("charttime_dt"),
+        pl.lit(0.0).cast(pl.Float64).alias("VALUENUM"),
+    ]).filter(pl.col("charttime_dt").is_not_null())
+
+    out = pl.concat([starts, stops]).with_columns([
+        pl.col("charttime_dt").dt.strftime("%Y-%m-%d %H:%M:%S").alias("CHARTTIME"),
+        pl.col("var_id").cast(pl.Int32),
+    ])
+    for vid in sorted(PER_DRUG_VAR.values()):
+        n = out.filter(pl.col("var_id") == vid).height
+        nz = out.filter((pl.col("var_id") == vid) & (pl.col("VALUENUM") == 0.0)).height
+        log.info(f"  var_id={vid}: {n:,} events ({nz:,} stops)")
+    return out
 
 
 def extract_vasopressors():
@@ -359,14 +455,23 @@ def infer_mechvent(fio2_peep_df):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=None, help="Process only N patients (for testing)")
+    parser.add_argument("--root", default=PROCESSED_ROOT,
+                        help="entity root to merge into (default: mimic3.output_dir from "
+                             "server_paths.yaml). Point this at a scratch mirror to leave the "
+                             "canonical store untouched.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="extract + report counts, write nothing")
     args = parser.parse_args()
+    root = args.root
 
     log.info("Stage 3b: Extract action variables -> merge into ehr_events.npy")
+    log.info(f"  root={root}  {'DRY-RUN (no write)' if args.dry_run else 'WRITE'}")
     t0 = time.time()
 
     # 1. Extract all action events from raw MIMIC-III tables
     fio2_peep = extract_fio2_peep()
     vasopressors = extract_vasopressors()
+    per_drug = extract_vasopressors_per_drug()
     fluids = extract_fluids()
     urine = extract_urine()
     mechvent = infer_mechvent(fio2_peep)
@@ -376,13 +481,14 @@ def main():
     all_actions = pl.concat([
         fio2_peep.select(schema_cols),
         vasopressors.select(schema_cols),
+        per_drug.select(schema_cols),
         fluids.select(schema_cols),
         urine.select(schema_cols),
         mechvent.select(schema_cols),
     ])
 
     log.info(f"\n=== Total action events: {len(all_actions):,} ===")
-    for vid in [200, 201, 202, 203, 204, 205, 206]:
+    for vid in [200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212]:
         n = all_actions.filter(pl.col("var_id") == vid).height
         log.info(f"  var_id={vid}: {n:,}")
 
@@ -393,8 +499,8 @@ def main():
 
     # 4. Iterate over processed patient directories and merge
     patient_dirs = sorted([
-        d for d in os.listdir(PROCESSED_ROOT)
-        if os.path.isdir(os.path.join(PROCESSED_ROOT, d))
+        d for d in os.listdir(root)
+        if os.path.isdir(os.path.join(root, d))
         and not d.startswith("tasks") and not d.startswith(".")
     ])
     log.info(f"\nProcessed patient dirs: {len(patient_dirs)}")
@@ -410,7 +516,7 @@ def main():
 
     from tqdm import tqdm
     for dirname in tqdm(patient_dirs, desc="Stage 3b", unit="pat"):
-        patient_dir = os.path.join(PROCESSED_ROOT, dirname)
+        patient_dir = os.path.join(root, dirname)
 
         # Parse subject_id and hadm_id from dir name: "{subject_id}_{hadm_id}"
         parts = dirname.split("_")
@@ -440,7 +546,10 @@ def main():
         # Convert back to polars for merge function
         hadm_pl = pl.from_pandas(hadm_actions[["charttime_dt", "var_id", "VALUENUM"]])
 
-        n_new = merge_actions_for_patient(patient_dir, hadm_pl)
+        if args.dry_run:
+            n_new = len(hadm_pl)
+        else:
+            n_new = merge_actions_for_patient(patient_dir, hadm_pl)
         if n_new > 0:
             n_merged += 1
             total_new_events += n_new
