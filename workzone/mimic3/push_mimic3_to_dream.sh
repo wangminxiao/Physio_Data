@@ -32,15 +32,25 @@ MIRROR="${MIRROR:-/labs/hulab/mxwang/tmp_local/mimic3}"
 CANON="${CANON:-/opt/localdata100tb/physio_data/mimic3}"
 REG="${REG:-/labs/hulab/mxwang/Physio_Data/indices/var_registry.json}"
 
+# ONE shared ssh connection for every ssh/rsync call below. Without multiplexing this script
+# authenticates 4-5 separate times; DREAM offers password/keyboard-interactive, so that would
+# be 4-5 password prompts (and would break entirely under a non-interactive runner).
+CTL="${TMPDIR:-/tmp}/push_dream_$$"
+SSH=(ssh -o ControlMaster=auto -o ControlPath="${CTL}" -o ControlPersist=900 -o ConnectTimeout=20)
+trap 'ssh -o ControlPath="${CTL}" -O exit "${DREAM_HOST}" 2>/dev/null || true' EXIT
+
+echo "[push] opening the shared connection (this is the ONLY auth prompt) ..."
+"${SSH[@]}" "${DREAM_HOST}" true
+
 # -rlt not -a: owner/group preservation is meaningless across clusters and only produces
 # warnings. --partial so a dropped WAN link resumes instead of restarting.
-RS=(rsync -rltvz --partial --info=progress2 --human-readable)
+RS=(rsync -rltvz --partial --info=progress2 --human-readable -e "${SSH[*]}")
 [[ -n "${DRY:-}" ]] && RS+=(--dry-run) && echo "*** DRY RUN ***"
 
-ssh -o ConnectTimeout=20 "${DREAM_HOST}" "mkdir -p '${DEST}'"
+"${SSH[@]}" "${DREAM_HOST}" "mkdir -p '${DEST}'"
 
 if [[ "${MODE}" == "auto" ]]; then
-  n_ent=$(ssh "${DREAM_HOST}" "ls -d '${DEST}'/*/time_ms.npy 2>/dev/null | wc -l" || echo 0)
+  n_ent=$("${SSH[@]}" "${DREAM_HOST}" "ls -d '${DEST}'/*/time_ms.npy 2>/dev/null | wc -l" || echo 0)
   if [[ "${n_ent}" -gt 0 ]]; then
     MODE=ehr
     echo "[push] auto: destination has ${n_ent} entity dirs with time_ms.npy -> MODE=ehr"
