@@ -210,6 +210,13 @@ def read_wfdb_blocks(patient_path, segments, source_fs):
         try:
             rec = wfdb.rdrecord(seg_path, channels=channel_indices)
             sig_data = {ch: rec.p_signal[:, i] for i, ch in enumerate(channels_to_read)}
+            # NU channels (PLETH): normalize by ADC full-scale. mimic3wdb-matched
+            # headers keep gain=1023 even on 12-bit segments, so physical values
+            # span [0,4] there vs [0,1] on 8/10-bit segments. gain/(2^res-1)
+            # rescales every segment to a consistent NU [0,1].
+            for i, ch in enumerate(channels_to_read):
+                if rec.units[i] == 'NU' and rec.adc_res[i] and rec.adc_gain[i]:
+                    sig_data[ch] = sig_data[ch] * (rec.adc_gain[i] / (2 ** rec.adc_res[i] - 1))
         except Exception:
             # Failed to read — treat as gap
             if current_parts is not None and any(len(v) > 0 for v in current_parts.values()):
