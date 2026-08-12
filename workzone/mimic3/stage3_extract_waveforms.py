@@ -9,16 +9,26 @@ Segments use 30 s non-overlapping windows (30 s stride) — consistent with
 the other physio_data datasets (Emory, MC_MED, UCSF, MOVER/SIS,
 MOVER/EPIC, VitalDB).
 
+Parameterized by a **channel list** and **seg_sec** (mirrors the MC_MED
+stage_b_wave.py API) so one script produces any UNIPHY FM variant. A channel =
+`name:source:target_fs[:src_fs]`; multiple channels may share a source sig_name
+(read once, resampled to each target). Changing seg_sec re-aligns the seg_idx of
+the inline ehr_events (expected). Defaults reproduce the original (PLETH40 @40,
+II120 @120, 30 s) output exactly.
+
 For each patient in the filtered inventory:
   1. Parse master header to get segment list + recording start time
   2. Match to hospital admission (HADM_ID) via ADMISSIONS table
   3. Read PLETH-anchored blocks (joint channel reading)
-  4. Resample: PLETH 125Hz -> 40Hz, II 125Hz -> 120Hz
-  5. Segment into 30 s non-overlapping windows (30 s stride)
+  4. Resample per channel spec (default: PLETH 125Hz -> 40Hz, II 125Hz -> 120Hz)
+  5. Segment into seg_sec non-overlapping windows (default 30 s, 30 s stride)
   6. Build ehr_events.npy from labs + vitals filtered by HADM_ID
   7. Save as per-patient directory: {SUBJECT_ID}_{HADM_ID}/
 
 Run:  python workzone/mimic3/stage3_extract_waveforms.py [--limit 10]
+      # variant: 10 s @ PLETH125 + II500, separate out-root
+      python workzone/mimic3/stage3_extract_waveforms.py --seg-sec 10 \\
+          --channels PLETH125:PLETH:125,II500:II:500 --out-root /path/to/mimic3_seg10
 Output: /opt/localdata100tb/physio_data/mimic3/{SUBJECT_ID}_{HADM_ID}/
 
 Depends on:
@@ -35,6 +45,7 @@ import logging
 import traceback
 from pathlib import Path
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 from math import gcd
 
 import numpy as np
@@ -56,7 +67,7 @@ EHR_ROOT = cfg["mimic3"]["raw_ehr_dir"]
 PROCESSED_ROOT = cfg["mimic3"]["output_dir"]
 
 # Canonical format constants
-SEGMENT_DUR_SEC = 30
+SEGMENT_DUR_SEC = 30          # default segment duration (cfg.seg_sec overrides)
 OVERLAP_SEC = 0
 STRIDE_SEC = SEGMENT_DUR_SEC - OVERLAP_SEC  # 30 — matches the other datasets
 WAVEFORM_DTYPE = np.float16
@@ -67,9 +78,76 @@ EHR_EVENT_DTYPE = np.dtype([
     ('var_id', 'uint16'),
     ('value', 'float32'),
 ])
-SOURCE_FS = 125  # MIMIC-III waveform source rate
-BASE_CHANNEL = "PLETH"
-TARGET_CHANNELS = {"PLETH": 40, "II": 120}  # channel -> target Hz
+# Native rate of each raw WFDB sig_name (used when a channel spec omits src_fs).
+SOURCE_FS = {"PLETH": 125, "II": 125}  # MIMIC-III waveform source rate
+MAX_NAN_RATIO = 0.20
+BASE_CHANNEL = "PLETH"  # default anchor: only PLETH-present segments anchor a block
+
+
+@dataclass(frozen=True)
+class ChannelSpec:
+    name: str          # canonical output name, e.g. "PLETH40"
+    source: str        # raw WFDB sig_name, e.g. "PLETH"
+    target_fs: int     # output sample rate, e.g. 40
+    src_fs: int        # expected native rate of `source`, e.g. 125
+
+
+@dataclass(frozen=True)
+class ExtractConfig:
+    seg_sec: int
+    anchor: str                       # sig_name that defines the grid; must be present
+    channels: tuple[ChannelSpec, ...]
+    max_nan_ratio: float = MAX_NAN_RATIO  # carried for API parity with stage_b_wave;
+    #                                       PLETH-anchored blocks are anchor-NaN-free so
+    #                                       no window-drop is applied (original behavior).
+
+
+# Default = the original hardcoded behavior (byte-identical output).
+DEFAULT_CFG = ExtractConfig(
+    seg_sec=30, anchor="PLETH",
+    channels=(
+        ChannelSpec("PLETH40", "PLETH", 40, 125),
+        ChannelSpec("II120",   "II",    120, 125),
+    ),
+)
+
+
+def resample_factors(target_fs, src_fs):
+    """(up, down) for scipy.resample_poly. gcd-reduced."""
+    g = gcd(int(target_fs), int(src_fs))
+    return int(target_fs) // g, int(src_fs) // g
+
+
+def _resample(sig, target_fs, src_fs):
+    """Resample to target_fs; no-op (no FIR pass) when rates already match.
+
+    Reference (stage_b_wave) API, float32. The mimic3 pipeline uses
+    `resample_signal` (float64) so the default extraction stays byte-identical.
+    """
+    if int(target_fs) == int(src_fs):
+        return np.asarray(sig, dtype=np.float32)
+    up, down = resample_factors(target_fs, src_fs)
+    return resample_poly(sig, up, down).astype(np.float32)
+
+
+def parse_channels(spec):
+    """Parse `name:source:target_fs[:src_fs]` comma-separated list.
+    src_fs is inferred from SOURCE_FS when omitted."""
+    chans = []
+    for tok in (t.strip() for t in spec.split(",") if t.strip()):
+        parts = tok.split(":")
+        if len(parts) not in (3, 4):
+            raise ValueError(f"bad channel spec {tok!r}; want name:source:target_fs[:src_fs]")
+        name, source, target_fs = parts[0], parts[1], int(parts[2])
+        if len(parts) == 4:
+            src_fs = int(parts[3])
+        elif source in SOURCE_FS:
+            src_fs = SOURCE_FS[source]
+        else:
+            raise ValueError(f"src_fs for source {source!r} unknown; give it explicitly "
+                             f"(known: {sorted(SOURCE_FS)})")
+        chans.append(ChannelSpec(name, source, target_fs, src_fs))
+    return tuple(chans)
 
 
 # ========================================================================
@@ -146,20 +224,23 @@ def parse_master_header(patient_path):
 # PLETH-anchored block reading
 # ========================================================================
 
-def read_wfdb_blocks(patient_path, segments, source_fs):
-    """Read waveform as PLETH-anchored blocks with joint channel reading.
+def read_wfdb_blocks(patient_path, segments, source_fs, source_names, base_channel=BASE_CHANNEL):
+    """Read waveform as anchor-anchored blocks with joint channel reading.
 
-    A 'block' is a maximal run of consecutive segments where PLETH exists.
-    Gaps (null segments or PLETH absent) break blocks.
+    A 'block' is a maximal run of consecutive segments where `base_channel`
+    (default PLETH) exists. Gaps (null segments or base absent) break blocks.
+
+    `source_names` are the unique raw sig_names to read (e.g. ["PLETH", "II"]);
+    multiple output channels may later share one source.
 
     Returns list of blocks:
-        [{'start_sec': float, 'channels': {name: 1D ndarray}}, ...]
+        [{'start_sec': float, 'channels': {sig_name: 1D ndarray}}, ...]
     All channel arrays within a block have identical length.
-    Missing II in a PLETH-present segment -> NaN-fill.
+    A non-base source absent in a base-present segment -> NaN-fill.
     """
     import wfdb
 
-    target_names = list(TARGET_CHANNELS.keys())
+    target_names = list(source_names)
     blocks = []
     current_parts = None  # {channel: [arrays]} for current block
     current_start_sec = None
@@ -190,7 +271,7 @@ def read_wfdb_blocks(patient_path, segments, source_fs):
 
         available = set(h.sig_name) if h.sig_name else set()
 
-        if BASE_CHANNEL not in available:
+        if base_channel not in available:
             # Base channel absent — gap
             if current_parts is not None:
                 blocks.append(_finalize_block(current_start_sec, current_parts))
@@ -225,7 +306,7 @@ def read_wfdb_blocks(patient_path, segments, source_fs):
             cumulative_samples += seg_len
             continue
 
-        actual_len = sig_data[BASE_CHANNEL].shape[0]
+        actual_len = sig_data[base_channel].shape[0]
 
         # Append each channel (NaN-fill if absent in this segment)
         for ch in target_names:
@@ -257,12 +338,15 @@ def _finalize_block(start_sec, parts):
 # ========================================================================
 
 def resample_signal(signal, src_fs, target_fs):
-    """Resample 1D signal using polyphase filtering."""
+    """Resample 1D signal using polyphase filtering (float64; pipeline path).
+
+    Routes through `resample_factors` (same gcd logic as the reference
+    `_resample`) but keeps the original float64 dtype so default extraction is
+    byte-identical to the pre-parameterization script.
+    """
     if src_fs == target_fs:
         return signal
-    g = gcd(int(src_fs), int(target_fs))
-    up = int(target_fs) // g
-    down = int(src_fs) // g
+    up, down = resample_factors(target_fs, src_fs)
     return resample_poly(signal, up, down).astype(np.float64)
 
 
@@ -362,7 +446,7 @@ def build_ehr_events(subject_id, hadm_id, segment_times_ms, labs_df, vitals_df):
 # Save with verification
 # ========================================================================
 
-def save_patient(out_dir, channels, time_ms, ehr_events, meta_extra):
+def save_patient(out_dir, channels, time_ms, ehr_events, meta_extra, seg_sec=SEGMENT_DUR_SEC):
     """Save one patient in canonical format with inline verification."""
     os.makedirs(out_dir, exist_ok=True)
     n_seg = len(time_ms)
@@ -387,14 +471,14 @@ def save_patient(out_dir, channels, time_ms, ehr_events, meta_extra):
 
     meta = {
         "n_segments": n_seg,
-        "segment_duration_sec": SEGMENT_DUR_SEC,
+        "segment_duration_sec": seg_sec,
         "overlap_sec": OVERLAP_SEC,
-        "stride_sec": STRIDE_SEC,
+        "stride_sec": seg_sec - OVERLAP_SEC,
         "channels": {
             name: {
                 "shape": list(arr.shape),
                 "dtype": str(arr.dtype),
-                "sample_rate_hz": int(arr.shape[1] / SEGMENT_DUR_SEC),
+                "sample_rate_hz": int(arr.shape[1] / seg_sec),
             }
             for name, arr in channels.items()
         },
@@ -413,11 +497,17 @@ def process_patient(args):
     """Process one patient: parse header -> match admission -> read blocks -> align -> save.
 
     Takes a single tuple for multiprocessing compatibility:
-    (row_dict, patient_labs, patient_vitals, patient_admissions)
+    (row_dict, patient_labs, patient_vitals, patient_admissions, cfg, out_root)
     """
-    row, patient_labs, patient_vitals, patient_admissions = args
+    row, patient_labs, patient_vitals, patient_admissions, cfg, out_root = args
     subject_id = row["subject_id"]
     patient_path = row["patient_path"]
+    seg_sec = cfg.seg_sec
+    # unique raw sig_names to read (multiple output channels may share a source)
+    source_names = []
+    for c in cfg.channels:
+        if c.source not in source_names:
+            source_names.append(c.source)
 
     try:
         # 1. Parse master header for segment list + start time
@@ -441,66 +531,67 @@ def process_patient(args):
                     "reason": f"admission overlap too short: {overlap_hours:.1f}h"}
 
         # 3. Read PLETH-anchored blocks (joint channel reading)
-        blocks = read_wfdb_blocks(patient_path, segment_list, source_fs)
+        blocks = read_wfdb_blocks(patient_path, segment_list, source_fs,
+                                  source_names, cfg.anchor)
         if not blocks:
             return {"subject_id": subject_id, "hadm_id": hadm_id,
                     "status": "SKIP", "reason": "no blocks with PLETH"}
 
-        # 4. Process each block: resample + segment with overlap
-        all_channel_segs = {ch: [] for ch in TARGET_CHANNELS}
+        # 4. Process each block: resample + segment (per channel spec)
+        all_channel_segs = {c.name: [] for c in cfg.channels}
         all_time_ms = []
 
         for block in blocks:
             block_start_ms = int((wav_start.timestamp() + block['start_sec']) * 1000)
 
-            # Resample each channel
+            # Resample each channel spec. Multiple specs may share a source; the
+            # block is read once by read_wfdb_blocks, then resampled to each target.
             resampled = {}
-            for ch, target_hz in TARGET_CHANNELS.items():
-                raw = block['channels'].get(ch)
+            for c in cfg.channels:
+                raw = block['channels'].get(c.source)
                 if raw is not None and len(raw) > 0:
-                    resampled[ch] = resample_signal(raw, source_fs, target_hz)
+                    resampled[c.name] = resample_signal(raw, source_fs, c.target_fs)
                 else:
-                    # Channel entirely missing in block — NaN at target rate
-                    base_raw = block['channels'][BASE_CHANNEL]
-                    target_len = int(np.ceil(len(base_raw) * target_hz / source_fs))
-                    resampled[ch] = np.full(target_len, np.nan)
+                    # Source entirely missing in block — NaN at target rate
+                    base_raw = block['channels'][cfg.anchor]
+                    target_len = int(np.ceil(len(base_raw) * c.target_fs / source_fs))
+                    resampled[c.name] = np.full(target_len, np.nan)
 
-            # Segment each channel with overlap
+            # Segment each channel (seg_sec-second non-overlap windows)
             segmented = {}
-            for ch, sig in resampled.items():
-                seg = segment_signal(sig, TARGET_CHANNELS[ch])
+            for c in cfg.channels:
+                seg = segment_signal(resampled[c.name], c.target_fs, seg_dur_sec=seg_sec)
                 if seg is None:
                     break  # block too short for even one window
-                segmented[ch] = seg
+                segmented[c.name] = seg
 
-            if len(segmented) != len(TARGET_CHANNELS):
+            if len(segmented) != len(cfg.channels):
                 continue  # skip this block (too short)
 
             # Align segment counts (may differ by 1 due to resampling rounding)
             n_seg_block = min(s.shape[0] for s in segmented.values())
-            for ch in segmented:
-                segmented[ch] = segmented[ch][:n_seg_block]
+            for name in segmented:
+                segmented[name] = segmented[name][:n_seg_block]
 
             # Build time_ms for this block
-            stride_ms = STRIDE_SEC * 1000
+            stride_ms = seg_sec * 1000
             block_time_ms = np.array(
                 [block_start_ms + i * stride_ms for i in range(n_seg_block)],
                 dtype=TIME_DTYPE,
             )
 
-            for ch in TARGET_CHANNELS:
-                all_channel_segs[ch].append(segmented[ch])
+            for c in cfg.channels:
+                all_channel_segs[c.name].append(segmented[c.name])
             all_time_ms.append(block_time_ms)
 
         if not all_time_ms:
             return {"subject_id": subject_id, "hadm_id": hadm_id,
                     "status": "SKIP", "reason": "all blocks too short"}
 
-        # 5. Concatenate across blocks
+        # 5. Concatenate across blocks (output keyed by ChannelSpec.name)
         channels_out = {}
-        for ch in TARGET_CHANNELS:
-            ch_name = f"{ch}{TARGET_CHANNELS[ch]}"  # e.g. PLETH40, II120
-            channels_out[ch_name] = np.concatenate(all_channel_segs[ch], axis=0)
+        for c in cfg.channels:
+            channels_out[c.name] = np.concatenate(all_channel_segs[c.name], axis=0)
 
         time_ms = np.concatenate(all_time_ms)
         n_seg = len(time_ms)
@@ -521,19 +612,20 @@ def process_patient(args):
         # 8. Count recording blocks (gaps show up as time_ms jumps > stride)
         if len(time_ms) > 1:
             diffs = np.diff(time_ms)
-            n_gaps = int(np.sum(diffs > STRIDE_SEC * 1000 * 1.5))  # >45 s gap (1.5x stride)
+            n_gaps = int(np.sum(diffs > seg_sec * 1000 * 1.5))  # >1.5x stride gap
         else:
             n_gaps = 0
 
         # 9. Save
         patient_id = f"{subject_id}_{hadm_id}"
-        out_dir = os.path.join(PROCESSED_ROOT, patient_id)
+        out_dir = os.path.join(out_root, patient_id)
 
         save_patient(
             out_dir=out_dir,
             channels=channels_out,
             time_ms=time_ms,
             ehr_events=ehr_events,
+            seg_sec=seg_sec,
             meta_extra={
                 "patient_id": patient_id,
                 "subject_id": int(subject_id),
@@ -541,7 +633,7 @@ def process_patient(args):
                 "source_dataset": "mimic3",
                 "source_path": patient_path,
                 "recording_start_ms": int(time_ms[0]),
-                "total_duration_hours": round(n_seg * STRIDE_SEC / 3600, 2),
+                "total_duration_hours": round(n_seg * seg_sec / 3600, 2),
                 "admission_overlap_hours": round(overlap_hours, 2),
                 "n_blocks": len(blocks),
                 "n_gaps": n_gaps,
@@ -562,7 +654,7 @@ def process_patient(args):
             "status": "OK",
             "n_segments": n_seg,
             "n_ehr_events": len(ehr_events),
-            "duration_hours": round(n_seg * STRIDE_SEC / 3600, 2),
+            "duration_hours": round(n_seg * seg_sec / 3600, 2),
             "overlap_hours": round(overlap_hours, 2),
             "n_blocks": len(blocks),
             "n_gaps": n_gaps,
@@ -587,17 +679,38 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=None, help="Process only N patients (for testing)")
     parser.add_argument("--workers", type=int, default=12, help="Parallel workers (default 12, max 50%% of cores)")
+    parser.add_argument("--out-root", type=str, default=None,
+                        help="Output dir override (default = PROCESSED_ROOT from server_paths.yaml)")
+    parser.add_argument("--seg-sec", type=int, default=None,
+                        help="Segment duration (default 30 = the canonical variant)")
+    parser.add_argument("--anchor", type=str, default=None,
+                        help="Anchor sig_name that defines the grid (default PLETH)")
+    parser.add_argument("--channels", type=str, default=None,
+                        help="name:source:target_fs[:src_fs] comma list. Default: PLETH40+II120")
+    parser.add_argument("--max-nan-ratio", type=float, default=None)
     args = parser.parse_args()
+
+    if args.channels or args.seg_sec is not None or args.anchor or args.max_nan_ratio is not None:
+        cfg = ExtractConfig(
+            seg_sec=args.seg_sec if args.seg_sec is not None else DEFAULT_CFG.seg_sec,
+            anchor=args.anchor or DEFAULT_CFG.anchor,
+            channels=parse_channels(args.channels) if args.channels else DEFAULT_CFG.channels,
+            max_nan_ratio=args.max_nan_ratio if args.max_nan_ratio is not None else MAX_NAN_RATIO,
+        )
+    else:
+        cfg = DEFAULT_CFG
+    out_root = args.out_root or PROCESSED_ROOT
 
     # Cap workers at 50% of cores (shared cluster)
     max_workers = os.cpu_count() // 2
     n_workers = min(args.workers, max_workers)
 
-    log.info(f"Stage 3: Extract waveforms -> {PROCESSED_ROOT}")
+    log.info(f"Stage 3: Extract waveforms -> {out_root}")
     log.info(f"  Workers: {n_workers} (max {max_workers} = 50% of {os.cpu_count()} cores)")
-    log.info(f"  Window: {SEGMENT_DUR_SEC}s, overlap: {OVERLAP_SEC}s, stride: {STRIDE_SEC}s")
-    log.info(f"  Base channel: {BASE_CHANNEL}, targets: {TARGET_CHANNELS}")
-    os.makedirs(PROCESSED_ROOT, exist_ok=True)
+    log.info(f"  Window: {cfg.seg_sec}s, overlap: {OVERLAP_SEC}s, stride: {cfg.seg_sec - OVERLAP_SEC}s")
+    log.info(f"  Anchor: {cfg.anchor}, channels: "
+             f"{[(c.name, c.source, c.target_fs, c.src_fs) for c in cfg.channels]}")
+    os.makedirs(out_root, exist_ok=True)
 
     # Load inventory
     inv_path = OUT_DIR_OUTPUTS / "record_inventory_final.parquet"
@@ -652,6 +765,8 @@ def main():
             labs_grouped.get(sid, empty_df_labs),
             vitals_grouped.get(sid, empty_df_vitals),
             adm_grouped.get(sid, empty_df_adm),
+            cfg,
+            out_root,
         ))
 
     # Process with multiprocessing
@@ -705,11 +820,12 @@ def main():
         "skipped": n_skip,
         "errors": n_err,
         "total_time_sec": round(elapsed, 1),
-        "output_dir": PROCESSED_ROOT,
+        "output_dir": out_root,
+        "channels": [c.name for c in cfg.channels],
         "segment_params": {
-            "duration_sec": SEGMENT_DUR_SEC,
+            "duration_sec": cfg.seg_sec,
             "overlap_sec": OVERLAP_SEC,
-            "stride_sec": STRIDE_SEC,
+            "stride_sec": cfg.seg_sec - OVERLAP_SEC,
         },
         "skip_reasons": skip_reasons,
         "errors_detail": [r for r in results if r["status"] == "ERROR"][:20],
@@ -725,7 +841,7 @@ def main():
     log.info(f"  OK: {n_ok}, SKIP: {n_skip}, ERROR: {n_err}")
     log.info(f"  Skip reasons: {skip_reasons}")
     log.info(f"  Time: {elapsed:.0f}s")
-    log.info(f"  Output: {PROCESSED_ROOT}")
+    log.info(f"  Output: {out_root}")
 
     if n_ok > 0:
         ok_results = [r for r in results if r["status"] == "OK"]

@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
 """
-Stage B - MOVER/SIS waveform extraction (raw XML -> canonical npy).
+Stage B — MOVER/SIS waveform extraction (raw XML -> canonical npy).
 
-Per PID:
-  1. Iterate all XML files in Waveforms/{suffix}/{PID}/
-  2. iterparse each XML. For every <cpc datetime="..."> with <mg name in
-     {PLETH, ECG1}>:
-       - base64-decode <m name="Wave"> as little-endian int16
-       - apply gain + offset from <m> tags (waveform_decode.py semantics)
-       - PLETH: 100 Hz, 100 samples/cpc (1 s)
-       - ECG1:  300 Hz, 300 samples/cpc (1 s)
-     Store as dict {cpc_datetime_ms: np.float32 samples} per channel.
-  3. Enumerate 30 s non-overlap windows aligned to first cpc second.
-  4. For each window:
-       PLETH: require >=24/30 seconds present. Concat (NaN-fill missing
-       seconds), resample 3000 -> 1200 via resample_poly(2, 5).
-       II:    concat ECG1 seconds (NaN-fill missing). If >=24/30 seconds
-       present, resample 9000 -> 3600 via resample_poly(2, 5). Else
-       whole II window = NaN.
-  5. Drop PLETH windows with >20% NaN.
-  6. Save PLETH40.npy, II120.npy, time_ms.npy (all C-contig float16 except
-     time_ms int64) + meta.json. stage_b_version=1.
+Anchor-driven, per-second XML alignment. Each raw `<mg name>` channel (source) is
+decoded into a per-second sample map {cpc_ms: samples_at_src_fs}. The anchor source
+(default `PLETH`) enumerates seg_sec-second non-overlap windows aligned to its first
+cpc second and gates each entity via MIN_CLEAN_WINDOWS. Every requested channel is
+then aligned onto that window grid via `_align_window` (concat per-second blocks,
+NaN-fill missing seconds, resample_poly to the channel's target rate); each channel
+also records a per-window seconds-present coverage array.
+
+Parameterized by a **channel list** and **seg_sec** (mirrors mcmed/stage_b_wave.py)
+so one script produces any UNIPHY FM variant. A channel = `name:source:target_fs
+[:src_fs]`; multiple channels may share a source (read once from the same per-second
+map, resampled to each target). `src_fs` is inferred from `SOURCE_FS` when omitted.
+
+Defaults reproduce the original exactly: PLETH40 <- PLETH @40 (src 100), II120 <-
+ECG1 @120 (src 300), seg_sec=30, coverage_s.npy (anchor) + ii_coverage_s.npy (ECG1),
+MIN_CLEAN_WINDOWS=5, Stream-A POLLTIME filter, stage_b_version=3.
+
+Run modes:
+  python stage_b_wave.py --limit 3 --workers 2          # smoke (default 40/120/30s)
+  python stage_b_wave.py --entity-id <PID>
+  # single-channel variant: 240 s @ PLETH50
+  python stage_b_wave.py --seg-sec 240 --anchor PLETH \\
+      --channels PLETH50:PLETH:50 \\
+      --out-root /opt/localdata100tb/physio_data/mover_seg240
 """
 import argparse
 import base64
@@ -31,7 +36,9 @@ import os
 import time
 import traceback
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from math import gcd
 from pathlib import Path
 
 import numpy as np
@@ -47,30 +54,68 @@ LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mover/logs"
 SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/stage_b_summary.json"
 
 SEG_SEC = 30
-PLETH_FS = 40
-II_FS = 120
-PLETH_SRC_FS = 100
-II_SRC_FS = 300       # ECG1 (monitor-parsed) native rate
-SEG_LEN_PLETH = SEG_SEC * PLETH_FS   # 1200
-SEG_LEN_II = SEG_SEC * II_FS         # 3600
 
-# v3 windowing policy: keep every 30-s window with >=1 s of real PLETH; NaN-fill
-# any missing-second region in both channels. The per-window second count is
-# saved as coverage_s.npy so training can pick its own quality bar.
+# Native rate of each raw XML `<mg name>` channel (used when a channel spec omits
+# src_fs). PLETH is 100 Hz (100 samples/cpc); ECG1 is 300 Hz (300 samples/cpc).
+SOURCE_FS = {"PLETH": 100, "ECG1": 300}
+
+# v3 windowing policy: keep every window with >=1 s of real anchor signal; NaN-fill
+# any missing-second region in every channel. The per-window second count is saved
+# as a coverage array so training can pick its own quality bar.
 MIN_SECONDS_PRESENT = 1        # window-level: keep anything with any data
-MIN_CLEAN_WINDOWS   = 5        # entity-level: require >=5 fully-clean (30/30) windows
-MAX_NAN_RATIO = 1.0            # permissive at storage time; training filters via coverage_s
+MIN_CLEAN_WINDOWS   = 5        # entity-level: require >=5 fully-clean windows on anchor
+MAX_NAN_RATIO = 1.0            # permissive at storage time; training filters via coverage
 DEFAULT_WORKERS = 16
 
-# v3 channel policy: Stream-A filter (see parse_xml_file). Only PLETH + ECG1
-# from Stream A are used; GE_ECG was a v2 no-op since Stream B's
-# fractional-second cpc timestamps never matched our whole-second per_sec_map.
-WANTED_CHANNELS = {"PLETH", "ECG1"}
+# v3 channel policy: Stream-A filter (see parse_xml_file). Only Stream-A `<mg>`
+# blocks (those carrying a POLLTIME) are used; Stream B's fractional-second cpc
+# timestamps never matched our whole-second per_sec_map. The set of raw sources
+# to parse is derived from the active config (only parse what a channel needs).
 
 # Per UCI's waveform_decode.py, INVP1 / GE_ART gains in the XML are incorrect
 # and must be overridden. Dormant for now (we don't extract those channels) but
 # retained so an ABP125 extension won't silently mis-scale.
 CHANNEL_GAIN_OVERRIDE = {"INVP1": 0.01, "GE_ART": 0.25}
+
+
+@dataclass(frozen=True)
+class ChannelSpec:
+    name: str          # canonical output name, e.g. "PLETH40"
+    source: str        # raw XML <mg name> channel, e.g. "PLETH"
+    target_fs: int     # output sample rate, e.g. 40
+    src_fs: int        # expected native rate of `source`, e.g. 100
+
+
+@dataclass(frozen=True)
+class ExtractConfig:
+    seg_sec: int
+    anchor: str                       # source that defines the grid; must be present
+    channels: tuple[ChannelSpec, ...]
+    max_nan_ratio: float = MAX_NAN_RATIO
+
+
+# Default = the original hardcoded behavior (byte-identical output).
+DEFAULT_CFG = ExtractConfig(
+    seg_sec=30, anchor="PLETH",
+    channels=(
+        ChannelSpec("PLETH40", "PLETH", 40, 100),
+        ChannelSpec("II120",   "ECG1",  120, 300),
+    ),
+)
+
+
+def resample_factors(target_fs: int, src_fs: int) -> tuple[int, int]:
+    """(up, down) for scipy.resample_poly. gcd-reduced."""
+    g = gcd(int(target_fs), int(src_fs))
+    return int(target_fs) // g, int(src_fs) // g
+
+
+def _resample(sig: np.ndarray, target_fs: int, src_fs: int) -> np.ndarray:
+    """Resample to target_fs; no-op (no FIR pass) when rates already match."""
+    if int(target_fs) == int(src_fs):
+        return np.asarray(sig, dtype=np.float32)
+    up, down = resample_factors(target_fs, src_fs)
+    return resample_poly(sig, up, down).astype(np.float32)
 
 
 def pid_suffix(pid: str) -> str:
@@ -110,15 +155,16 @@ def decode_wave(b64_str: str, gain: float, offset: float,
     return arr
 
 
-def parse_xml_file(path: Path) -> dict:
-    """Return {'PLETH': {cpc_ms: samples}, 'ECG1': {cpc_ms: samples}}.
+def parse_xml_file(path: Path, wanted: set[str]) -> dict:
+    """Return {source: {cpc_ms: samples}} for each source in `wanted`.
 
-    v3 only processes Stream A: `<measurements>` blocks that contain a
-    `<m name="POLLTIME">` child. Stream B (GE native, fractional cpc
-    timestamps, no POLLTIME) is skipped explicitly. Uses iterparse +
-    element clearing so 6 MB XMLs don't blow memory.
+    `wanted` is the set of raw `<mg name>` sources the active config needs
+    (e.g. {"PLETH", "ECG1"}). v3 only processes Stream A: `<measurements>`
+    blocks that contain a `<m name="POLLTIME">` child. Stream B (GE native,
+    fractional cpc timestamps, no POLLTIME) is skipped explicitly. Uses
+    iterparse + element clearing so 6 MB XMLs don't blow memory.
     """
-    out = {"PLETH": {}, "ECG1": {}}
+    out = {name: {} for name in wanted}
     try:
         ctx = ET.iterparse(str(path), events=("start", "end"))
     except Exception:
@@ -157,7 +203,7 @@ def parse_xml_file(path: Path) -> dict:
         # Extract all wanted <mg> children of this measurements block.
         for mg in elem.findall("mg"):
             name = mg.get("name")
-            if name not in WANTED_CHANNELS:
+            if name not in wanted:
                 continue
             wave = offset = gain = None
             points = None
@@ -197,20 +243,19 @@ def parse_xml_file(path: Path) -> dict:
 
 
 def _align_window(per_sec_map: dict, t_start_ms: int,
-                  src_fs: int, target_len: int) -> tuple[np.ndarray, int]:
-    """Build one 30 s window at target rate via resample_poly(2, 5).
+                  src_fs: int, target_fs: int,
+                  seg_sec: int = SEG_SEC) -> tuple[np.ndarray, int]:
+    """Build one seg_sec-second window at target_fs via resample_poly.
 
     per_sec_map: {cpc_ms_aligned_to_second: samples_at_src_fs_for_1s}
-    Returns (window float32 length=target_len, n_seconds_present 0..30).
+    Returns (window float32 length=seg_sec*target_fs, n_seconds_present 0..seg_sec).
     """
-    from math import gcd
-    g = gcd(src_fs, PLETH_FS if target_len == SEG_LEN_PLETH else II_FS)
-    up = (PLETH_FS if target_len == SEG_LEN_PLETH else II_FS) // g
-    down = src_fs // g
+    target_len = seg_sec * target_fs
+    up, down = resample_factors(target_fs, src_fs)
     n_raw_per_sec = src_fs
-    raw = np.full(SEG_SEC * n_raw_per_sec, np.nan, dtype=np.float32)
-    presence = np.zeros(SEG_SEC, dtype=bool)
-    for i in range(SEG_SEC):
+    raw = np.full(seg_sec * n_raw_per_sec, np.nan, dtype=np.float32)
+    presence = np.zeros(seg_sec, dtype=bool)
+    for i in range(seg_sec):
         t = t_start_ms + i * 1000
         s = per_sec_map.get(t)
         if s is None or len(s) != n_raw_per_sec:
@@ -234,7 +279,7 @@ def _align_window(per_sec_map: dict, t_start_ms: int,
         resamp = resamp[:target_len]
     # Re-apply NaN on absent seconds so downstream sees NaN, not 0-filled noise.
     if not presence.all():
-        per_sec_target = target_len // SEG_SEC
+        per_sec_target = target_len // seg_sec
         out_sig = resamp.copy()
         for i in np.where(~presence)[0]:
             out_sig[i * per_sec_target:(i + 1) * per_sec_target] = np.nan
@@ -242,13 +287,42 @@ def _align_window(per_sec_map: dict, t_start_ms: int,
     return resamp, n_present
 
 
-def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
+def _coverage_filename(chan: ChannelSpec, anchor_primary_name: str,
+                       is_default: bool) -> str:
+    """Per-channel coverage filename. Anchor primary -> `coverage_s.npy`. The
+    single non-anchor channel of the default config keeps the legacy name
+    `ii_coverage_s.npy`; every other non-anchor channel gets `{name}_coverage_s.npy`.
+    """
+    if chan.name == anchor_primary_name:
+        return "coverage_s.npy"
+    if is_default:
+        return "ii_coverage_s.npy"
+    return f"{chan.name}_coverage_s.npy"
+
+
+def process_entity(row: dict, cfg: ExtractConfig = DEFAULT_CFG,
+                   out_root: str = OUT_ROOT) -> dict:
     pid = str(row["pid"])
     out_dir = Path(out_root) / pid
     meta_path = out_dir / "meta.json"
+    seg_sec = cfg.seg_sec
 
-    required = ["PLETH40.npy", "II120.npy", "time_ms.npy", "meta.json",
-                "coverage_s.npy"]
+    by_source: dict[str, list[ChannelSpec]] = {}
+    for c in cfg.channels:
+        by_source.setdefault(c.source, []).append(c)
+    if cfg.anchor not in by_source:
+        raise ValueError(f"anchor {cfg.anchor!r} not among channel sources {sorted(by_source)}")
+    anchor_chans = by_source[cfg.anchor]
+    anchor0 = anchor_chans[0]                 # primary anchor channel: drives grid + gate
+
+    is_default = (cfg == DEFAULT_CFG)
+    cov_files = {c.name: _coverage_filename(c, anchor0.name, is_default)
+                 for c in cfg.channels}
+
+    # Resume: keyed on the config's channel + coverage files + version >= 3.
+    required = ([f"{c.name}.npy" for c in cfg.channels]
+                + ["time_ms.npy", "meta.json"]
+                + list(cov_files.values()))
     if all((out_dir / f).exists() for f in required):
         try:
             m = json.loads(meta_path.read_text())
@@ -265,126 +339,168 @@ def process_entity(row: dict, out_root: str = OUT_ROOT) -> dict:
     if not xml_paths:
         return {"entity_id": pid, "status": "no_xmls"}
 
-    pleth_map: dict[int, np.ndarray] = {}
-    ecg1_map: dict[int, np.ndarray] = {}
+    # Only parse the raw sources this config actually needs.
+    wanted = {c.source for c in cfg.channels}
+    source_maps: dict[str, dict[int, np.ndarray]] = {s: {} for s in wanted}
     n_xml_parsed = n_xml_fail = 0
     for p in xml_paths:
         try:
-            parsed = parse_xml_file(p)
-            pleth_map.update(parsed["PLETH"])
-            ecg1_map.update(parsed["ECG1"])
+            parsed = parse_xml_file(p, wanted)
+            for s in wanted:
+                source_maps[s].update(parsed[s])
             n_xml_parsed += 1
         except Exception:
             n_xml_fail += 1
 
-    if not pleth_map:
-        return {"entity_id": pid, "status": "no_pleth_blocks",
+    anchor_map = source_maps[cfg.anchor]
+    if not anchor_map:
+        return {"entity_id": pid, "status": "no_anchor_blocks",
                 "n_xmls": len(xml_paths), "n_xml_fail": n_xml_fail}
 
-    # Enumerate 30 s windows aligned to the first PLETH cpc second.
-    all_secs = sorted(pleth_map.keys())
+    # Enumerate seg_sec windows aligned to the first anchor cpc second.
+    all_secs = sorted(anchor_map.keys())
     first_ms = all_secs[0]
     last_ms = all_secs[-1]
-    win_starts = list(range(first_ms, last_ms + 1, SEG_SEC * 1000))
+    win_starts = list(range(first_ms, last_ms + 1, seg_sec * 1000))
 
-    pleth_blocks = []
-    ii_blocks = []
+    blocks: dict[str, list] = {c.name: [] for c in cfg.channels}
+    coverage: dict[str, list] = {c.name: [] for c in cfg.channels}  # per-window seconds present
     time_ms_list: list[int] = []
-    coverage_s_list: list[int] = []   # per-window PLETH seconds present (0..30)
-    ii_coverage_s_list: list[int] = [] # per-window ECG1 seconds present (0..30)
     n_dropped_empty = 0
-    n_ii_with_any = 0
+    # Windows-with-any-signal count, only for non-anchor-source channels.
+    n_with_any: dict[str, int] = {c.name: 0 for c in cfg.channels
+                                  if c.source != cfg.anchor}
 
     for t_start in win_starts:
-        p_win, p_sec = _align_window(pleth_map, t_start, PLETH_SRC_FS, SEG_LEN_PLETH)
-        if p_sec < MIN_SECONDS_PRESENT:
+        a_win, a_sec = _align_window(anchor_map, t_start, anchor0.src_fs,
+                                     anchor0.target_fs, seg_sec)
+        if a_sec < MIN_SECONDS_PRESENT:
             n_dropped_empty += 1
             continue
-        ii_win, i_sec = _align_window(ecg1_map, t_start, II_SRC_FS, SEG_LEN_II)
-        if i_sec >= 1:
-            n_ii_with_any += 1
-        # _align_window returns all-NaN when i_sec == 0; keep as-is
-        pleth_blocks.append(p_win)
-        ii_blocks.append(ii_win)
+        win_by_ch = {anchor0.name: a_win}
+        sec_by_ch = {anchor0.name: a_sec}
+        for c in cfg.channels:
+            if c.name == anchor0.name:
+                continue
+            w, sec = _align_window(source_maps[c.source], t_start, c.src_fs,
+                                   c.target_fs, seg_sec)
+            win_by_ch[c.name] = w
+            sec_by_ch[c.name] = sec
+            # _align_window returns all-NaN when sec == 0; keep as-is.
+            if c.source != cfg.anchor and sec >= 1:
+                n_with_any[c.name] += 1
+        for c in cfg.channels:
+            blocks[c.name].append(win_by_ch[c.name])
+            coverage[c.name].append(sec_by_ch[c.name])
         time_ms_list.append(t_start)
-        coverage_s_list.append(p_sec)
-        ii_coverage_s_list.append(i_sec)
 
-    if not pleth_blocks:
+    if not time_ms_list:
         return {"entity_id": pid, "status": "no_valid_windows",
                 "n_xmls_parsed": n_xml_parsed,
                 "n_dropped_empty": n_dropped_empty}
 
-    coverage_s = np.asarray(coverage_s_list, dtype=np.uint8)
-    ii_coverage_s = np.asarray(ii_coverage_s_list, dtype=np.uint8)
-    n_clean_windows = int((coverage_s == SEG_SEC).sum())
+    cov_arrays = {c.name: np.asarray(coverage[c.name], dtype=np.uint8)
+                  for c in cfg.channels}
+    anchor_cov = cov_arrays[anchor0.name]
+    n_clean_windows = int((anchor_cov == seg_sec).sum())
     if n_clean_windows < MIN_CLEAN_WINDOWS:
         return {"entity_id": pid, "status": "too_few_clean_windows",
                 "n_xmls_parsed": n_xml_parsed,
-                "n_windows_kept": int(len(coverage_s)),
+                "n_windows_kept": int(len(anchor_cov)),
                 "n_clean_windows": n_clean_windows}
 
-    pleth40 = np.ascontiguousarray(np.vstack(pleth_blocks).astype(np.float16))
-    ii120 = np.ascontiguousarray(np.vstack(ii_blocks).astype(np.float16))
+    arrays = {}
+    for c in cfg.channels:
+        arr = np.ascontiguousarray(np.vstack(blocks[c.name]).astype(np.float16))
+        assert arr.flags["C_CONTIGUOUS"]
+        assert arr.shape[1] == seg_sec * c.target_fs
+        arrays[c.name] = arr
     time_ms = np.asarray(time_ms_list, dtype=np.int64)
-    assert pleth40.flags["C_CONTIGUOUS"] and ii120.flags["C_CONTIGUOUS"]
-    assert pleth40.shape[0] == ii120.shape[0] == len(time_ms) == len(coverage_s)
-    assert pleth40.shape[1] == SEG_LEN_PLETH and ii120.shape[1] == SEG_LEN_II
-    assert len(time_ms) == 1 or np.all(np.diff(time_ms) > 0)
+    n_seg = int(time_ms.shape[0])
+    for c in cfg.channels:
+        assert arrays[c.name].shape[0] == n_seg == len(cov_arrays[c.name])
+    assert n_seg == 1 or np.all(np.diff(time_ms) > 0)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    np.save(out_dir / "PLETH40.npy", pleth40)
-    np.save(out_dir / "II120.npy", ii120)
+    for c in cfg.channels:
+        np.save(out_dir / f"{c.name}.npy", arrays[c.name])
     np.save(out_dir / "time_ms.npy", time_ms)
-    np.save(out_dir / "coverage_s.npy", coverage_s)
-    np.save(out_dir / "ii_coverage_s.npy", ii_coverage_s)
+    for c in cfg.channels:
+        np.save(out_dir / cov_files[c.name], cov_arrays[c.name])
+
+    ch_meta = {}
+    for c in cfg.channels:
+        up, down = resample_factors(c.target_fs, c.src_fs)
+        if c.source == cfg.anchor:
+            src = (f"SIS XML {c.source} (Stream-A only via POLLTIME filter) @ "
+                   f"{c.src_fs} Hz, resample_poly({up},{down}); NaN-filled per missing-second")
+        else:
+            src = (f"SIS XML {c.source} (Stream-A only) @ {c.src_fs} Hz, "
+                   f"resample_poly({up},{down}); NaN-filled per missing-second")
+        ch_meta[c.name] = {"sample_rate_hz": c.target_fs,
+                           "shape": list(arrays[c.name].shape),
+                           "dtype": "float16", "source": src,
+                           "coverage_file": cov_files[c.name]}
 
     meta = {
         "entity_id": pid,
         "pid": pid,
         "source_dataset": "mover_sis",
-        "n_segments": int(pleth40.shape[0]),
-        "segment_duration_sec": SEG_SEC,
-        "total_duration_hours": round(int(pleth40.shape[0]) * SEG_SEC / 3600, 2),
+        "n_segments": n_seg,
+        "segment_duration_sec": seg_sec,
+        "total_duration_hours": round(n_seg * seg_sec / 3600, 2),
         "wave_start_ms": int(time_ms[0]),
-        "wave_end_ms": int(time_ms[-1] + SEG_SEC * 1000),
-        "channels": {
-            "PLETH40": {"sample_rate_hz": PLETH_FS, "shape": list(pleth40.shape),
-                        "dtype": "float16",
-                        "source": f"SIS XML PLETH (Stream-A only via POLLTIME filter) @ {PLETH_SRC_FS} Hz, resample_poly(2,5); NaN-filled per missing-second"},
-            "II120":   {"sample_rate_hz": II_FS, "shape": list(ii120.shape),
-                        "dtype": "float16",
-                        "source": f"SIS XML ECG1 (Stream-A only) @ {II_SRC_FS} Hz, resample_poly(2,5); NaN-filled per missing-second"},
-        },
+        "wave_end_ms": int(time_ms[-1] + seg_sec * 1000),
+        "anchor": cfg.anchor,
+        "channels": ch_meta,
         "n_xml_files_listed":  len(xml_paths),
         "n_xml_files_parsed":  n_xml_parsed,
         "n_xml_files_failed":  n_xml_fail,
         "n_windows_dropped_empty":  n_dropped_empty,
-        "n_windows_with_ii_any":    n_ii_with_any,
-        "n_windows_clean_pleth":    n_clean_windows,
-        "n_windows_clean_ii":       int((ii_coverage_s == SEG_SEC).sum()),
-        "has_ii":          bool(n_ii_with_any > 0),
-        "coverage_file":   "coverage_s.npy",       # [N_seg] uint8, seconds of PLETH present per window
-        "ii_coverage_file": "ii_coverage_s.npy",   # [N_seg] uint8, seconds of ECG1 present per window
+        "n_windows_with":      n_with_any,   # {non-anchor channel: windows with >=1 s}
+        "n_windows_clean":     {c.name: int((cov_arrays[c.name] == seg_sec).sum())
+                                for c in cfg.channels},
+        "n_windows_clean_anchor": n_clean_windows,
+        "coverage_file":   "coverage_s.npy",       # anchor: [N_seg] uint8, seconds present per window
         "min_seconds_present": MIN_SECONDS_PRESENT,
         "min_clean_windows":   MIN_CLEAN_WINDOWS,
-        "max_nan_ratio":   MAX_NAN_RATIO,
+        "max_nan_ratio":   cfg.max_nan_ratio,
         "stream_filter":   "polltime_only",
         "or_start_ms":     int(row["or_start_ms"]) if row.get("or_start_ms") is not None else None,
         "or_end_ms":       int(row["or_end_ms"])   if row.get("or_end_ms")   is not None else None,
         "stage_b_version": 3,
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
-    return {"entity_id": pid, "status": "ok", "n_seg": int(pleth40.shape[0]),
-            "n_xmls": n_xml_parsed, "n_windows_clean_pleth": n_clean_windows,
-            "n_windows_with_ii_any": n_ii_with_any,
+    return {"entity_id": pid, "status": "ok", "n_seg": n_seg,
+            "n_xmls": n_xml_parsed, "n_windows_clean_anchor": n_clean_windows,
+            "n_windows_with": n_with_any,
             "n_dropped_empty": n_dropped_empty}
 
 
+def parse_channels(spec: str) -> tuple[ChannelSpec, ...]:
+    """Parse `name:source:target_fs[:src_fs]` comma-separated list.
+    src_fs is inferred from SOURCE_FS when omitted."""
+    chans = []
+    for tok in (t.strip() for t in spec.split(",") if t.strip()):
+        parts = tok.split(":")
+        if len(parts) not in (3, 4):
+            raise ValueError(f"bad channel spec {tok!r}; want name:source:target_fs[:src_fs]")
+        name, source, target_fs = parts[0], parts[1], int(parts[2])
+        if len(parts) == 4:
+            src_fs = int(parts[3])
+        elif source in SOURCE_FS:
+            src_fs = SOURCE_FS[source]
+        else:
+            raise ValueError(f"src_fs for source {source!r} unknown; give it explicitly "
+                             f"(known: {sorted(SOURCE_FS)})")
+        chans.append(ChannelSpec(name, source, target_fs, src_fs))
+    return tuple(chans)
+
+
 def _worker(args):
-    row, out_root = args
+    row, cfg, out_root = args
     try:
-        return process_entity(row, out_root)
+        return process_entity(row, cfg=cfg, out_root=out_root)
     except Exception as e:
         return {"entity_id": row.get("entity_id", "?"), "status": "error",
                 "error": f"{type(e).__name__}: {e}",
@@ -398,7 +514,24 @@ def main():
     ap.add_argument("--entity-id", type=str, default=None)
     ap.add_argument("--entities", type=str, default=None)
     ap.add_argument("--out-root", default=OUT_ROOT)
+    ap.add_argument("--seg-sec", type=int, default=None,
+                    help="Segment duration (default 30 = the canonical variant)")
+    ap.add_argument("--anchor", type=str, default=None,
+                    help="Anchor source (XML <mg name>) that defines the grid (default PLETH)")
+    ap.add_argument("--channels", type=str, default=None,
+                    help="name:source:target_fs[:src_fs] comma list. Default: PLETH40+II120")
+    ap.add_argument("--max-nan-ratio", type=float, default=None)
     args = ap.parse_args()
+
+    if args.channels or args.seg_sec is not None or args.anchor or args.max_nan_ratio is not None:
+        cfg = ExtractConfig(
+            seg_sec=args.seg_sec if args.seg_sec is not None else DEFAULT_CFG.seg_sec,
+            anchor=args.anchor or DEFAULT_CFG.anchor,
+            channels=parse_channels(args.channels) if args.channels else DEFAULT_CFG.channels,
+            max_nan_ratio=args.max_nan_ratio if args.max_nan_ratio is not None else MAX_NAN_RATIO,
+        )
+    else:
+        cfg = DEFAULT_CFG
 
     os.makedirs(LOG_DIR, exist_ok=True)
     logging.basicConfig(level=logging.INFO,
@@ -407,6 +540,8 @@ def main():
                                   logging.FileHandler(f"{LOG_DIR}/stage_b_wave.log")])
     log = logging.getLogger(__name__)
     log.info(f"Loading cohort: {COHORT_PARQUET}")
+    log.info(f"Config: seg_sec={cfg.seg_sec} anchor={cfg.anchor} out_root={args.out_root} "
+             f"channels={[(c.name, c.source, c.target_fs, c.src_fs) for c in cfg.channels]}")
     df = pl.read_parquet(COHORT_PARQUET)
     if args.entity_id:
         df = df.filter(pl.col("entity_id") == args.entity_id)
@@ -423,7 +558,7 @@ def main():
     ctx = mp.get_context("spawn")
     with ctx.Pool(args.workers) as pool:
         for i, r in enumerate(pool.imap_unordered(_worker,
-                                                  [(row, args.out_root) for row in rows],
+                                                  [(row, cfg, args.out_root) for row in rows],
                                                   chunksize=1)):
             results.append(r)
             if (i + 1) % 50 == 0 or i + 1 == len(rows):
@@ -441,6 +576,9 @@ def main():
         "elapsed_sec": round(elapsed, 1),
         "by_status": {s: len(v) for s, v in by.items()},
         "ok_total_segments": sum(r.get("n_seg", 0) for r in by.get("ok", [])),
+        "seg_sec": cfg.seg_sec,
+        "channels": [c.name for c in cfg.channels],
+        "out_root": args.out_root,
         "workers": args.workers,
     }
     with open(SUMMARY_JSON, "w") as f:
