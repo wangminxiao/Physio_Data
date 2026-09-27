@@ -129,7 +129,7 @@ See `workzone/mover/README.md` for stage commands + wall-time estimates.
   +60×1,399, decided 6,200 (88.7 %), unverified 793 (744 undecided/conflict + 37 with < 20 charted-HR points, the old "no_vitals");
   EPIC −60×396 / 0×1,028 / +60×349, decided 1,601 (88.0 %), unverified 218.** Tasks after exclusion (train): SIS `lab_est_full`
   970→924, `vital_est_full` 4,771→4,351; EPIC 309→242, 1,211→1,115; `mover_combine` `lab_est_full` 1,279→1,166, `vital_est_full`
-  5,982→5,466, `lab6_any_min2` rebuilt from `task_specs/lab6_any_min2.yaml` (lost `lab_task.py`, no spec). Per-case rows: `clock_shift.parquet` (v3 rows kept
+  5,982→5,466, `lab6_any_min2` 854→769 (rebuilt from `task_specs/lab6_any_min2.yaml`; lost `lab_task.py`, no spec). Per-case rows: `clock_shift.parquet` (v3 rows kept
   in `clock_shift_v3.parquet`), summaries `clock_shift_summary_{validate_season,season}.json`.
 * BeeGFS: `/projects/xhu40-cdsfm/physio_data/mover_combine` holds real (dereferenced) copies incl. waveforms and FM sidecars
   but was **not** refreshed by the first copy job (symlinked entity dirs vs `rsync -rlt`); the fixed `copy` step uses
