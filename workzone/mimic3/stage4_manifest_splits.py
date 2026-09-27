@@ -100,7 +100,8 @@ def validate_patient(patient_dir):
     time_path = os.path.join(patient_dir, "time_ms.npy")
     time_ms_arr = np.load(time_path) if os.path.exists(time_path) else None
     wave_start = int(time_ms_arr[0]) if time_ms_arr is not None and len(time_ms_arr) else None
-    wave_end   = int(time_ms_arr[-1]) if time_ms_arr is not None and len(time_ms_arr) else None
+    # the last segment covers [time_ms[-1], time_ms[-1] + pad): stage3c admits in-window events up to that end
+    wave_end   = (int(time_ms_arr[-1]) + int(meta.get("wave_end_pad_ms", 30000))) if time_ms_arr is not None and len(time_ms_arr) else None
 
     for kind, fname in (
         ("baseline", FNAME_BASELINE),
@@ -143,8 +144,49 @@ def validate_patient(patient_dir):
     return entry, errors
 
 
+def _write_splits_from_lists(valid_entries, kept, prev):
+    """--keep-splits: rewrite pretrain_splits.json / downstream_splits.json from existing membership lists."""
+    by_dir = {e["dir"]: e for e in valid_entries}
+    def subj(d):
+        e = by_dir[d]; return e.get("subject_id", int(d.split("_")[0]))
+    splits = {
+        "train": sorted(kept["train"]), "val": sorted(kept["val"]), "test": sorted(kept["test"]),
+        "seed": prev.get("seed", SPLIT_SEED), "train_fraction": prev.get("train_fraction", TRAIN_FRACTION),
+        "val_fraction": prev.get("val_fraction", VAL_FRACTION), "test_fraction": prev.get("test_fraction", TEST_FRACTION),
+        "n_unique_subjects": len({subj(d) for k in kept for d in kept[k]}),
+        "n_train_subjects": len({subj(d) for d in kept["train"]}), "n_val_subjects": len({subj(d) for d in kept["val"]}),
+        "n_test_subjects": len({subj(d) for d in kept["test"]}),
+        "n_train_dirs": len(kept["train"]), "n_val_dirs": len(kept["val"]), "n_test_dirs": len(kept["test"]),
+        "n_subjects_with_multi_admissions": prev.get("n_subjects_with_multi_admissions"),
+        "keep_splits_note": "membership reused from the previous build (clock fix 2026-09); entities that no longer validate were dropped",
+    }
+    with open(os.path.join(PROCESSED_ROOT, "pretrain_splits.json"), "w") as f:
+        json.dump(splits, f, indent=2)
+    def build_split_list(dirs):
+        return [[os.path.join(PROCESSED_ROOT, d), subj(d), 0, by_dir[d]["n_segments"], -1, 0] for d in sorted(dirs)]
+    downstream = {"train_control_list": build_split_list(kept["train"]), "val_control_list": build_split_list(kept["val"]),
+                  "test_control_list": build_split_list(kept["test"])}
+    with open(os.path.join(PROCESSED_ROOT, "downstream_splits.json"), "w") as f:
+        json.dump(downstream, f, indent=2)
+    log.info(f"keep-splits: train/val/test = {len(kept['train'])}/{len(kept['val'])}/{len(kept['test'])} dirs")
+
+
+def _write_summary(valid_entries, all_errors, patient_dirs, t0):
+    total_hours = sum(e.get("duration_hours", 0) for e in valid_entries)
+    total_events = sum(e.get("n_ehr_events", 0) for e in valid_entries)
+    summary = {"n_valid": len(valid_entries), "n_failed": len(all_errors), "n_dirs": len(patient_dirs),
+               "total_hours": round(total_hours, 1), "total_ehr_events": total_events, "mode": "keep_splits",
+               "elapsed_sec": round(time.time() - t0, 1), "failed_patients": dict(list(all_errors.items())[:20])}
+    with open(OUT_DIR_OUTPUTS / "stage4_summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
+    log.info(f"=== Stage 4 (keep-splits) complete: valid={len(valid_entries)} failed={len(all_errors)} ===")
+
+
 def main():
-    log.info(f"Stage 4: Build manifest and splits from {PROCESSED_ROOT}")
+    import argparse
+    ap = argparse.ArgumentParser(); ap.add_argument("--keep-splits", action="store_true", help="re-validate + rewrite manifest.json but reuse the existing pretrain_splits.json membership (prunes entities that no longer validate)")
+    args = ap.parse_args()
+    log.info(f"Stage 4: Build manifest and splits from {PROCESSED_ROOT} keep_splits={args.keep_splits}")
     t0 = time.time()
 
     # Find all patient directories
@@ -188,6 +230,26 @@ def main():
     with open(manifest_path, "w") as f:
         json.dump(valid_entries, f, indent=2)
     log.info(f"Manifest: {manifest_path} ({len(valid_entries)} patients)")
+
+    if args.keep_splits:
+        prev = json.load(open(os.path.join(PROCESSED_ROOT, "pretrain_splits.json")))
+        valid_dirs = {e["dir"] for e in valid_entries}
+        new_dirs = valid_dirs - set(prev["train"]) - set(prev["val"]) - set(prev["test"])
+        kept = {k: [d for d in prev[k] if d in valid_dirs] for k in ("train", "val", "test")}
+        if new_dirs:   # entities that validate now but were absent before: follow their subject's split, else train
+            subj_split = {}
+            for k in kept:
+                for d in kept[k]:
+                    subj_split[d.split("_")[0]] = k
+            placed = {"train": 0, "val": 0, "test": 0}
+            for d in sorted(new_dirs):
+                k = subj_split.get(d.split("_")[0], "train"); kept[k].append(d); placed[k] += 1
+            log.warning(f"keep-splits: {len(new_dirs)} newly valid entities added by subject rule -> {placed}")
+        dropped = sum(len(prev[k]) - len(kept[k]) for k in kept)
+        log.info(f"keep-splits: membership reused ({dropped} entities dropped as no longer valid)")
+        _write_splits_from_lists(valid_entries, kept, prev)
+        _write_summary(valid_entries, all_errors, patient_dirs, t0)
+        return
 
     # Generate splits -- split by SUBJECT_ID (not by dir)
     # All admissions from the same subject must be in the same set (no data leakage)

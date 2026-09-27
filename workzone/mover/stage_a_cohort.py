@@ -20,11 +20,11 @@ from pathlib import Path
 
 import polars as pl
 
-RAW_ROOT = "/opt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
+RAW_ROOT = "/mnt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
 PAT_INFO_CSV = f"{RAW_ROOT}/EMR/patient_information.csv"
 SIS_WAVE_ROOT = f"{RAW_ROOT}/sis_wave_v2/UCI_deidentified_part3_SIS_11_07/Waveforms"
 
-OUT_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover"
+OUT_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover"
 OUT_PARQUET = f"{OUT_DIR}/valid_cohort.parquet"
 OUT_SUMMARY = f"{OUT_DIR}/stage_a_summary.json"
 

@@ -29,7 +29,7 @@ from pathlib import Path
 import polars as pl
 
 UTC = timezone.utc
-RAW_ROOT = "/opt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
+RAW_ROOT = "/mnt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
 CROSSWALK_CSV = f"{RAW_ROOT}/EPIC_MRN_PAT_ID.csv"
 PAT_INFO_CSV = f"{RAW_ROOT}/EPIC_EMR/EMR/patient_information.csv"
 WAVE_DIRS = [
@@ -38,7 +38,7 @@ WAVE_DIRS = [
     f"{RAW_ROOT}/epic_wave_3_v2/UCI_deidentified_part4_EPIC_11_28/Waveforms",
 ]
 
-OUT_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic"
+OUT_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic"
 OUT_PARQUET = f"{OUT_DIR}/valid_cohort.parquet"
 OUT_SUMMARY = f"{OUT_DIR}/stage_a_summary.json"
 WINDOW_BUFFER_MS = 3600 * 1000  # +/- 1 h around anesthesia window

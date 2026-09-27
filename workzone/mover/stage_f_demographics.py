@@ -13,9 +13,9 @@ from pathlib import Path
 
 import polars as pl
 
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
-SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/stage_f_demographics_summary.json"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
+SUMMARY_JSON = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover/stage_f_demographics_summary.json"
 
 
 def main():

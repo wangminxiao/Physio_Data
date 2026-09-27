@@ -20,7 +20,7 @@ Run modes:
   python stage_b_wave.py --entity-id <LOG_ID>
   # variant: 240 s @ PLETH50
   python stage_b_wave.py --seg-sec 240 --channels PLETH50:PLETH:50 \\
-      --out-root /opt/localdata100tb/physio_data/mover_epic_seg240
+      --out-root /mnt/localdata100tb/physio_data/mover_epic_seg240
 
 Differences vs SIS v4 (EPIC-specific, preserved):
   - EPIC XMLs are attributed per LOG_ID via Stage A's cohort parquet
@@ -63,10 +63,10 @@ import polars as pl
 from scipy.signal import resample_poly
 
 UTC = timezone.utc
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover_epic"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
-LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mover_epic/logs"
-SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_b_summary.json"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover_epic"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
+LOG_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/mover_epic/logs"
+SUMMARY_JSON = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_b_summary.json"
 
 # Native rate of each XML source channel (used when a channel spec omits src_fs).
 #   PLETH source @ 100 Hz, ECG1 source (Bernoulli Pollster) @ 300 Hz.

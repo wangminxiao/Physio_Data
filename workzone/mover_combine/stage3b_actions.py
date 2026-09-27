@@ -20,10 +20,10 @@ import os, json, argparse, datetime
 from zoneinfo import ZoneInfo
 import numpy as np
 
-RAW = "/opt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
+RAW = "/mnt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
 SIS_MED = RAW + "/EMR/patient_medication.csv"
 EPIC_MED = RAW + "/EPIC_EMR/EMR/patient_medications.csv"
-PROCESSED = "/opt/localdata100tb/physio_data/mover_combine"
+PROCESSED = "/mnt/localdata100tb/physio_data/mover_combine"
 TZ = ZoneInfo("America/Los_Angeles")
 DTYPE = np.dtype([("time_ms", "int64"), ("seg_idx", "int32"), ("var_id", "uint16"), ("value", "float32")])
 

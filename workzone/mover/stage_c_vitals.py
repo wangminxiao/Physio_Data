@@ -23,15 +23,15 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-RAW_ROOT = "/opt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
+RAW_ROOT = "/mnt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
 VITALS_CSV = f"{RAW_ROOT}/EMR/patient_vitals.csv"
 
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
-OUTPUTS_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
+OUTPUTS_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover"
 COMBINED_PARQUET = f"{OUTPUTS_DIR}/stage_c_vitals_combined.parquet"
 SUMMARY_JSON = f"{OUTPUTS_DIR}/stage_c_summary.json"
-LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mover/logs"
+LOG_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/mover/logs"
 
 LA_TZ = "America/Los_Angeles"
 

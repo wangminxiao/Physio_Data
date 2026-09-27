@@ -25,7 +25,7 @@ Run modes:
   # single-channel variant: 240 s @ PLETH50
   python stage_b_wave.py --seg-sec 240 --anchor PLETH \\
       --channels PLETH50:PLETH:50 \\
-      --out-root /opt/localdata100tb/physio_data/mover_seg240
+      --out-root /mnt/localdata100tb/physio_data/mover_seg240
 """
 import argparse
 import base64
@@ -46,12 +46,12 @@ import polars as pl
 from scipy.signal import resample_poly
 
 UTC = timezone.utc
-RAW_ROOT = "/opt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
+RAW_ROOT = "/mnt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
 SIS_WAVE_ROOT = f"{RAW_ROOT}/sis_wave_v2/UCI_deidentified_part3_SIS_11_07/Waveforms"
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
-LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mover/logs"
-SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/stage_b_summary.json"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
+LOG_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/mover/logs"
+SUMMARY_JSON = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover/stage_b_summary.json"
 
 SEG_SEC = 30
 

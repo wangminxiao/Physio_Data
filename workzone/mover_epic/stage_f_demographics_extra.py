@@ -48,9 +48,9 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover_epic"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
-SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_f_demographics_4h_summary.json"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover_epic"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
+SUMMARY_JSON = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_f_demographics_4h_summary.json"
 
 FOUR_HOURS_MS = 4 * 3600 * 1000
 

@@ -98,3 +98,23 @@ See `workzone/mover/README.md` for stage commands + wall-time estimates.
 - `patient_a_line` / `patient_input_output` / `patient_medication` / `patient_observations` / `patient_procedure_events` / `patient_ventilator` CSVs not yet mined — would add actions (var_ids 200+) to the trajectory.
 - SIS signals include invasive arterial pressure (INVP1 100 Hz, GE_ART 180 Hz) — if a future task needs ABP, we'd add `ABP125.npy` as a channel.
 - Old `data_processing_ICML/` pipeline at `/labs/hulab/mxwang/data/MOVER/` is reference-only; we are NOT reusing its precomputed NPZ or split JSON.
+
+## Clock fix applied 2026-09-27 (SIS and EPIC)
+
+* XML waveform `…Z` timestamps come from devices with a fixed UTC offset (no DST), so ≈40 % of cases were ±60 min off the
+  EHR (winter −60, summer +60). `workzone/mover/stage_b2_clock.py` measured each case (charted HR vs PPG pulse rate, ECG
+  when usable) and shifted `time_ms` by {−60, 0, +60} min: SIS 6,993 cases → −60×1,175 / 0×3,919 / +60×1,191, no vitals 708,
+  unverified 1,023 (kept as is, `meta.clock_shift_confidence = "unverified"`); EPIC 1,820 → −60×357 / 0×1,092 / +60×311,
+  unverified 331. Meta: `time_base = "utc_ms"`, `clock_shift_min`, `clock_shift_method`, `clock_shift_confidence`,
+  `clock_shift_detail`, `clock_fix_version = 1`; per-case report `workzone/outputs/{mover,mover_epic}/clock_shift.parquet`.
+* Gates (`verify_mover_clock.py`, all PASS): decided 84 % / 81 %; corrected store needs no residual shift (120/120 both);
+  OR_start − wave_start inside the aligned envelope 98 % / 93 %; no case moved out of its OR window; structural OK; snapshots OK.
+  Note the OR_start − wave_start distribution is bimodal even when aligned (waveform starts at OR entry ≈ −3 min or at
+  induction ≈ +50 min).
+* Stage E re-run (partitions, `seg_idx`), splits identical to before, tasks rebuilt (`lab_est_full` SIS 970→983 train,
+  EPIC 309→275; `vital_est_full` unchanged). `mover_combine`: all 8,812 symlinks re-pointed from `/opt/localdata100tb` to
+  `/mnt/localdata100tb` (they had been dangling since the 2026-08 migration); tasks rebuilt (`lab_est_full` 1,279→1,258 train)
+  and the BeeGFS copy re-synced. All `mover*/` scripts had hard-coded old server paths → translated; `mover`, `mover_epic`,
+  `mover_combine` sections added to `workzone/configs/server_paths.yaml`.
+* **Downstream rule**: exclude `clock_shift_confidence == "unverified"` cases from sub-hour analyses (≈40 % of them are
+  probably still an hour off). Plan and evidence: `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.

@@ -32,6 +32,9 @@ densify call site in dataset.py when target_var_ids intersect 150..164.
 import os, json, glob, argparse
 from datetime import datetime
 import numpy as np
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
+from clock_utils import wall_ms, translate_path  # noqa: E402
 import multiprocessing as mp
 
 EHR_EVENT_DTYPE = np.dtype([('time_ms', 'int64'), ('seg_idx', 'int32'),
@@ -99,7 +102,7 @@ def parse_num_header(hea):
             continue
     if dt is None:
         return None
-    base_ms = int(dt.timestamp() * 1000)             # MATCH stage3 (.timestamp())
+    base_ms = wall_ms(dt)                            # wall-clock ms, MATCH stage3 v2 (clock_utils.wall_ms)
     sigs = []
     for l in lines[1:]:
         if not l or l.startswith('#'):
@@ -171,7 +174,9 @@ def process_entity(args):
     n_seg = len(time_ms)
     meta = json.load(open(mpath))
     seg_dur_ms = int(meta.get('segment_duration_sec', 30)) * 1000
-    subj_dir = meta.get('source_path')
+    subj_dir = translate_path(meta.get('source_path'))
+    if meta.get('time_base') != 'wall_clock':
+        return (pid, 'skip_legacy_time_base', 0, None)   # run fix_clock_migrate.py first
     if not subj_dir or not os.path.isdir(subj_dir):
         return (pid, 'skip_nosrc', 0, None)
 
@@ -213,6 +218,8 @@ def process_entity(args):
         np.save(os.path.join(edir, 'ehr_hf.npy'), arr)
         meta['n_hf_events'] = int(len(arr))
         meta['hf_vars'] = sorted({int(r[2]) for r in rows})
+        meta['hf_time_base'] = 'wall_clock'
+        meta.pop('hf_time_base_provisional', None)
         json.dump(meta, open(mpath, 'w'), indent=2)
     return (pid, 'ok', len(arr), (n_seg, len(q_seg), sample_diag))
 

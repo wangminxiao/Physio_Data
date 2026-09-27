@@ -142,7 +142,7 @@ def build_height_weight_lookup(hadm_ids: list[int],
                                   chunksize=2_000_000, dtype={"HADM_ID":"Int64","ITEMID":"Int64","VALUENUM":"Float64"}):
                 ch = ch[ch["ITEMID"].isin(ALL_HW_ITEMIDS) & ch["HADM_ID"].isin(hadm_set)]
                 if not ch.empty:
-                    ch["charttime_ms"] = pd.to_datetime(ch["CHARTTIME"], errors="coerce").astype("int64") // 1_000_000
+                    ch["charttime_ms"] = pd.to_datetime(ch["CHARTTIME"], errors="coerce").astype("datetime64[ms]").astype("int64")
                     chunks.append(ch[["HADM_ID","ITEMID","charttime_ms","VALUENUM"]]
                                   .rename(columns={"HADM_ID":"hadm_id","ITEMID":"itemid","VALUENUM":"valuenum"}))
             if chunks:

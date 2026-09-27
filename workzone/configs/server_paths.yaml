@@ -37,3 +37,11 @@ ucsf_all:
   ca_eventtime_csv: /mnt/localdata/storage/mxwang/data/ucsf_EHR/bedanalysis_waveformExtraction/Output_new/ValidWaveTime_allEnc_eventtime.csv
   offset_table_parquet: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all/encounter_offset_table.parquet
   codeblue_parquet: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all/codeblue_first_event.parquet
+
+# MOVER (UCI OR) stores — SIS (2015–2017), EPIC (2017–2022) and the merged symlink store. Paths after the 2026-08 migration.
+mover:
+  output_dir: /mnt/localdata100tb/physio_data/mover
+mover_epic:
+  output_dir: /mnt/localdata100tb/physio_data/mover_epic
+mover_combine:
+  output_dir: /mnt/localdata100tb/physio_data/mover_combine

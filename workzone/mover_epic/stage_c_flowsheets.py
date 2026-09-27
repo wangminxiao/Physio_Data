@@ -28,15 +28,15 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-RAW_ROOT = "/opt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
+RAW_ROOT = "/mnt/localdata100tb/UNIPHY_Plus/raw_datasets/MOVER"
 FLOWSHEET_GLOB = f"{RAW_ROOT}/flowsheets_cleaned/flowsheet_part*.csv"
 
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover_epic"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
-OUTPUTS_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover_epic"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
+OUTPUTS_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic"
 COMBINED_PARQUET = f"{OUTPUTS_DIR}/stage_c_vitals_combined.parquet"
 SUMMARY_JSON = f"{OUTPUTS_DIR}/stage_c_summary.json"
-LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mover_epic/logs"
+LOG_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/mover_epic/logs"
 
 LA_TZ = "America/Los_Angeles"
 

@@ -213,3 +213,23 @@ auto-encode to integer IDs 1..C (0 reserved for unknown/pad).
 - MIMIC-III Waveform Database Matched Subset: https://physionet.org/content/mimic3wdb-matched/1.0/
 - MIMIC-III documentation: https://mimic.mit.edu/docs/iii/
 - Existing preprocessing code: `/home/mxwan/workspace/MIMIC-III-preparation-for-UNIPHY_Plus/`
+
+## Clock fix applied 2026-09-27
+
+* `time_ms.npy` moved from the legacy local-epoch base (naive surrogate time via `datetime.timestamp()` on the
+  America/New_York lab node → +4 h EDT / +5 h EST) to **wall-clock ms**, the base the chart/lab side always used
+  (`meta.time_base = "wall_clock"`, `meta.clock_shift_ms` = −4 h or −5 h per entity, `recording_start_legacy_ms` kept).
+  `ehr_hf.npy` (numerics 150–159) recomputed on the same base; `ehr_baseline/recent/events/future`, `ehr_actions`, sepsis
+  labels, demographics and the manifest rebuilt; splits unchanged (`stage4 --keep-splits`; 21 newly valid entities placed
+  by subject). Gates (`workzone/mimic3/verify_mimic3_clock.py`, all PASS): numerics vs ECG-HR lag 2 s / corr 0.76; charted
+  HR vs ECG-HR median |lag| 0 min (was +220…+300); charted NIBP vs numerics NBP median +5 min (was +4/+5 h); partitions
+  baseline 434,900→413,002, recent 439,005→238,700, in-wave 1.53 M→1.70 M, future 1.66 M→1.80 M.
+* Two latent bugs fixed on the way: `stage3c` parsed parquet datetimes as nanoseconds (pandas ≥ 2 delivers ms → all
+  parquet-sourced EHR events had collapsed to 1970 and were dropped); `stage4` checked in-wave events against
+  `time_ms[-1]` while stage3c admits events up to `time_ms[-1] + 30 s`.
+* Tasks rebuilt from their `build_summary.json` specs: `abp_hf` train 1,116→1,149, `lab_est_full` 3,259→3,465,
+  `vital_est_full` 3,203→3,391, `lab6_any_min2` 2,112, `sepsis` 1,821. **`cardio/gas/hgb/kidney_traj` were NOT rebuilt**:
+  their two-stage builder (`stage_b_per_target_min`, `stage_b_target_frac`, `stage_b_min_targets_passing`) is not in this
+  repo; the pre-fix versions were restored and remain based on the old partitions — rebuild with the original script.
+* Only naive→epoch helper: `workzone/common/clock_utils.wall_ms` / `wall_ms_array`. Plan and evidence:
+  `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.

@@ -49,6 +49,9 @@ from dataclasses import dataclass
 from math import gcd
 
 import numpy as np
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'common'))
+from clock_utils import wall_ms  # noqa: E402
 import pandas as pd
 from scipy.signal import resample_poly
 
@@ -542,7 +545,8 @@ def process_patient(args):
         all_time_ms = []
 
         for block in blocks:
-            block_start_ms = int((wav_start.timestamp() + block['start_sec']) * 1000)
+            # wall-clock ms (NOT wav_start.timestamp(): that applied the machine's local zone; see workzone/common/clock_utils.py)
+            block_start_ms = wall_ms(wav_start) + int(round(block['start_sec'] * 1000))
 
             # Resample each channel spec. Multiple specs may share a source; the
             # block is read once by read_wfdb_blocks, then resampled to each target.
@@ -633,6 +637,9 @@ def process_patient(args):
                 "source_dataset": "mimic3",
                 "source_path": patient_path,
                 "recording_start_ms": int(time_ms[0]),
+                "time_base": "wall_clock",
+                "clock_shift_ms": 0,
+                "clock_fix_version": 1,
                 "total_duration_hours": round(n_seg * seg_sec / 3600, 2),
                 "admission_overlap_hours": round(overlap_hours, 2),
                 "n_blocks": len(blocks),

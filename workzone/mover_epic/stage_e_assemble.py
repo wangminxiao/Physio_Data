@@ -31,10 +31,10 @@ from physio_data.ehr_trajectory import (  # noqa: E402
     split_events, validate_partition,
 )
 
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover_epic"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
-SUMMARY_JSON = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_e_summary.json"
-LOG_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/mover_epic/logs"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover_epic"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/valid_cohort.parquet"
+SUMMARY_JSON = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover_epic/stage_e_summary.json"
+LOG_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/mover_epic/logs"
 
 MAX_WORKERS = 24
 LAYOUT_VERSION = 2

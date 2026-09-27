@@ -21,7 +21,11 @@ import time
 import logging
 from pathlib import Path
 
+import sys
 import numpy as np
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'common'))
+from clock_utils import wall_ms  # noqa: E402
 import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -306,7 +310,7 @@ def extract_missing_patients(missing_df, labs_df, vitals_df, admissions_df):
             all_time_ms = []
 
             for block in blocks:
-                block_start_ms = int((wav_start.timestamp() + block['start_sec']) * 1000)
+                block_start_ms = wall_ms(wav_start) + int(round(block['start_sec'] * 1000))   # wall-clock ms (clock_utils)
                 resampled = {}
                 for ch, target_hz in TARGET_CHANNELS.items():
                     raw = block['channels'].get(ch)
@@ -390,6 +394,9 @@ def extract_missing_patients(missing_df, labs_df, vitals_df, admissions_df):
     return results
 
 
+SKIP_MISSING = "--skip-missing" in sys.argv
+
+
 def main():
     log.info("Post-stage: Sepsis cohort adaptation")
     t0 = time.time()
@@ -410,8 +417,8 @@ def main():
     log.info(f"  Already processed:      {len(already_processed)}")
     log.info(f"  Missing (need extract):  {len(missing)}")
 
-    # 4. Extract missing patients (waveforms + EHR)
-    if len(missing) > 0:
+    # 4. Extract missing patients (waveforms + EHR) — skipped with --skip-missing (clock-fix rerun: rebuild labels for the existing store only)
+    if len(missing) > 0 and not SKIP_MISSING:
         log.info("Loading EHR data for missing patient extraction...")
         OUT_DIR_OUTPUTS = REPO_ROOT / "workzone" / "outputs" / "mimic3"
         labs_df = pd.read_parquet(OUT_DIR_OUTPUTS / "labs_filtered.parquet")

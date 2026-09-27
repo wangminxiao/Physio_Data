@@ -25,9 +25,9 @@ from physio_data.ehr_trajectory import (  # noqa: E402
     validate_partition,
 )
 
-OUT_ROOT = "/opt/localdata100tb/physio_data/mover"
-COHORT_PARQUET = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
-OUTPUTS_DIR = "/labs/hulab/mxwang/Physio_Data/workzone/outputs/mover"
+OUT_ROOT = "/mnt/localdata100tb/physio_data/mover"
+COHORT_PARQUET = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover/valid_cohort.parquet"
+OUTPUTS_DIR = "/mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/mover"
 
 DEFAULT_SEED = 42
 DEFAULT_RATIOS = (0.70, 0.15, 0.15)

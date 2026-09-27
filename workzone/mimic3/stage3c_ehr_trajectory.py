@@ -37,6 +37,9 @@ import time
 from pathlib import Path
 
 import numpy as np
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'common'))
+from clock_utils import wall_ms_array  # noqa: E402
 import pandas as pd
 import yaml
 
@@ -82,8 +85,8 @@ def load_admissions() -> pd.DataFrame:
     df = pd.read_csv(p, usecols=["SUBJECT_ID", "HADM_ID", "ADMITTIME", "DISCHTIME"])
     df["ADMITTIME"] = pd.to_datetime(df["ADMITTIME"])
     df["DISCHTIME"] = pd.to_datetime(df["DISCHTIME"])
-    df["admit_ms"] = (df["ADMITTIME"].astype("int64") // 10**6).astype("int64")
-    df["disch_ms"] = (df["DISCHTIME"].astype("int64") // 10**6).astype("int64")
+    df["admit_ms"] = wall_ms_array(df["ADMITTIME"])
+    df["disch_ms"] = wall_ms_array(df["DISCHTIME"])
     return df.set_index("HADM_ID")[["SUBJECT_ID", "admit_ms", "disch_ms"]]
 
 
@@ -107,7 +110,9 @@ def load_events_parquet(path: Path) -> pd.DataFrame:
         ctt = pd.to_datetime(df["CHARTTIME"])
     else:
         raise RuntimeError(f"{path}: no CHARTTIME or charttime_dt column")
-    df["time_ms"] = (pd.to_datetime(ctt).astype("int64") // 10**6).astype("int64")
+    # resolution-independent wall ms (pandas >= 2 reads parquet datetimes as datetime64[ms]; the old
+    # `astype(int64) // 1e6` assumed nanoseconds and silently produced 1970 timestamps)
+    df["time_ms"] = wall_ms_array(pd.to_datetime(ctt))
 
     if "HADM_ID" in df.columns:
         df["HADM_ID"] = pd.to_numeric(df["HADM_ID"], errors="coerce").astype("Int64")
@@ -297,7 +302,12 @@ def main():
     ap.add_argument("--workers", type=int, default=1,
                     help="Parallel workers. Conversion is IO-light and parquet groupby "
                          "is already cached per worker; 1-4 is usually enough.")
+    ap.add_argument("--root", type=str, default=None,
+                    help="override the processed store root (scratch / smoke runs); default server_paths.yaml")
     args = ap.parse_args()
+    global PROCESSED_ROOT
+    if args.root:
+        PROCESSED_ROOT = Path(args.root)
 
     log.info(f"Stage 3c: EHR trajectory split -> {PROCESSED_ROOT}")
     log.info(f"  dry_run={args.dry_run}, limit={args.limit}, workers={args.workers}")
