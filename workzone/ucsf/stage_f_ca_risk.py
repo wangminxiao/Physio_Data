@@ -99,7 +99,8 @@ def entity_stats(task: dict) -> dict:
         out["usable_pre_event"] = bool(out["last_ppg_gap_min"] is not None and out["last_ppg_gap_min"] <= 30
                                        and (out.get("ppg_cov_6h") or 0) >= 0.5)
         out["self_control_end_ms"] = int(t - gap_h * 3.6e6)        # windows ending before this are within-patient negatives
-        out["self_control_hours"] = round(max(0.0, (out["self_control_end_ms"] - int(tm[0])) / 3.6e6), 2)
+        sc_end = min(out["self_control_end_ms"], int(tm[-1]) + SEG_MS)   # capped at the end of this cycle
+        out["self_control_hours"] = round(max(0.0, (sc_end - int(tm[0])) / 3.6e6), 2)
     except Exception as ex:  # noqa: BLE001
         out["error"] = f"{type(ex).__name__}: {str(ex)[:120]}"
     return out
