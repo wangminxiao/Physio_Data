@@ -1,6 +1,6 @@
 #!/bin/bash
 # MIMIC-III clock fix (datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md §1) — one step per job, chain with --dependency=afterok.
-#   snapshot | migrate | numerics | actions | sepsis_cohort | trajectory | sepsis_traj | demographics | manifest | tasks | traj | verify | copy
+#   snapshot | migrate | numerics | actions | sepsis_cohort | trajectory | sepsis_traj | demographics | manifest | tasks | traj | lab6 | verify | copy
 #   traj = rebuild cardio/gas/hgb/kidney_traj with the two-stage builder (workzone/common/build_trajectory_task.py, --keep-splits)
 # Submit (user): cd /projects/mwang80/staging/Physio_Data/workzone/mimic3/logs && sbatch ../slurm/mimic3_fix_clock.sbatch <step>
 #SBATCH --job-name=mimic3_fix_clock
@@ -43,6 +43,10 @@ case "$STEP" in
              for t in $STORE/tasks/*/; do n=$(basename $t); if [ -f $SNAP/tasks_${n}_splits.json ]; then echo "task $n: before $(grep -o '"n_train": [0-9]*' $SNAP/tasks_${n}_splits.json | head -1) after $(grep -o '"n_train": [0-9]*' $t/splits.json | head -1)"; fi; done ;;
   traj)      for t in cardio_traj gas_traj hgb_traj kidney_traj; do $PY workzone/common/build_trajectory_task.py --root $STORE --registry $REPO/indices/var_registry.json --from-summary $STORE/tasks/$t/build_summary.json --keep-splits --workers 8 "$@"; done
              for t in cardio_traj gas_traj hgb_traj kidney_traj; do echo "$t: before $(grep -o '"n_train": [0-9]*' $SNAP/tasks_${t}_splits.json | head -1) after $(grep -o '"n_train": [0-9]*' $STORE/tasks/$t/splits.json | head -1) | rebuild $(grep -o '"n_kept": [0-9]*\|"n_dropped": [0-9]*\|"n_added": [0-9]*' $STORE/tasks/$t/splits.json | tr '\n' ' ')"; done ;;
+  lab6)      # lab6_any_min2 had no build_summary.json (built by the lost lab_task.py) -> rebuild from the equivalent spec
+             cp $STORE/tasks/lab6_any_min2/splits.json workzone/outputs/mimic3/lab6_any_min2_splits_before.json 2>/dev/null || true
+             $PY workzone/common/build_estimation_task.py --root $STORE --registry $REPO/indices/var_registry.json --spec workzone/common/task_specs/lab6_any_min2.yaml --workers 8
+             echo "lab6_any_min2: before $(grep -o '"n_train": [0-9]*' workzone/outputs/mimic3/lab6_any_min2_splits_before.json | head -1) after $(grep -o '"n_train": [0-9]*' $STORE/tasks/lab6_any_min2/splits.json | head -1)" ;;
   verify)    $PY workzone/mimic3/verify_mimic3_clock.py --root $STORE --snapshot $SNAP "$@" ;;
   copy)      mkdir -p $COPY; rsync -rlt --no-g --info=stats1 --include='*/' --include='time_ms.npy' --include='meta.json' --include='ehr_*.npy' --include='demographics*.csv' --include='manifest.json' --include='pretrain_splits.json' --include='downstream_splits.json' --include='tasks/**' --exclude='*' "$STORE/" "$COPY/"
              echo "copy: $(ls -d $COPY/*/ | wc -l) dirs" ;;

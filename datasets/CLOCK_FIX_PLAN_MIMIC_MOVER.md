@@ -200,18 +200,17 @@ reference alone produces spurious multi-hour "shifts" on ED recordings and must 
 
 | Store | Result |
 |---|---|
-| `mimic3` | 5,623 entities migrated (−4 h ×… / −5 h; exact per-entity shift), numerics/actions/sepsis/trajectories/demographics/manifest/tasks rebuilt; all gates PASS (G3 charted HR vs ECG median 0 min, G4 NIBP vs numerics +5 min, G7 partitions consistent); splits unchanged; BeeGFS copy synced (2.0 GB of changed files). Two latent bugs fixed (stage3c datetime resolution, stage4 window pad). `*_traj` tasks: two-stage builder re-implemented (`workzone/common/build_trajectory_task.py`, rule verified exactly on all four recorded cohorts) — `traj → verify → copy` jobs awaiting submission (§7). |
-| `mover` (SIS) | 6,993 cases: v3 shifted −60×1,175 / +60×1,191, unchanged 3,919, unverified 1,719 (708 without charted HR); gates PASS; Stage E, manifest (splits identical), tasks rebuilt. **v4 season-binary re-test of the unverified cases + task exclusion: jobs written, awaiting submission (§7).** |
-| `mover_epic` | 1,819 cases: v3 −60×357 / +60×311, unchanged 1,092, unverified 374 (59 without HR); gates PASS (EPIC envelope [−30, 90]); Stage E, manifest, tasks rebuilt; v4 re-test pending (§7). |
-| `mover_combine` | 8,812 dangling symlinks re-pointed; tasks rebuilt. **BeeGFS copy was NOT refreshed by the 2026-09-27 copy job (symlink dirs, see §2.6) — fixed copy step pending (§7).** No `mover` / `mover_epic` BeeGFS copies yet (§2.6 layout pending). |
+| `mimic3` | 5,623 entities migrated (−4 h / −5 h exact per-entity shift), numerics/actions/sepsis/trajectories/demographics/manifest/tasks rebuilt; all gates PASS (G3 charted HR vs ECG median 0 min, G4 NIBP vs numerics +5 min, G7 partitions consistent); splits unchanged; BeeGFS copy synced. Two latent bugs fixed (stage3c datetime resolution, stage4 window pad). `*_traj` tasks rebuilt 2026-09-27 with the re-implemented two-stage builder (`workzone/common/build_trajectory_task.py`, rule verified exactly on all four recorded cohorts; `--keep-splits`): cardio 453→572 train (kept 578 / dropped 67 / added 240), gas 862→958 (1,108/123/261), hgb 1,637→1,960 (2,231/108/569), kidney 1,906→2,187 (2,568/154/556). `lab6_any_min2` (NMI 6-lab task built by the lost `lab_task.py`, no spec recorded → skipped by the first rebuild) rebuilt from the equivalent `task_specs/lab6_any_min2.yaml`: train 2,112→2,384 (n 3,377; 2,384/485/508). |
+| `mover` (SIS) | 6,993 cases. v3 (free scan): −60×1,175 / +60×1,191 / 0×3,919, unverified 1,719 (of which 708 had < 60 charted-HR points). v4 season test (jobs 50369/50370): validation on the 5,274 v3-decided cases — coverage 97.9 %, agreement 99.4 % (high 99.4 %, medium 99.4 %) → PASS; re-test of the 1,719 → 938 decided (74 high, 864 medium: −60×234, +60×208, aligned 496), 744 still unverified (702 undecided, 41 PPG/ECG conflict, 1 attribution risk), 37 with < 20 HR points. **Store now: −60×1,409 / 0×4,148 / +60×1,399; decided 6,200 (88.7 %), unverified 793 → excluded from `tasks/`** (780 manifest entities; `lab_est_full` 970→924 train, `vital_est_full` 4,771→4,351). Post-re-test gates 12/12 PASS (G5 structural 0/6,956 failing), pretrain splits identical. |
+| `mover_epic` | 1,819 cases. v3: −60×357 / +60×311 / 0×1,092, unverified 374. v4: validation on 1,445 decided — coverage 97.7 %, agreement 99.4 % (high 100 %) → PASS; re-test of the 374 → 172 decided (14 high, 158 medium: −60×39, +60×38, aligned 95), 156 still unverified, 46 with < 20 HR points. **Store now: −60×396 / 0×1,028 / +60×349; decided 1,601 (88.0 %), unverified 218 → excluded from `tasks/`** (201 excluded; `lab_est_full` 309→242 train, `vital_est_full` 1,211→1,115). Gates PASS, pretrain splits identical. |
+| `mover_combine` | 8,812 dangling symlinks re-pointed; tasks rebuilt with the unverified exclusion (`lab_est_full` 1,279→1,166 train, `vital_est_full` 5,982→5,466; `lab6_any_min2` rebuilt from the equivalent spec — the lost `lab_task.py` left no `build_summary.json`, so the earlier rebuild passes had skipped it). BeeGFS copy refreshed with `rsync -rLt` (the first copy job had updated nothing, §2.6); `mover` / `mover_epic` BeeGFS copies created as symlink layouts (§2.6). |
 | `mcmed` | unchanged (verified aligned). |
 
-Follow-ups: grep every pipeline for `astype("int64") // 10**6` on datetimes; fill in the v4 / trajectory numbers below once
-the §7 jobs have run.
+Follow-ups: grep every pipeline for `astype("int64") // 10**6` on datetimes; re-run the stale NMI / cross-eval result folders (§7).
 
-## 7. Pending jobs (2026-09-27 — Claude's `sbatch` was blocked by the permission classifier; the user submits)
+## 7. Job chains and training reruns (2026-09-27, submitted on the user's instruction)
 
-All from dream node00 (mirror already holds the code; each job rsyncs mirror → lab-node clone first):
+Chains run from dream node00 (each job rsyncs mirror → lab-node clone first): MOVER 50369–50378 (+ `lab6 → verify → copy`), MIMIC 50379–50381 and 50390–50392 (`lab6`):
 
 ```bash
 # MOVER: v4 validation (fails the chain below 98 % agreement) → unverified re-test → gates → Stage E → manifest → tasks (excl. unverified) → gates → BeeGFS copies
@@ -220,7 +219,7 @@ cd /projects/mwang80/staging/Physio_Data/workzone/mover/logs && bash ../slurm/su
 cd /projects/mwang80/staging/Physio_Data/workzone/mimic3/logs && bash ../slurm/submit_fix_clock_from.sh traj
 ```
 
-Afterwards (training, dream b.q via `scripts/slurm_run.sh`; archive the old result folder first, e.g. `mv X X_old_preclockfix_20260927`):
+Training reruns (dream b.q via `scripts/slurm_run.sh`; previous folders renamed `*_old_preclockfix_20260927`): submitted 50382/50383 (mimic3 BP wav/emb), 50384–50387 (mimic3 traj ×4); mover / mover_epic BP after their BeeGFS copies:
 `mimic3_vital_est_wav_BP`, `mimic3_vital_est_emb_BP_pcs_pcp` (data ready now), `mover_vital_est_wav_BP`, `mover_epic_vital_est_wav_BP`
 (after the MOVER `copy` job), `mimic3_{cardio,gas,hgb,kidney}_traj` (after the MIMIC `traj` job). Stale but not scheduled here:
 162 top-level folders in `/projects/mwang80/uniphy_v2_out` (cross_eval_*_emory_to_mimic3_*, baselines, vmamba/uniphy traj

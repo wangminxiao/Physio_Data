@@ -1,6 +1,6 @@
 #!/bin/bash
 # MOVER (SIS + EPIC) clock fix (datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md §2) — one step per job, chain with afterok:
-#   snapshot | b2_sis | b2_epic | b2_validate | b2_unverified | verify_b2 | assemble | relink | actions | manifest | tasks | verify | copy
+#   snapshot | b2_sis | b2_epic | b2_validate | b2_unverified | verify_b2 | assemble | relink | actions | manifest | tasks | lab6 | verify | copy
 #   b2_validate / b2_unverified = v4 season-constrained binary test (2026-09-27): validate on decided cases (fails the chain
 #   below 98 % agreement), then re-test the unverified cases only. tasks/ exclude what is still unverified (exclude_meta).
 # Submit (user): cd /projects/mwang80/staging/Physio_Data/workzone/mover/logs && sbatch ../slurm/mover_fix_clock.sbatch <step>
@@ -54,6 +54,10 @@ PYEOF
              echo "relinked $n symlinks; broken now: $(for l in $COMB/*; do [ -L "$l" ] && [ ! -e "$l" ] && echo x; done | wc -l)" ;;
   tasks)     for s in $SIS $EPIC $COMB; do $PY workzone/common/rebuild_tasks_from_summaries.py --root $s --registry $REPO/indices/var_registry.json --workers 8 --builder-args=--exclude-clock-unverified; done
              for s in $SIS $EPIC $COMB; do n=$(basename $s); for t in $s/tasks/*/; do tn=$(basename $t); if [ -f $SNAP/${n}_task_${tn}_splits.json ]; then echo "$n/$tn: before $(grep -o '"n_train": [0-9]*' $SNAP/${n}_task_${tn}_splits.json | head -1) after $(grep -o '"n_train": [0-9]*' $t/splits.json | head -1)"; fi; done; done ;;
+  lab6)      # mover_combine/tasks/lab6_any_min2 had no build_summary.json (lost lab_task.py) -> rebuild from the equivalent spec, excluding clock-unverified cases
+             cp $COMB/tasks/lab6_any_min2/splits.json workzone/outputs/mover_combine/lab6_any_min2_splits_before.json 2>/dev/null || true
+             $PY workzone/common/build_estimation_task.py --root $COMB --registry $REPO/indices/var_registry.json --spec workzone/common/task_specs/lab6_any_min2.yaml --workers 8 --exclude-clock-unverified
+             echo "mover_combine/lab6_any_min2: before $(grep -o '"n_train": [0-9]*' workzone/outputs/mover_combine/lab6_any_min2_splits_before.json | head -1) after $(grep -o '"n_train": [0-9]*' $COMB/tasks/lab6_any_min2/splits.json | head -1)" ;;
   verify)    $PY workzone/mover/verify_mover_clock.py --dataset mover --snapshot $SNAP/sis; $PY workzone/mover/verify_mover_clock.py --dataset mover_epic --snapshot $SNAP/epic --g3-envelope=-30,90 --g3-min-frac 0.8 ;;
   copy)      mkdir -p $COPY/mover_combine $COPY/mover $COPY/mover_epic
              # mover_combine: entity dirs are symlinks on the lab node -> dereference (-L); waveforms + FM sidecars already live on BeeGFS

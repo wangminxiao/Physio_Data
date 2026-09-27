@@ -228,11 +228,17 @@ auto-encode to integer IDs 1..C (0 reserved for unknown/pad).
   parquet-sourced EHR events had collapsed to 1970 and were dropped); `stage4` checked in-wave events against
   `time_ms[-1]` while stage3c admits events up to `time_ms[-1] + 30 s`.
 * Tasks rebuilt from their `build_summary.json` specs: `abp_hf` train 1,116→1,149, `lab_est_full` 3,259→3,465,
-  `vital_est_full` 3,203→3,391, `lab6_any_min2` 2,112, `sepsis` 1,821. `cardio/gas/hgb/kidney_traj` use a two-stage rule
+  `vital_est_full` 3,203→3,391, `sepsis` 1,821. `lab6_any_min2` (6-lab NMI task; its builder `lab_task.py` was lost with the old
+  server and had left no spec, so the first pass skipped it) rebuilt from the equivalent `task_specs/lab6_any_min2.yaml`: train
+  2,112→2,384 (2,384/485/508). `cardio/gas/hgb/kidney_traj` use a two-stage rule
   (stage A: any target ≥ 1 in-wave event → `cohort.json`; stage B: ≥ `stage_b_min_targets_passing` targets with ≥ 2 events →
   split lists; original builder lost with the old server, re-implemented as `workzone/common/build_trajectory_task.py` and
   verified to reproduce all four recorded cohorts exactly). Rebuild on the corrected partitions with `--keep-splits` (entities
   keep their split, dropped ones removed, new ones by subject rule / ratio fill; previous `splits.json` kept under
-  `workzone/outputs/mimic3/traj_rebuild/`) — `traj → verify → copy` jobs pending submission (plan §7).
+  `workzone/outputs/mimic3/traj_rebuild/`). Rebuilt 2026-09-27 on the corrected partitions (train/val/test, before → after):
+  `cardio_traj` 453/96/96 → 572/123/123 (stage A 4,915, stage B 818; kept 578, dropped 67, added 240), `gas_traj` 862/184/185 →
+  958/206/205 (2,029 / 1,369; 1,108 / 123 / 261), `hgb_traj` 1,637/351/351 → 1,960/420/420 (4,676 / 2,800; 2,231 / 108 / 569),
+  `kidney_traj` 1,906/408/408 → 2,187/469/468 (4,813 / 3,124; 2,568 / 154 / 556). Cohorts grew because events that used to sit
+  4–5 h before the wave window now fall inside it.
 * Only naive→epoch helper: `workzone/common/clock_utils.wall_ms` / `wall_ms_array`. Plan and evidence:
   `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.

@@ -1,0 +1,8 @@
+# NMI 6-lab joint estimation task (originally written by the lost `lab_task.py` from tasks/lab_est_full/cohort.json:
+# same rule — any of the 6 labs with >= 2 in-wave events; splits filtered from pretrain_splits.json).
+# For MOVER stores pass --exclude-clock-unverified so clock-unverified cases stay out.
+task_name: lab6_any_min2
+target_var_ids: [0, 1, 2, 3, 9, 16]      # Potassium, Calcium, Sodium, Glucose, Hemoglobin, HCO3
+min_events_per_target: 2
+eligibility: any
+inherit_splits_from: pretrain
