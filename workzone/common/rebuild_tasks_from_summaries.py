@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--root", required=True); ap.add_argument("--registry", required=True)
     ap.add_argument("--workers", type=int, default=8); ap.add_argument("--only", default="")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--builder-args", default="", help="extra args forwarded to build_estimation_task.py, e.g. '--exclude-clock-unverified'")
     args = ap.parse_args()
     root = Path(args.root); tasks = root / "tasks"; only = {s for s in args.only.split(",") if s}
     done, skipped, failed = [], [], []
@@ -43,7 +44,7 @@ def main():
         with tempfile.NamedTemporaryFile("w", suffix=f"_{name}.yaml", delete=False) as f:
             yaml.safe_dump(spec, f); spec_path = f.name
         cmd = [sys.executable, str(HERE / "build_estimation_task.py"), "--root", str(root), "--registry", args.registry,
-               "--spec", spec_path, "--workers", str(args.workers)]
+               "--spec", spec_path, "--workers", str(args.workers)] + args.builder_args.split()
         print(f"== {name}: {' '.join(cmd)}", flush=True)
         if args.dry_run:
             done.append(name); continue

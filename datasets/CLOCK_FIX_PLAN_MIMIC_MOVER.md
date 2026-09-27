@@ -132,6 +132,43 @@ them. `meta.json` gets `time_base = "utc_ms"`, `clock_shift_min`, `clock_shift_m
 | G6 end-to-end vs snapshot | `time_ms_new − time_ms_old == shift`; event multiset unchanged | 400/400 |
 | G7 downstream | MOVER `vitalBP` config (UNIPHY_Plus_v2) NIBP labels: within-subject error before vs after; MOVER lab_est unchanged within noise | within-R² for NIBP does not decrease; expected to increase (≈40 % of labels were 60 min off) |
 
+### 2.5 v4 — season-constrained binary test for the cases the free scan left unverified (2026-09-27)
+
+The device hypothesis (fixed UTC offset, no DST) fixes the **sign** of any shift by season: in standard time a −7 h
+device stamps the waveform 60 min early (→ +60), in DST a −8 h device stamps it 60 min late (→ −60). Checked on the v3
+decisions (`workzone/mover/explore/unverified_analysis.py`): SIS 99.2 % of the 2,366 non-zero shifts obey it (high 99.3 %,
+medium 99.2 %), EPIC 98.7 % of 668 (high 100 %). Left unverified by v3: SIS 1,719 (708 without charted HR, 1,011 with;
+methods none 1,180 / unclear 472 / conflict 40 / disputed 27), EPIC 374 (59 without HR). Their charted-HR series are short
+(median 67 points, cases median 2 h), so the 31-lag free scan (≥ 30 points at ≥ 15 lags) mostly had no usable reference.
+
+`stage_b2_clock.py --season-binary` replaces the free scan by a two-hypothesis test per reference (PPG pulse rate, ECG rate):
+H0 "aligned" = best of lags −10…+10 min, H1 "the one hour the season allows" = best of lags ±50…70 min; per hypothesis the
+MAE (≥ 15 charted points) and the Pearson r between charted HR and the rate medians. A reference votes when its
+MAE-preferred hypothesis has MAE ≤ 10 bpm (PPG) / 8 bpm (ECG) and a margin — MAE < 0.8 × the other, or r ≥ 0.5 with an r
+gain ≥ 0.15 — and the two criteria do not contradict. Two votes agreeing → high, one → medium, disagreement or no vote →
+unverified. `meta.clock_fix_version = 2`, `clock_season_prior`, `clock_shift_v3_method` recorded; the report rows are
+merged into `clock_shift.parquet` (v3 copy kept as `clock_shift_v3.parquet`).
+
+Gates: `--validate-decided` replays the test on every v3-decided case from its pre-fix clock (`time_ms − clock_shift_min`)
+and fails the chain below 98 % agreement / 60 % coverage (smoke: 40/40 agree); then `--only-unverified` re-tests only the
+unverified cases (smoke: 13 of 30 decided — 11 PPG, 2 PPG+ECG; 14 undecided, 2 conflict). Cases still unverified stay in
+the store and in `pretrain_splits.json` (waveform-only pretraining does not need the EHR clock) but are **excluded from
+every `tasks/` list**: `build_estimation_task.py` spec key `exclude_meta = {clock_shift_confidence: [unverified]}`
+(`--exclude-clock-unverified`, recorded in `build_summary.json`; the excluded ids are listed in `splits.json`).
+
+Chain (`workzone/mover/slurm/mover_fix_clock.sbatch`): b2_validate → b2_unverified → verify_b2 → assemble → relink →
+actions → manifest → tasks → verify → copy.
+
+### 2.6 BeeGFS copies (corrected 2026-09-27)
+
+The 2026-09-27 `copy` step did **not** update `/projects/xhu40-cdsfm/physio_data/mover_combine`: its entity dirs are
+symlinks on the lab node and `rsync -rlt` cannot replace the real directories on BeeGFS with links (job ran 2 s; files
+there still dated 2026-06-20). Fixed copy step: `rsync -rLt` (dereference) of the small files into `mover_combine`
+(waveforms and the FM sidecars — PPG_GPT_emory/ucsf, ECG_GPT, pyPPG, ecgNK, super-beat — already live there and are
+unaffected: segments did not change), and `mover/`, `mover_epic/` created as per-entity symlinks `../mover_combine/<id>`
+(every SIS/EPIC entity is a combine entity; no 38 GB duplicate) plus their own `manifest.json`, `pretrain_splits.json`,
+`demographics*.csv`, `tasks/`. Training configs that translate `/opt/localdata100tb/physio_data/mover*` to BeeGFS then work.
+
 ## 3. Shared guard so this cannot recur
 
 * `workzone/common/clock_utils.py`: the only place that turns a naive datetime into epoch ms (`wall_ms`), plus
@@ -163,11 +200,28 @@ reference alone produces spurious multi-hour "shifts" on ED recordings and must 
 
 | Store | Result |
 |---|---|
-| `mimic3` | 5,623 entities migrated (−4 h ×… / −5 h; exact per-entity shift), numerics/actions/sepsis/trajectories/demographics/manifest/tasks rebuilt; all gates PASS (G3 charted HR vs ECG median 0 min, G4 NIBP vs numerics +5 min, G7 partitions consistent); splits unchanged; BeeGFS copy synced (2.0 GB of changed files). Two latent bugs fixed (stage3c datetime resolution, stage4 window pad). `*_traj` tasks restored pre-fix (external two-stage builder missing) — pending. |
-| `mover` (SIS) | 6,993 cases: shifted −60×1,175 / +60×1,191, unchanged 3,919, unverified 1,023, no vitals 708; gates PASS; Stage E, manifest (splits identical), tasks rebuilt. |
-| `mover_epic` | 1,820 cases: −60×357 / +60×311, unchanged 1,092, unverified 331; gates PASS (EPIC envelope [−30, 90]); Stage E, manifest, tasks rebuilt. |
-| `mover_combine` | 8,812 dangling symlinks re-pointed; tasks rebuilt; BeeGFS copy synced. |
+| `mimic3` | 5,623 entities migrated (−4 h ×… / −5 h; exact per-entity shift), numerics/actions/sepsis/trajectories/demographics/manifest/tasks rebuilt; all gates PASS (G3 charted HR vs ECG median 0 min, G4 NIBP vs numerics +5 min, G7 partitions consistent); splits unchanged; BeeGFS copy synced (2.0 GB of changed files). Two latent bugs fixed (stage3c datetime resolution, stage4 window pad). `*_traj` tasks: two-stage builder re-implemented (`workzone/common/build_trajectory_task.py`, rule verified exactly on all four recorded cohorts) — `traj → verify → copy` jobs awaiting submission (§7). |
+| `mover` (SIS) | 6,993 cases: v3 shifted −60×1,175 / +60×1,191, unchanged 3,919, unverified 1,719 (708 without charted HR); gates PASS; Stage E, manifest (splits identical), tasks rebuilt. **v4 season-binary re-test of the unverified cases + task exclusion: jobs written, awaiting submission (§7).** |
+| `mover_epic` | 1,819 cases: v3 −60×357 / +60×311, unchanged 1,092, unverified 374 (59 without HR); gates PASS (EPIC envelope [−30, 90]); Stage E, manifest, tasks rebuilt; v4 re-test pending (§7). |
+| `mover_combine` | 8,812 dangling symlinks re-pointed; tasks rebuilt. **BeeGFS copy was NOT refreshed by the 2026-09-27 copy job (symlink dirs, see §2.6) — fixed copy step pending (§7).** No `mover` / `mover_epic` BeeGFS copies yet (§2.6 layout pending). |
 | `mcmed` | unchanged (verified aligned). |
 
-Follow-ups: rebuild the MIMIC trajectory tasks with their original two-stage builder; re-run the ICML configs on `mimic3`,
-`mover`, `mover_epic`, `mover_combine`; grep every pipeline for `astype("int64") // 10**6` on datetimes.
+Follow-ups: grep every pipeline for `astype("int64") // 10**6` on datetimes; fill in the v4 / trajectory numbers below once
+the §7 jobs have run.
+
+## 7. Pending jobs (2026-09-27 — Claude's `sbatch` was blocked by the permission classifier; the user submits)
+
+All from dream node00 (mirror already holds the code; each job rsyncs mirror → lab-node clone first):
+
+```bash
+# MOVER: v4 validation (fails the chain below 98 % agreement) → unverified re-test → gates → Stage E → manifest → tasks (excl. unverified) → gates → BeeGFS copies
+cd /projects/mwang80/staging/Physio_Data/workzone/mover/logs && bash ../slurm/submit_fix_clock_from.sh b2_validate
+# MIMIC: rebuild cardio/gas/hgb/kidney_traj (two-stage, --keep-splits) → gates → BeeGFS copy
+cd /projects/mwang80/staging/Physio_Data/workzone/mimic3/logs && bash ../slurm/submit_fix_clock_from.sh traj
+```
+
+Afterwards (training, dream b.q via `scripts/slurm_run.sh`; archive the old result folder first, e.g. `mv X X_old_preclockfix_20260927`):
+`mimic3_vital_est_wav_BP`, `mimic3_vital_est_emb_BP_pcs_pcp` (data ready now), `mover_vital_est_wav_BP`, `mover_epic_vital_est_wav_BP`
+(after the MOVER `copy` job), `mimic3_{cardio,gas,hgb,kidney}_traj` (after the MIMIC `traj` job). Stale but not scheduled here:
+162 top-level folders in `/projects/mwang80/uniphy_v2_out` (cross_eval_*_emory_to_mimic3_*, baselines, vmamba/uniphy traj
+variants) and 475 `NMI/` folders (mimic3 / mover_combine matrix, ablations, fusion) — the user decides which to re-run.

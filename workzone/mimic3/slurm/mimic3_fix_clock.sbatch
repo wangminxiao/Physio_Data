@@ -1,6 +1,7 @@
 #!/bin/bash
 # MIMIC-III clock fix (datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md §1) — one step per job, chain with --dependency=afterok.
-#   snapshot | migrate | numerics | actions | sepsis_cohort | trajectory | sepsis_traj | demographics | manifest | tasks | verify | copy
+#   snapshot | migrate | numerics | actions | sepsis_cohort | trajectory | sepsis_traj | demographics | manifest | tasks | traj | verify | copy
+#   traj = rebuild cardio/gas/hgb/kidney_traj with the two-stage builder (workzone/common/build_trajectory_task.py, --keep-splits)
 # Submit (user): cd /projects/mwang80/staging/Physio_Data/workzone/mimic3/logs && sbatch ../slurm/mimic3_fix_clock.sbatch <step>
 #SBATCH --job-name=mimic3_fix_clock
 #SBATCH --partition=xhu40-b.q
@@ -40,6 +41,8 @@ case "$STEP" in
   tasks)     $PY workzone/common/rebuild_tasks_from_summaries.py --root $STORE --registry $REPO/indices/var_registry.json --workers 8
              $PY workzone/mimic3/build_abp_hf_task.py --root $STORE --src tasks/vital_est_full/splits.json --gate-var 155 --min-abp 30 --out tasks/abp_hf --write
              for t in $STORE/tasks/*/; do n=$(basename $t); if [ -f $SNAP/tasks_${n}_splits.json ]; then echo "task $n: before $(grep -o '"n_train": [0-9]*' $SNAP/tasks_${n}_splits.json | head -1) after $(grep -o '"n_train": [0-9]*' $t/splits.json | head -1)"; fi; done ;;
+  traj)      for t in cardio_traj gas_traj hgb_traj kidney_traj; do $PY workzone/common/build_trajectory_task.py --root $STORE --registry $REPO/indices/var_registry.json --from-summary $STORE/tasks/$t/build_summary.json --keep-splits --workers 8 "$@"; done
+             for t in cardio_traj gas_traj hgb_traj kidney_traj; do echo "$t: before $(grep -o '"n_train": [0-9]*' $SNAP/tasks_${t}_splits.json | head -1) after $(grep -o '"n_train": [0-9]*' $STORE/tasks/$t/splits.json | head -1) | rebuild $(grep -o '"n_kept": [0-9]*\|"n_dropped": [0-9]*\|"n_added": [0-9]*' $STORE/tasks/$t/splits.json | tr '\n' ' ')"; done ;;
   verify)    $PY workzone/mimic3/verify_mimic3_clock.py --root $STORE --snapshot $SNAP "$@" ;;
   copy)      mkdir -p $COPY; rsync -rlt --no-g --info=stats1 --include='*/' --include='time_ms.npy' --include='meta.json' --include='ehr_*.npy' --include='demographics*.csv' --include='manifest.json' --include='pretrain_splits.json' --include='downstream_splits.json' --include='tasks/**' --exclude='*' "$STORE/" "$COPY/"
              echo "copy: $(ls -d $COPY/*/ | wc -l) dirs" ;;

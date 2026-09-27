@@ -3,7 +3,7 @@
 set -euo pipefail
 START=${1:?start step}; shift || true; EXTRA="$*"
 S=../slurm/mimic3_fix_clock.sbatch; prev=""; go=0
-for step in snapshot migrate numerics actions sepsis_cohort trajectory sepsis_traj demographics manifest tasks verify copy; do
+for step in snapshot migrate numerics actions sepsis_cohort trajectory sepsis_traj demographics manifest tasks traj verify copy; do
   [ "$step" = "$START" ] && go=1; [ $go = 1 ] || continue
   if [ -z "$prev" ]; then j=$(sbatch --parsable $S $step $EXTRA); else j=$(sbatch --parsable --dependency=afterok:$prev $S $step); fi
   echo "$step=$j"; prev=$j

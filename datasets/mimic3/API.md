@@ -228,8 +228,11 @@ auto-encode to integer IDs 1..C (0 reserved for unknown/pad).
   parquet-sourced EHR events had collapsed to 1970 and were dropped); `stage4` checked in-wave events against
   `time_ms[-1]` while stage3c admits events up to `time_ms[-1] + 30 s`.
 * Tasks rebuilt from their `build_summary.json` specs: `abp_hf` train 1,116→1,149, `lab_est_full` 3,259→3,465,
-  `vital_est_full` 3,203→3,391, `lab6_any_min2` 2,112, `sepsis` 1,821. **`cardio/gas/hgb/kidney_traj` were NOT rebuilt**:
-  their two-stage builder (`stage_b_per_target_min`, `stage_b_target_frac`, `stage_b_min_targets_passing`) is not in this
-  repo; the pre-fix versions were restored and remain based on the old partitions — rebuild with the original script.
+  `vital_est_full` 3,203→3,391, `lab6_any_min2` 2,112, `sepsis` 1,821. `cardio/gas/hgb/kidney_traj` use a two-stage rule
+  (stage A: any target ≥ 1 in-wave event → `cohort.json`; stage B: ≥ `stage_b_min_targets_passing` targets with ≥ 2 events →
+  split lists; original builder lost with the old server, re-implemented as `workzone/common/build_trajectory_task.py` and
+  verified to reproduce all four recorded cohorts exactly). Rebuild on the corrected partitions with `--keep-splits` (entities
+  keep their split, dropped ones removed, new ones by subject rule / ratio fill; previous `splits.json` kept under
+  `workzone/outputs/mimic3/traj_rebuild/`) — `traj → verify → copy` jobs pending submission (plan §7).
 * Only naive→epoch helper: `workzone/common/clock_utils.wall_ms` / `wall_ms_array`. Plan and evidence:
   `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.

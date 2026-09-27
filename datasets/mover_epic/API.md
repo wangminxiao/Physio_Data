@@ -147,8 +147,22 @@ See `workzone/mover_epic/README.md` for stage commands + wall-time estimates.
   induction ≈ +50 min).
 * Stage E re-run (partitions, `seg_idx`), splits identical to before, tasks rebuilt (`lab_est_full` SIS 970→983 train,
   EPIC 309→275; `vital_est_full` unchanged). `mover_combine`: all 8,812 symlinks re-pointed from `/opt/localdata100tb` to
-  `/mnt/localdata100tb` (they had been dangling since the 2026-08 migration); tasks rebuilt (`lab_est_full` 1,279→1,258 train)
-  and the BeeGFS copy re-synced. All `mover*/` scripts had hard-coded old server paths → translated; `mover`, `mover_epic`,
-  `mover_combine` sections added to `workzone/configs/server_paths.yaml`.
-* **Downstream rule**: exclude `clock_shift_confidence == "unverified"` cases from sub-hour analyses (≈40 % of them are
-  probably still an hour off). Plan and evidence: `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.
+  `/mnt/localdata100tb` (they had been dangling since the 2026-08 migration); tasks rebuilt (`lab_est_full` 1,279→1,258 train).
+  All `mover*/` scripts had hard-coded old server paths → translated; `mover`, `mover_epic`, `mover_combine` sections added
+  to `workzone/configs/server_paths.yaml`.
+* **v4 (season-constrained binary test, `stage_b2_clock.py --only-unverified`)** for the cases v3 left unverified (SIS 1,719
+  incl. 708 without charted HR; EPIC 374 incl. 59): the device hypothesis fixes the sign of the shift by season (standard
+  time → +60 only, DST → −60 only; 99.2 % / 98.7 % of the v3 decisions obey it), so each reference only has to separate
+  "aligned" from "the one allowed hour" (MAE ≤ 10/8 bpm and MAE < 0.8× or r ≥ 0.5 with gain ≥ 0.15). `clock_fix_version = 2`,
+  `clock_season_prior`, `clock_shift_v3_method` in meta; validated first on every v3-decided case (`--validate-decided`,
+  chain stops below 98 % agreement). Cases still unverified stay in the store and in `pretrain_splits.json` but are
+  **excluded from every `tasks/*/splits.json`** (`build_summary.json` spec `exclude_meta`, excluded ids listed in
+  `splits.json.excluded_by_meta`). Counts: `workzone/outputs/{mover,mover_epic}/clock_shift_summary_season.json` (jobs
+  pending submission, see `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md` §7).
+* BeeGFS: `/projects/xhu40-cdsfm/physio_data/mover_combine` holds real (dereferenced) copies incl. waveforms and FM sidecars
+  but was **not** refreshed by the first copy job (symlinked entity dirs vs `rsync -rlt`); the fixed `copy` step uses
+  `rsync -rLt`, and creates `/projects/xhu40-cdsfm/physio_data/{mover,mover_epic}` as per-entity symlinks into
+  `../mover_combine/<id>` plus their own manifest / splits / demographics / `tasks/` (plan §2.6).
+* **Downstream rule**: `tasks/*` already exclude `clock_shift_confidence == "unverified"`; anyone reading the store directly
+  for sub-hour EHR↔waveform analyses must apply the same filter (`meta.clock_shift_confidence`). Plan and evidence:
+  `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.

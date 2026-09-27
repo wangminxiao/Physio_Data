@@ -399,6 +399,14 @@ variables broadly, not filter to a narrow set. Task-specific variable requiremen
 are a post-stage concern. If the main pipeline filters too aggressively (e.g., requiring
 70% of 9 specific variables), patients valid for other tasks may be excluded.
 
+**Shared task builders** (`workzone/common/`): `build_estimation_task.py --spec` (targets + `min_events_per_target` +
+`eligibility`; splits inherited from `pretrain_splits.json`; spec key `exclude_meta` drops entities by a `meta.json` value,
+e.g. `{clock_shift_confidence: [unverified]}` for MOVER cases whose waveform clock could not be verified),
+`build_trajectory_task.py` (two-stage trajectory cohorts: stage A "any target ≥ 1 in-wave event" → `cohort.json`, stage B
+"≥ N targets with ≥ 2 events" → split lists; `--keep-splits` preserves an existing assignment when the store is rebuilt), and
+`rebuild_tasks_from_summaries.py` (re-runs every task from its recorded spec after a time-base change). Every task dir
+records its spec in `build_summary.json` so it can be rebuilt reproducibly.
+
 ## Adding EHR Variables to Existing Data
 
 The sparse event format means new variables can be added without re-extracting waveforms.

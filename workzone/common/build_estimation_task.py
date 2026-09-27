@@ -50,6 +50,9 @@ logging.basicConfig(level=logging.INFO,
 log = logging.getLogger(__name__)
 
 DEFAULT_WORKERS = 16
+# meta.json keys copied into the scan so a spec can exclude entities by their value (spec key `exclude_meta`, e.g.
+# {"clock_shift_confidence": ["unverified"]} for MOVER cases whose waveform clock could not be verified, 2026-09)
+META_FLAG_KEYS = ("clock_shift_confidence",)
 
 
 # ---------- registry helpers ----------
@@ -96,6 +99,13 @@ def _count_one_entity(args):
             return out
         t = np.load(time_path, mmap_mode="r")
         out["n_seg"] = int(len(t))
+        mp = edir / "meta.json"
+        if mp.exists():
+            try:
+                _m = json.loads(mp.read_text())
+                out["meta_flags"] = {k: _m.get(k) for k in META_FLAG_KEYS if k in _m}
+            except Exception:
+                out["meta_flags"] = {}
         out["wave_start_ms"] = int(t[0]) if len(t) else None
         out["wave_end_ms"]   = int(t[-1]) if len(t) else None
 
@@ -219,9 +229,15 @@ def build_task(scans: list[dict], spec: dict, registry: dict[int, dict],
     mode = spec.get("eligibility", "any")
     assert mode in ("any", "all", "per_target"), f"bad eligibility {mode}"
 
+    excl_rule = spec.get("exclude_meta") or {}
+    excluded: list[str] = []
     per_entity: dict[str, dict] = {}
     for s in scans:
         if not s["ok"]:
+            continue
+        flags = s.get("meta_flags") or {}
+        if any(flags.get(k) in set(v) for k, v in excl_rule.items()):
+            excluded.append(s["entity_id"])
             continue
         ev = s["per_partition"].get("events", {})
         re_ = s["per_partition"].get("recent", {})
@@ -255,12 +271,15 @@ def build_task(scans: list[dict], spec: dict, registry: dict[int, dict],
                             if row["per_var_count"][str(vid)] >= min_n}
             cohorts[f"{spec['task_name']}/{sub_name}__var{vid}"] = ([vid], sub_eligible)
 
+    if excl_rule:
+        log.info(f"exclude_meta {excl_rule}: {len(excluded)} entities excluded before eligibility")
     return {"per_entity": per_entity, "target_ids": target_ids,
-            "mode": mode, "min_n": min_n, "cohorts": cohorts}
+            "mode": mode, "min_n": min_n, "cohorts": cohorts,
+            "excluded_by_meta": {"rule": excl_rule, "n": len(excluded), "entities": sorted(excluded)}}
 
 
 def write_task(task_name: str, target_ids: list[int], eligible: dict[str, dict],
-               registry: dict[int, dict], spec: dict, root: Path) -> dict:
+               registry: dict[int, dict], spec: dict, root: Path, excluded_by_meta: dict | None = None) -> dict:
     """Write cohort.json + splits.json under <root>/tasks/<task_name>/."""
     task_dir = root / "tasks" / task_name
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -315,6 +334,8 @@ def write_task(task_name: str, target_ids: list[int], eligible: dict[str, dict],
                    "per_var_count", "per_var_count_recent", "per_var_count_baseline"],
         "entities": list(eligible.values()),
     }
+    if excluded_by_meta and excluded_by_meta.get("rule"):
+        cohort_json["excluded_by_meta"] = {"rule": excluded_by_meta["rule"], "n": excluded_by_meta["n"]}
     (task_dir / "cohort.json").write_text(json.dumps(cohort_json, indent=2, default=str))
 
     splits_json = {
@@ -330,6 +351,8 @@ def write_task(task_name: str, target_ids: list[int], eligible: dict[str, dict],
         "val":   sorted(f_val),
         "test":  sorted(f_test),
     }
+    if excluded_by_meta and excluded_by_meta.get("rule"):
+        splits_json["excluded_by_meta"] = excluded_by_meta   # rule + n + entity list (kept out of every split)
     (task_dir / "splits.json").write_text(json.dumps(splits_json, indent=2))
 
     return {"task_dir": str(task_dir),
@@ -354,6 +377,8 @@ def main():
                     help="debug: scan first N entities only")
     ap.add_argument("--out-name", default=None,
                     help="override task_name from spec (used as subdir under tasks/)")
+    ap.add_argument("--exclude-clock-unverified", action="store_true",
+                    help="add spec.exclude_meta = {clock_shift_confidence: [unverified]} (MOVER: waveform clock not verifiable)")
     args = ap.parse_args()
 
     root = Path(args.root)
@@ -401,6 +426,10 @@ def main():
     spec = yaml.safe_load(Path(args.spec).read_text())
     if args.out_name:
         spec["task_name"] = args.out_name
+    if args.exclude_clock_unverified:
+        ex = dict(spec.get("exclude_meta") or {})
+        ex["clock_shift_confidence"] = sorted(set(ex.get("clock_shift_confidence", [])) | {"unverified"})
+        spec["exclude_meta"] = ex
     log.info(f"spec: task_name={spec['task_name']!r}  "
              f"targets={spec['target_var_ids']}  "
              f"min_events={spec.get('min_events_per_target', 1)}  "
@@ -411,7 +440,7 @@ def main():
     for sub_name, (tids, eligible) in bundle["cohorts"].items():
         sub_spec = dict(spec)
         sub_spec["target_var_ids"] = tids
-        info = write_task(sub_name, tids, eligible, registry, sub_spec, root)
+        info = write_task(sub_name, tids, eligible, registry, sub_spec, root, bundle.get("excluded_by_meta"))
         summary.append({"task": sub_name, **info})
         log.info(f"wrote task {sub_name!r}: n={info['n_entities']}  "
                  f"train/val/test={info['n_train']}/{info['n_val']}/{info['n_test']}")
