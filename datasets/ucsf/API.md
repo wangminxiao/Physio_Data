@@ -120,6 +120,22 @@ come from `gcd(source_rate, target_rate)`.
   straddling cycles' waveform/vitals rebuilt, `tasks/ca_prediction` rebuilt from Code Blue times, manifest re-validated (4,913
   valid after the all-NaN rule; split membership kept). See `ALIGNMENT.md` §6 for the full table.
 
+## `ucsf_all/tasks/ca_risk` — cardiac-arrest risk prediction (2026-09-27)
+
+Built by `workzone/ucsf/stage_f_ca_risk.py` (`slurm/ucsf_all_ca_risk.sbatch`); design notes in the task's `README.md`.
+
+* Universe: every valid wave cycle of the 3,754 patients held out of pretrain train (ValidWaveTime study cohort ∪ 235
+  Code Blue CPA patients) — the FM pretrained on `ucsf_all` never saw them.
+* Label `has_ca` (patient level) = Code Blue TypeCode CPA; `event_grid_ms` = CodeTime on the entity's UTC-continuous
+  grid (may lie outside the cycle: see `event_in_cycle`, `event_offset_from_wave_end_min`). Auxiliary t0′ detector
+  markers (`ecg_collapse_offset_min`, `t0_prime_offset_min`, `t0_prime_quality`) for QA only.
+* Pre-event coverage per positive entity: `ppg_cov_{1,6,12,24}h`, `ecg_cov_{6,24}h`, `last_ppg_gap_min`,
+  `ppg_hours_before_event`, `usable_pre_event` (gap ≤ 30 min & 6-h PPG ≥ 50 %); `self_control_end_ms` = event − 24 h.
+* Controls: held-out non-CPA patients (`has_ca = 0`) + self-control windows before `self_control_end_ms`; exclude
+  everything after the event.
+* Split: train / test only (no val), grouped by patient, stratified by `has_ca`, 30 % test drawn from pretrain TEST
+  patients only; `splits.json` has `train`, `test` (and an empty `val`) entity lists plus per-split counts.
+
 ## EHR Variables to Extract
 
 All categories share the structured dtype
