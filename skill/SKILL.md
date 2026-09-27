@@ -49,6 +49,18 @@ optimized for deep learning training. Works with any combination of:
 The four EHR files share a single dtype. Readers pick which subset they need; no
 reader ever has to re-do time-based splitting. See "EHR Trajectory Structure" below.
 
+**Optional dense sidecars** (`{name}_hf.npy`): when a source delivers machine-sampled
+numerics on a regular sub-segment grid (UCSF `.vital` at 0.5 Hz, MIMIC numerics at 1 Hz),
+a dataset may add a float32 array `[N_seg, slots_per_seg, n_var]` next to the canonical
+files. NaN = no reading; slot `k` of segment `i` covers
+`[time_ms[i] + k*slot_ms, time_ms[i] + (k+1)*slot_ms)`. `meta.json` carries
+`{name}: {var_ids, var_names, slot_sec, slots_per_seg, shape, dtype, ...}` with `var_ids`
+from the registry (150–164 = monitor numerics). Intermittent readings that the source
+streams as a hold (cuff NBP) go into an extra events file with `EHR_EVENT_DTYPE`
+(`nbp_events.npy`), not into the dense array. Sidecars never replace `ehr_events.npy`
+and no reader may require them. Precedent: `vitals_hf.npy` in the UCSF all-raw store
+(`datasets/ucsf/API.md`, `workzone/ucsf/stage_c_vitals_hf.py`).
+
 **Signal arrays**: `[N_seg, rate_hz * seg_duration_sec]` float16.
 All channels share dim 0. Segment index `i` = same time window across all channels.
 Channel naming: `{SIGNAL}{RATE}` (e.g. PLETH40, II120, ABP125, EEG256).
@@ -59,6 +71,13 @@ within a contiguous block; larger jumps indicate recording gaps.
 **PLETH-anchored alignment**: PLETH (PPG) is the base channel. Only WFDB segments where
 PLETH exists are included. ECG II is NaN-filled when absent in a PLETH-present segment.
 Recording gaps produce time_ms jumps, not NaN padding. Windows never span gaps.
+
+**Time base**: `time_ms` must be continuous in *real elapsed time* within an entity (a UTC-based grid rendered
+as the source's local wall clock at the origin). De-identification day shifts and DST switches inside a
+recording must never open a 1-h gap or overlap; convert every external timestamp (EHR, ADT, event lists) with
+one shared, tested module and record the rule in `meta.json` (`time_base`, `time_rule`). Verify alignment on
+data (charted vitals vs monitor at lags −60/0/+60 min) before trusting sub-hour horizons. Worked example with
+three different shift conventions in one dataset: `datasets/ucsf/ALIGNMENT.md`.
 
 **Standard channels for physiological waveform pretraining:**
 - **PLETH40**: PPG at 40 Hz (1200 samples/seg) -- base channel, always has real data
@@ -141,6 +160,7 @@ preprocessing pass.
 |---------|-----------|--------|
 | Waveform-only pretraining | `{CHANNEL}.npy` | standard mmap read |
 | Waveform + concurrent EHR | `{CHANNEL}.npy` + `ehr_events.npy` | index events by `seg_idx` |
+| Waveform + dense monitor numerics | `{CHANNEL}.npy` + `{name}_hf.npy` | same segment index on dim 0; NaN-aware pooling per segment |
 | PCS / patient-state prior | `ehr_recent.npy` | group by `var_id`, take last value |
 | Chronic / baseline conditioning | `ehr_baseline.npy` | aggregate per `var_id` (mean/min/max) |
 | EHR-only pretraining (no waveform) | `ehr_baseline + recent + events + future` | concat, re-sort by `time_ms` |

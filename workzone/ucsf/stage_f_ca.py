@@ -37,9 +37,32 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO_ROOT / "workzone" / "configs" / "server_paths.yaml"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from clock import real_wall_to_grid_ms, matlab_datenum_to_wall_ms  # noqa: E402
 
 
-def build_cohort(parquet_path: Path, output_dir: Path) -> list[dict]:
+def load_codeblue(codeblue_parquet: Path, offset_parquet: Path) -> dict[str, int]:
+    """Patient_ID_GE -> Code Blue (TypeCode CPA) time as TRUE local wall ms (not de-identified).
+
+    Source: SAUCSFCodeBlue_FirstEvent_2013_2018_final.xlsx (EID == offset-table Encounter_ID, CodeTime = MATLAB
+    datenum), converted once to parquet.  The ValidWaveTime CSV EventTime is NOT used: it carries a spurious
+    UTC conversion (+7/+8 h) on top of the naive day shift (datasets/ucsf/ALIGNMENT.md).
+    """
+    cb = pl.read_parquet(codeblue_parquet)
+    off = pl.read_parquet(offset_parquet).select([
+        pl.col("Encounter_ID").cast(pl.Utf8).str.strip_chars().alias("EID"),
+        pl.col("Patient_ID_GE").cast(pl.Utf8).str.strip_chars().str.replace(r"^DE", "").alias("pid"),
+    ]).unique("EID", keep="first")
+    m = cb.with_columns(pl.col("EID").cast(pl.Utf8).str.strip_chars()).join(off, on="EID", how="inner")
+    m = m.filter(pl.col("TypeCode").str.strip_chars() == "CPA").sort("CodeTime")
+    out: dict[str, int] = {}
+    for r in m.iter_rows(named=True):
+        if r["pid"] not in out:
+            out[r["pid"]] = matlab_datenum_to_wall_ms(float(r["CodeTime"]))
+    return out
+
+
+def build_cohort(parquet_path: Path, output_dir: Path, codeblue: dict[str, int] | None = None) -> list[dict]:
     """Build per-entity CA cohort rows.
 
     Only keeps entities whose Stage B output dir has `meta.json` and
@@ -80,7 +103,16 @@ def build_cohort(parquet_path: Path, output_dir: Path) -> list[dict]:
         wave_start = int(time_ms[0])
         wave_end = int(time_ms[-1])
 
-        ev_ms = r["event_time_ms"]
+        pid = str(r["patient_id_ge"]).strip()
+        if codeblue is not None:
+            cb = codeblue.get(pid)
+            has_ca = int(cb is not None)
+            ev_ms = None; ev_src = None
+            if cb is not None and r.get("offset_ge_days") is not None:
+                ev_ms = int(real_wall_to_grid_ms(cb, float(r["offset_ge_days"]), int(r["episode_start_ms"])))
+                ev_src = "codeblue_xlsx_cpa"
+        else:
+            has_ca = int(r["has_ca"]); ev_ms = r["event_time_ms"]; ev_src = "validwavetime_csv_legacy" if ev_ms is not None else None
         min_after_wave_end = None
         if ev_ms is not None:
             min_after_wave_end = (int(ev_ms) - wave_end) / 60000.0
@@ -88,8 +120,11 @@ def build_cohort(parquet_path: Path, output_dir: Path) -> list[dict]:
         rows.append({
             "entity_id": eid,
             "patient_id_ge": r["patient_id_ge"],
-            "has_ca": int(r["has_ca"]),
+            "has_ca": has_ca,
+            "has_ca_csv": int(r["has_ca"]),
             "event_time_ms": (int(ev_ms) if ev_ms is not None else None),
+            "event_time_source": ev_src,
+            "event_in_wave": (bool(wave_start <= int(ev_ms) <= wave_end + 30000) if ev_ms is not None else None),
             "min_event_to_wave_end": (
                 None if min_after_wave_end is None else round(min_after_wave_end, 2)
             ),
@@ -194,7 +229,13 @@ def main():
     print(f"seed     = {args.seed}, ratios={ratios}", flush=True)
 
     t0 = time.time()
-    cohort = build_cohort(parquet, output_dir)
+    codeblue = None
+    if cfg.get("codeblue_parquet") and cfg.get("offset_table_parquet"):
+        codeblue = load_codeblue(Path(cfg["codeblue_parquet"]), Path(cfg["offset_table_parquet"]))
+        print(f"Code Blue (CPA) events: {len(codeblue)} patients from {cfg['codeblue_parquet']}", flush=True)
+    else:
+        print("WARNING: codeblue_parquet / offset_table_parquet not configured -> legacy CSV event times", flush=True)
+    cohort = build_cohort(parquet, output_dir, codeblue)
     if not cohort:
         print("ERROR: empty cohort; make sure Stage B has run first")
         sys.exit(1)
@@ -223,6 +264,8 @@ def main():
     cohort_json = {
         "task": "ca_prediction",
         "source_csv": cfg["ca_eventtime_csv"],
+        "event_time_source": ("codeblue_xlsx_cpa (CodeTime -> UTC-continuous grid, clock.real_wall_to_grid_ms)" if codeblue else "validwavetime_csv_legacy"),
+        "n_entities_event_in_wave": sum(1 for r in cohort if r.get("event_in_wave")),
         "built_at_unix": int(time.time()),
         "n_entities": len(cohort),
         "n_pos_entities": n_pos_entities,
@@ -230,8 +273,8 @@ def main():
         "n_patients_pos": split_stats["n_patients_pos"],
         "n_patients_neg": split_stats["n_patients_neg"],
         "fields": [
-            "entity_id", "patient_id_ge", "has_ca",
-            "event_time_ms", "min_event_to_wave_end",
+            "entity_id", "patient_id_ge", "has_ca", "has_ca_csv",
+            "event_time_ms", "event_time_source", "event_in_wave", "min_event_to_wave_end",
             "episode_start_ms", "episode_end_ms",
             "wave_start_ms", "wave_end_ms",
             "admission_start_ms", "admission_end_ms",

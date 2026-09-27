@@ -12,6 +12,10 @@ For each entity in valid_wave_window.parquet:
 Out-of-window samples are dropped. Gaps between .adibin files stay as NaN.
 Entities with episode duration < min_duration_sec (default 300) are skipped.
 Entities longer than max_duration_sec (default 14 days) are truncated.
+
+Works for two config sections (--dataset): `ucsf` (CA cohort, files listed by
+bed_subdir + UID) and `ucsf_all` (every raw wave cycle; Stage A supplies the
+`adibin_files` list per entity, so no directory listing is needed).
 """
 from __future__ import annotations
 
@@ -34,6 +38,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "workzone" / "ucsf"))
 from readers.binfilepy import binfile  # noqa: E402
 from readers.binfilepy import constant as binconst  # noqa: E402
+from clock import ge_wall_to_grid_ms, utc_offset_ms, dst_switch_between  # noqa: E402
 
 CONFIG_PATH = REPO_ROOT / "workzone" / "configs" / "server_paths.yaml"
 
@@ -45,7 +50,8 @@ PLETH_SAMPLES_PER_SEG = PLETH_TARGET_RATE * SEG_SEC  # 1200
 II_SAMPLES_PER_SEG = II_TARGET_RATE * SEG_SEC        # 3600
 PLETH_DOWN = SRC_RATE // PLETH_TARGET_RATE  # 6
 II_DOWN = SRC_RATE // II_TARGET_RATE        # 2
-MAX_WORKERS = 24
+MAX_WORKERS = 22  # half of xhu40-n01 (44 cores); was 24 on the 48-core bedanalysis
+FLOAT16_MAX = 65000.0
 
 
 def adibin_start_ms(h) -> int:
@@ -109,6 +115,14 @@ def read_adibin_channels(path: Path, want_titles: tuple[str, ...]):
         return start_ms, dur_ms, None
 
     header_bytes = binconst.CFWB_SIZE + binconst.CHANNEL_SIZE * n_chan
+    # A few headers declare more samples than the file holds (2 of 32,938 in a random scan);
+    # clamp to the real payload instead of failing the memmap.
+    n_avail = (path.stat().st_size - header_bytes) // (np.dtype(sample_dtype).itemsize * n_chan)
+    if n_avail <= 0:
+        return start_ms, dur_ms, None
+    if n_samp > n_avail:
+        n_samp = int(n_avail)
+        dur_ms = int(round(n_samp * h.secsPerTick * 1000))
     # Memmap as (n_samp, n_chan) so per-channel slice is a strided column view.
     mm = np.memmap(str(path), dtype=sample_dtype, mode="r",
                    offset=header_bytes, shape=(n_samp, n_chan))
@@ -158,7 +172,11 @@ def _place(grid: np.ndarray, src: np.ndarray, grid_start: int) -> None:
         src_hi -= grid_end - len(grid)
         grid_end = len(grid)
     if src_hi > src_lo:
-        grid[grid_start:grid_end] = src[src_lo:src_hi].astype(grid.dtype)
+        vals = src[src_lo:src_hi].astype(np.float32)
+        # Saturated / garbage samples (|x| > float16 max, e.g. int16 rails x 2.44 uV) would overflow
+        # float16 to +-inf and poison downstream statistics; store them as missing instead.
+        vals[np.abs(vals) > FLOAT16_MAX] = np.nan
+        grid[grid_start:grid_end] = vals.astype(grid.dtype)
 
 
 def process_entity(row: dict, raw_dir: str, output_dir: str,
@@ -169,8 +187,11 @@ def process_entity(row: dict, raw_dir: str, output_dir: str,
               "n_adibin_files": 0, "n_files_ok": 0, "n_files_no_chans": 0,
               "n_files_skipped_window": 0}
     try:
-        ep_start = int(row["episode_start_ms"])
-        ep_end = int(row["episode_end_ms"])
+        ep_start = int(row["episode_start_ms"])      # wall clock on the GE calendar = grid origin
+        ep_end_wall = int(row["episode_end_ms"])
+        # UTC-continuous grid (datasets/ucsf/ALIGNMENT.md): elapsed time is measured in UTC, so a DST switch on
+        # the GE calendar inside the cycle neither opens a 1-h gap (spring) nor overlaps 1 h (fall).
+        ep_end = int(ge_wall_to_grid_ms(ep_end_wall, ep_start))
         dur_sec = (ep_end - ep_start) / 1000.0
         if dur_sec < min_dur:
             status["status"] = "skip_short"
@@ -180,9 +201,14 @@ def process_entity(row: dict, raw_dir: str, output_dir: str,
             dur_sec = max_dur
             status["truncated"] = True
 
-        files = list_adibin_files(Path(raw_dir), row["wynton_folder"],
-                                  row["patient_id_ge"], row["bed_subdir"],
-                                  row["wave_cycle_uid"])
+        rel_files = row.get("adibin_files")
+        if rel_files:
+            # Stage A (all-raw) already enumerated the files (relative to raw_dir).
+            files = [Path(raw_dir) / p for p in rel_files]
+        else:
+            files = list_adibin_files(Path(raw_dir), row["wynton_folder"],
+                                      row["patient_id_ge"], row["bed_subdir"],
+                                      row["wave_cycle_uid"])
         status["n_adibin_files"] = len(files)
         if not files:
             status["status"] = "no_adibin"
@@ -209,6 +235,7 @@ def process_entity(row: dict, raw_dir: str, output_dir: str,
             if chans is None:
                 status["n_files_no_chans"] += 1
                 continue
+            f_start_ms = int(ge_wall_to_grid_ms(f_start_ms, ep_start))   # header wall clock -> grid position
             f_end_ms = f_start_ms + f_dur_ms
             if f_end_ms <= ep_start or f_start_ms >= ep_end:
                 status["n_files_skipped_window"] += 1
@@ -239,6 +266,11 @@ def process_entity(row: dict, raw_dir: str, output_dir: str,
             "bed_subdir": row["bed_subdir"],
             "episode_start_ms": ep_start,
             "episode_end_ms": ep_end,
+            "episode_end_wall_ms": ep_end_wall,
+            "time_base": "utc_continuous",
+            "grid_utc_offset_min": int(utc_offset_ms(ep_start) // 60000),
+            "dst_switch_in_cycle": bool(dst_switch_between(ep_start, ep_end_wall)),
+            "stage_b_version": 2,
             "episode_duration_sec": int(dur_sec),
             "n_seg": n_seg,
             "seg_duration_sec": SEG_SEC,
@@ -252,8 +284,8 @@ def process_entity(row: dict, raw_dir: str, output_dir: str,
             },
             "n_adibin_files": status["n_adibin_files"],
             "n_files_ok": status["n_files_ok"],
-            "has_ca": int(row["has_ca"]),
-            "event_time_raw": row["event_time_raw"],
+            "has_ca": (int(row["has_ca"]) if row.get("has_ca") is not None else None),
+            "event_time_raw": row.get("event_time_raw"),
             "encounter_id": row.get("encounter_id"),
             "offset_days": row.get("offset_days"),
             "offset_ge_days": row.get("offset_ge_days"),
@@ -277,6 +309,8 @@ def process_entity(row: dict, raw_dir: str, output_dir: str,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(CONFIG_PATH))
+    ap.add_argument("--dataset", default="ucsf",
+                    help="config section: ucsf (CA cohort) or ucsf_all (every raw wave cycle)")
     ap.add_argument("--min-duration-sec", type=int, default=300)
     ap.add_argument("--max-duration-sec", type=int, default=14 * 24 * 3600)
     ap.add_argument("--limit", type=int, default=0, help="0 = all")
@@ -284,6 +318,10 @@ def main():
                     help=f"max {MAX_WORKERS} (shared cluster cap)")
     ap.add_argument("--entities", default="",
                     help="comma-separated entity_ids; overrides limit")
+    ap.add_argument("--entity-file", default="",
+                    help="text file with one entity_id per line (merged with --entities)")
+    ap.add_argument("--dst-switch-only", action="store_true",
+                    help="only cycles that straddle a DST switch on the GE calendar (time-base fix rerun)")
     ap.add_argument("--no-resume", action="store_true",
                     help="do not skip entities that already have meta.json")
     ap.add_argument("--batch-size", type=int, default=100,
@@ -294,7 +332,7 @@ def main():
         print(f"clamping workers {args.workers} -> {MAX_WORKERS}")
         args.workers = MAX_WORKERS
 
-    cfg = yaml.safe_load(Path(args.config).read_text())["ucsf"]
+    cfg = yaml.safe_load(Path(args.config).read_text())[args.dataset]
     raw_dir = cfg["raw_waveform_dir"]
     output_dir = cfg["output_dir"]
     intermediate_dir = Path(cfg["intermediate_dir"])
@@ -308,13 +346,18 @@ def main():
     df = pl.read_parquet(parquet)
     df = df.unique(subset=["entity_id"], keep="first")
 
-    if args.entities:
-        ids = [s.strip() for s in args.entities.split(",") if s.strip()]
+    ids = [s.strip() for s in args.entities.split(",") if s.strip()]
+    if args.entity_file:
+        ids += [s.strip() for s in Path(args.entity_file).read_text().splitlines() if s.strip() and not s.startswith("#")]
+    if ids:
         df = df.filter(pl.col("entity_id").is_in(ids))
     elif args.limit:
         df = df.head(args.limit)
 
     all_rows = df.to_dicts()
+    if args.dst_switch_only:
+        all_rows = [r for r in all_rows if dst_switch_between(int(r["episode_start_ms"]), int(r["episode_end_ms"]))]
+        print(f"dst-switch-only: {len(all_rows)} cycles straddle a DST switch on the GE calendar")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # Resume: skip entities whose meta.json already exists on disk.
@@ -344,7 +387,7 @@ def main():
 
     def _flush_status():
         try:
-            pl.DataFrame(statuses).write_parquet(out_status)
+            pl.DataFrame(statuses, infer_schema_length=None).write_parquet(out_status)
         except Exception as e:
             print(f"  (warning: could not write status parquet: {e})")
 
@@ -428,12 +471,13 @@ def main():
         "min_duration_sec": args.min_duration_sec,
         "max_duration_sec": args.max_duration_sec,
         "workers": args.workers,
+        "dataset": args.dataset,
         "output_dir": output_dir,
     }
     out_summary = intermediate_dir / "stage_b_summary.json"
     out_summary.write_text(json.dumps(summary, indent=2))
 
-    pl.DataFrame(statuses).write_parquet(out_status)
+    pl.DataFrame(statuses, infer_schema_length=None).write_parquet(out_status)
 
     print(f"wrote {out_summary}")
     print(f"wrote {out_status}")

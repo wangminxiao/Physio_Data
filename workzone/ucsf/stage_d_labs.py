@@ -19,7 +19,9 @@ Two-phase pipeline:
       - filter combined DataFrame by patient_id (covers all candidate
         encounters, since multi-encounter entities share patient_id)
       - shift EHR time to GE/wave time:
-            time_ms_ge = time_ms_ehr - (offset_ge_days - offset_days) * 86_400_000
+            time_ms_ge = clock.ehr_wall_to_grid_ms(time_ms_ehr, offset_days, offset_ge_days, episode_start_ms)
+            (real wall clock = EHR + offset days; UTC - offset_GE days; UTC-continuous grid — datasets/ucsf/ALIGNMENT.md;
+             the former rule `ehr - (offset_ge - offset) days` was off by +-60 min in ~45 % of encounters)
       - clip to [episode_start_ms, episode_end_ms]
       - sort by time_ms, write {output_dir}/{entity_id}/labs_events.npy
         as structured (time_ms:i8, var_id:u2, value:f4)
@@ -51,6 +53,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "workzone" / "ucsf"))
 from readers.csv_repair import read_dirty_csv  # noqa: E402
+from clock import ehr_wall_to_grid_ms  # noqa: E402
 
 CONFIG_PATH = REPO_ROOT / "workzone" / "configs" / "server_paths.yaml"
 VAR_REGISTRY_PATH = REPO_ROOT / "indices" / "var_registry.json"
@@ -301,7 +304,7 @@ def run_phase_2(combined_parquet: Path, entities_df: pl.DataFrame,
                 events = np.empty(0, dtype=EVENT_DTYPE)
                 np.save(npy_path, events)
                 meta["labs"] = {"n_events": 0, "per_var_count": {},
-                                "shift_ms": shift_ms,
+                                "shift_ms": shift_ms, "time_rule": "utc_continuous_v2",
                                 "window": "admission",
                                 "admission_start_ms": adm_start,
                                 "admission_end_ms": adm_end}
@@ -310,14 +313,15 @@ def run_phase_2(combined_parquet: Path, entities_df: pl.DataFrame,
                 statuses.append(status); done += 1; continue
 
             status["n_matched_patient"] = int(bucket["time_ms_ehr"].shape[0])
-            t_ge = bucket["time_ms_ehr"] - shift_ms
+            t_ge = ehr_wall_to_grid_ms(bucket["time_ms_ehr"], int(row["offset_days"]), int(row["offset_ge_days"]),
+                                       int(meta["episode_start_ms"]))   # datasets/ucsf/ALIGNMENT.md
             mask = (t_ge >= adm_start) & (t_ge < adm_end)
             if not mask.any():
                 events = np.empty(0, dtype=EVENT_DTYPE)
                 np.save(npy_path, events)
                 meta["labs"] = {"n_events": 0,
                                 "n_matched_patient": status["n_matched_patient"],
-                                "per_var_count": {}, "shift_ms": shift_ms,
+                                "per_var_count": {}, "shift_ms": shift_ms, "time_rule": "utc_continuous_v2",
                                 "window": "admission",
                                 "admission_start_ms": adm_start,
                                 "admission_end_ms": adm_end}
@@ -344,7 +348,7 @@ def run_phase_2(combined_parquet: Path, entities_df: pl.DataFrame,
                 "n_events": int(events.shape[0]),
                 "n_matched_patient": status["n_matched_patient"],
                 "per_var_count": {str(k): v for k, v in sorted(per_var_count.items())},
-                "shift_ms": shift_ms,
+                "shift_ms": shift_ms, "time_rule": "utc_continuous_v2",
                 "window": "admission",
                 "admission_start_ms": adm_start,
                 "admission_end_ms": adm_end,

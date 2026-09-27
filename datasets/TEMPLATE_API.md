@@ -11,6 +11,7 @@
 | Organization | {describe directory structure} |
 | Patient ID field | {field name, e.g. SUBJECT_ID, encounter_nbr, CSN} |
 | Time reference | {how timestamps are stored: UTC, local, unix epoch, ...} |
+| De-identification shift & DST | {per-source shift arithmetic (absolute vs wall clock), DST handling inside a recording, `time_base` of the entity grid — see `datasets/ucsf/ALIGNMENT.md` for the pattern} |
 
 ### EHR - Clinical Tables
 
@@ -160,6 +161,19 @@ datasets/{dataset_name}/
             ├── {pid}.recent.npy
             └── {pid}.future.npy     forecasting labels — LEAKAGE if used as input
 ```
+
+### Optional dense sidecars
+
+| File | Shape / dtype | When | Notes |
+|---|---|---|---|
+| `{name}_hf.npy` | `[N_seg, slots_per_seg, n_var]` float32, C-contiguous, NaN = missing | source has machine-sampled numerics on a regular grid finer than a segment (0.5–1 Hz) | slot `k` covers `[time_ms[i] + k·slot_ms, +slot_ms)`; declared in `meta.json` under `{name}` with `var_ids`, `var_names`, `slot_sec`, `slots_per_seg`, `shape`, `dtype` |
+| `{name}_src.npy` | `[N_seg, slots_per_seg]` uint8 | several physical sources feed one variable (e.g. arterial lines AR1/AR2) | code per slot; codes listed in `meta.json`; sources are never mixed within a slot |
+| `{name}_events.npy` | `EHR_EVENT_DTYPE`, sorted, `seg_idx ∈ [0, N_seg)` | intermittent readings the source streams as a hold (cuff NBP) | events at value changes; extra to `ehr_events.npy`, never merged into it by the pipeline |
+
+Sidecars are additive: canonical files and their readers are unchanged, and a
+store may omit all of them. First instance: UCSF all-raw (`vitals_hf.npy`,
+`vitals_hf_abp_src.npy`, `nbp_events.npy`), see `datasets/ucsf/API.md`.
+
 
 ## EHR Trajectory Files
 

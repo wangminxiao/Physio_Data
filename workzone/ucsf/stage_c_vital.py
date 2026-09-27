@@ -36,6 +36,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "workzone" / "ucsf"))
 from readers.vitalfilepy import constant as vconst  # noqa: E402
+from clock import ge_wall_to_grid_ms, dst_switch_between  # noqa: E402
 
 CONFIG_PATH = REPO_ROOT / "workzone" / "configs" / "server_paths.yaml"
 VAR_REGISTRY_PATH = REPO_ROOT / "indices" / "var_registry.json"
@@ -171,7 +172,8 @@ def process_entity(entity_id: str, entity_row: dict, raw_dir: str,
                 continue
             start_ms, values, offsets = read
 
-            time_ms = (start_ms + (offsets * 1000.0)).astype(np.int64)
+            # header wall clock (GE calendar) -> UTC-continuous grid (datasets/ucsf/ALIGNMENT.md)
+            time_ms = (int(ge_wall_to_grid_ms(start_ms, ep_start)) + (offsets * 1000.0)).astype(np.int64)
             # Window clip + validity filter
             mask = ((time_ms >= ep_start) & (time_ms < ep_end)
                     & np.isfinite(values)
@@ -215,6 +217,7 @@ def process_entity(entity_id: str, entity_row: dict, raw_dir: str,
             "n_matched_files": status["n_matched_files"],
             "per_var_count": {str(k): v for k, v in sorted(per_var_count.items())},
             "per_suffix_count": dict(sorted(per_suffix_count.items())),
+            "time_base": "utc_continuous",
         }
         meta_path.write_text(json.dumps(meta, indent=2, default=str))
 
@@ -236,6 +239,10 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="0 = all")
     ap.add_argument("--workers", type=int, default=12,
                     help=f"max {MAX_WORKERS} (shared cluster cap)")
+    ap.add_argument("--entity-file", default="",
+                    help="one entity_id per line (merged with --entities)")
+    ap.add_argument("--dst-switch-only", action="store_true",
+                    help="only cycles that straddle a DST switch on the GE calendar")
     ap.add_argument("--entities", default="",
                     help="comma-separated entity_ids; overrides limit")
     ap.add_argument("--no-resume", action="store_true",
@@ -269,11 +276,16 @@ def main():
                       if p.is_dir() and (p / "meta.json").exists())
     print(f"Stage B meta.json universe: {len(universe)} entities")
 
-    if args.entities:
-        ids = [s.strip() for s in args.entities.split(",") if s.strip()]
-        universe = [e for e in universe if e in ids]
+    ids = [s.strip() for s in args.entities.split(",") if s.strip()]
+    if args.entity_file:
+        ids += [s.strip() for s in Path(args.entity_file).read_text().splitlines() if s.strip() and not s.startswith("#")]
+    if ids:
+        universe = [e for e in universe if e in set(ids)]
     elif args.limit:
         universe = universe[:args.limit]
+    if args.dst_switch_only:
+        universe = [e for e in universe if e in rows_by_id and dst_switch_between(int(rows_by_id[e]["episode_start_ms"]), int(rows_by_id[e]["episode_end_ms"]))]
+        print(f"dst-switch-only: {len(universe)} cycles straddle a DST switch on the GE calendar")
 
     statuses: list[dict] = []
     if not args.no_resume:

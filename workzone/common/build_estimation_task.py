@@ -102,7 +102,8 @@ def _count_one_entity(args):
         per_partition = {}
         for fname, key in (("ehr_events.npy",   "events"),
                            ("ehr_recent.npy",   "recent"),
-                           ("ehr_baseline.npy", "baseline")):
+                           ("ehr_baseline.npy", "baseline"),
+                           ("ehr_hf.npy",       "hf")):
             p = edir / fname
             if not p.exists():
                 per_partition[key] = {}
@@ -113,6 +114,11 @@ def _count_one_entity(args):
                 continue
             vids, counts = np.unique(arr["var_id"], return_counts=True)
             per_partition[key] = {int(v): int(c) for v, c in zip(vids, counts)}
+        # The in-wave monitor-numerics sidecar (ehr_hf.npy, var_ids 150+, MIMIC-III and UCSF all-raw)
+        # counts as in-wave availability: merge it into "events" so hf targets can gate a task.
+        # Chart-vital ids (100-range) never appear in ehr_hf, so existing tasks are unaffected.
+        for v, c in per_partition.get("hf", {}).items():
+            per_partition["events"][v] = per_partition["events"].get(v, 0) + c
         out["per_partition"] = per_partition
         out["ok"] = True
     except Exception as e:

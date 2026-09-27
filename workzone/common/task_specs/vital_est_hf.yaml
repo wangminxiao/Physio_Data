@@ -1,0 +1,7 @@
+# Machine-sampled (monitor) vitals from the ehr_hf.npy sidecar — UCSF all-raw (and MIMIC-III numerics).
+# 150 HR_hf, 151 SpO2_hf, 152 RR_hf, 153 ABPs_hf, 154 ABPd_hf, 155 ABPm_hf, 156 PULSE_hf
+task_name: vital_est_hf
+target_var_ids: [150, 151, 152, 153, 154, 155, 156]
+min_events_per_target: 1
+eligibility: any
+inherit_splits_from: pretrain

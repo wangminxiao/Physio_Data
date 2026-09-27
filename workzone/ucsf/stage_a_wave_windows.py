@@ -30,6 +30,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO_ROOT / "workzone" / "configs" / "server_paths.yaml"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from clock import ehr_wall_to_grid_ms  # noqa: E402
 
 
 def load_cohort(path: Path) -> pl.DataFrame:
@@ -81,8 +83,15 @@ def load_offset_xlsx(path: Path) -> pl.DataFrame:
         admission_end_GE   = admission_start_GE + Encounter_LOS days
     These bound the trajectory partitions (baseline/recent/future) in Stage E.
     """
-    df = pd.read_excel(path)
+    if str(path).endswith(".parquet"):      # xlsx converted once with openpyxl (workzone/ucsf/explore/convert_offset_xlsx.py)
+        df = pd.DataFrame(pl.read_parquet(path).to_dict(as_series=False))
+    else:
+        df = pd.read_excel(path)
     df.columns = [c.strip() for c in df.columns]
+    for c in ("offset", "offset_GE", "Encounter_LOS"):
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    df = df.dropna(subset=[c for c in ("offset", "offset_GE") if c in df.columns])
     keep = ["Patient_ID_GE", "Wynton_folder", "Encounter_ID", "Patient_ID",
             "Encounter_Start_time", "Encounter_LOS", "offset", "offset_GE"]
     missing = [c for c in keep if c not in df.columns]
@@ -95,6 +104,9 @@ def load_offset_xlsx(path: Path) -> pl.DataFrame:
     df["Encounter_Start_time"] = pd.to_datetime(df["Encounter_Start_time"], errors="coerce")
 
     enc_start_ehr_ms = df["Encounter_Start_time"].astype("int64") // 1_000_000
+    df["encounter_start_ehr_ms"] = enc_start_ehr_ms
+    # provisional (legacy naive rule); recomputed per entity on the UTC-continuous grid in main() once the
+    # wave-cycle origin is known (datasets/ucsf/ALIGNMENT.md)
     shift_ms = (df["offset_GE"].astype("int64") - df["offset"].astype("int64")) * 86_400_000
     df["admission_start_ms"] = enc_start_ehr_ms - shift_ms
     df["admission_end_ms"] = df["admission_start_ms"] + df["Encounter_LOS"].astype("int64") * 86_400_000
@@ -108,7 +120,7 @@ def load_offset_xlsx(path: Path) -> pl.DataFrame:
     })
     return pl.from_pandas(df[["patient_id_ge", "wynton_folder", "encounter_id",
                               "patient_id", "offset_days", "offset_ge_days",
-                              "encounter_los_days",
+                              "encounter_los_days", "encounter_start_ehr_ms",
                               "admission_start_ms", "admission_end_ms"]])
 
 
@@ -119,7 +131,7 @@ def main():
 
     cfg = yaml.safe_load(Path(args.config).read_text())["ucsf"]
     ca_csv = Path(cfg["ca_eventtime_csv"])
-    offset_xlsx = Path(cfg["offset_xlsx"])
+    offset_xlsx = Path(cfg.get("offset_table_parquet") or cfg["offset_xlsx"])
     out_dir = Path(cfg["intermediate_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -146,6 +158,33 @@ def main():
     # Handle multi-encounter matches: annotate + deduplicate
     counts = joined.group_by("entity_id").agg(pl.len().alias("n_candidate_encounters"))
     joined = joined.join(counts, on="entity_id", how="left")
+
+    # Admission window on the entity grid: EHR wall clock -> real wall clock -> UTC - offset_GE -> grid
+    def _adm(s):
+        if s["encounter_start_ehr_ms"] is None or s["offset_days"] is None or s["offset_ge_days"] is None:
+            return None
+        return int(ehr_wall_to_grid_ms(int(s["encounter_start_ehr_ms"]), float(s["offset_days"]),
+                                       float(s["offset_ge_days"]), int(s["episode_start_ms"])))
+    joined = joined.with_columns(
+        pl.struct(["encounter_start_ehr_ms", "offset_days", "offset_ge_days", "episode_start_ms"])
+          .map_elements(_adm, return_dtype=pl.Int64).alias("admission_start_ms"))
+    joined = joined.with_columns(
+        (pl.col("admission_start_ms") + pl.col("encounter_los_days").cast(pl.Int64) * 86_400_000).alias("admission_end_ms"))
+
+    # Resolve multi-encounter matches deterministically: prefer the encounter whose admission window contains the
+    # wave-cycle start, then the nearest admission start (the former `unique(keep="first")` downstream depended on
+    # polars' unstable sort order, so the encounter — and its offsets — could change between runs).
+    joined = joined.with_columns(
+        ((pl.col("admission_start_ms") <= pl.col("episode_start_ms")) & (pl.col("episode_start_ms") < pl.col("admission_end_ms")))
+        .fill_null(False).alias("_contains"),
+        (pl.col("episode_start_ms") - pl.col("admission_start_ms")).abs().fill_null(2**62).alias("_dist"))
+    n_before = joined.height
+    joined = (joined.sort(["entity_id", "_contains", "_dist"], descending=[False, True, False])
+                    .unique("entity_id", keep="first", maintain_order=True))
+    n_contained = int(joined["_contains"].sum())
+    joined = joined.drop(["_contains", "_dist"])
+    print(f"multi-encounter resolution: {n_before} rows -> {joined.height} entities; "
+          f"admission window contains wave start for {n_contained}")
 
     n_unmatched = joined.filter(pl.col("encounter_id").is_null()).select(pl.col("entity_id").n_unique()).item()
     n_multi = joined.filter(pl.col("n_candidate_encounters") > 1).select(pl.col("entity_id").n_unique()).item()

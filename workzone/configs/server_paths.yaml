@@ -1,24 +1,39 @@
-# Server-specific data paths
-# Edit these to match your remote server layout
+# Server-specific data paths (DREAM lab node xhu40-n01; former bedanalysis paths translated 2026-09-09:
+#   /labs/hulab/<X> -> /mnt/localdata/storage/<X>,  /opt/localdata100tb/<X> -> /mnt/localdata100tb/<X>)
 
 # MIMIC-III
 mimic3:
-  raw_waveform_dir: /labs/hulab/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0
-  raw_ehr_dir: /labs/hulab/MIMICIII-v1.4
-  output_dir: /opt/localdata100tb/physio_data/mimic3
+  raw_waveform_dir: /mnt/localdata/storage/MIMIC_waveform_matched_subset/physionet.org/files/mimic3wdb-matched/1.0
+  raw_ehr_dir: /mnt/localdata/storage/MIMICIII-v1.4
+  output_dir: /mnt/localdata100tb/physio_data/mimic3
 
 # MC_MED
 mcmed:
-  raw_npz_dir: /labs/hulab/mxwang/MC_MED_ECG_PLETH_40hz_120hz_500hz_lab_vital
-  raw_csv_dir: /labs/hulab/mxwang/mc_med_csv
-  output_dir: /opt/localdata100tb/physio_data/mcmed
+  raw_npz_dir: /mnt/localdata/storage/mxwang/MC_MED_ECG_PLETH_40hz_120hz_500hz_lab_vital
+  raw_csv_dir: /mnt/localdata/storage/mxwang/mc_med_csv
+  output_dir: /mnt/localdata100tb/physio_data/mcmed
 
 # UCSF
 ucsf:
-  raw_waveform_dir: /labs/hulab/UCSF
-  raw_ehr_dir: /labs/hulab/UCSF/rdb_new
-  offset_xlsx: /labs/hulab/UCSF/encounter_date_offset_table_ver_Apr2024.xlsx
-  flowsheet_rowdim_csv: /labs/hulab/UCSF/rdb_database/FLOWSHEETROWDIM_New/FLOWSHEETROWDIM_New.csv
-  ca_eventtime_csv: /labs/hulab/mxwang/data/ucsf_EHR/bedanalysis_waveformExtraction/Output_new/ValidWaveTime_allEnc_eventtime.csv
-  intermediate_dir: /labs/hulab/mxwang/Physio_Data/workzone/outputs/ucsf
-  output_dir: /opt/localdata100tb/physio_data/ucsf
+  raw_waveform_dir: /mnt/localdata/storage/UCSF
+  raw_ehr_dir: /mnt/localdata/storage/UCSF/rdb_new
+  offset_xlsx: /mnt/localdata/storage/UCSF/encounter_date_offset_table_ver_Apr2024.xlsx
+  flowsheet_rowdim_csv: /mnt/localdata/storage/UCSF/rdb_database/FLOWSHEETROWDIM_New/FLOWSHEETROWDIM_New.csv
+  ca_eventtime_csv: /mnt/localdata/storage/mxwang/data/ucsf_EHR/bedanalysis_waveformExtraction/Output_new/ValidWaveTime_allEnc_eventtime.csv
+  intermediate_dir: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf
+  output_dir: /mnt/localdata100tb/physio_data/ucsf
+  # offset xlsx / Code Blue xlsx converted to parquet once (openpyxl lives only in the S4M env): workzone/ucsf/explore/convert_*.py
+  offset_table_parquet: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all/encounter_offset_table.parquet
+  codeblue_xlsx: /mnt/localdata/storage/mxwang/data/ucsf_EHR/SAUCSFCodeBlue_FirstEvent_2013_2018_final.xlsx
+  codeblue_parquet: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all/codeblue_first_event.parquet
+
+# UCSF — ALL raw wave cycles (paired PPG + ECG + machine-sampled vitals), no EHR linkage.
+# Separate store from `ucsf` (the CA-study cohort); entity ids overlap by design.
+ucsf_all:
+  raw_waveform_dir: /mnt/localdata/storage/UCSF
+  intermediate_dir: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all
+  output_dir: /mnt/localdata100tb/physio_data/ucsf_all
+  # cardiac-arrest study cohort (cases + study controls): its patients are held out of the pretrain TRAIN split
+  ca_eventtime_csv: /mnt/localdata/storage/mxwang/data/ucsf_EHR/bedanalysis_waveformExtraction/Output_new/ValidWaveTime_allEnc_eventtime.csv
+  offset_table_parquet: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all/encounter_offset_table.parquet
+  codeblue_parquet: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all/codeblue_first_event.parquet
