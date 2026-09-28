@@ -1,0 +1,8 @@
+# Cuff (non-invasive) BP estimation from the monitor's own NBP cycles — UCSF counterpart of MIMIC-III's charted-NBP task
+# (vital_est_full targets 104-106). UCSF has no charted flowsheet vitals in the all-raw store; the cuff readings live in
+# nbp_events.npy / ehr_hf.npy as var 157-159 (true cuff times). Eligibility: any cuff reading inside the wave window.
+task_name: nbp_est_hf
+target_var_ids: [157, 158, 159]      # NBPs_hf, NBPd_hf, NBPm_hf
+min_events_per_target: 1
+eligibility: any
+inherit_splits_from: pretrain

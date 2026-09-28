@@ -296,7 +296,7 @@ def run_phase_2(combined_parquet: Path, entities_df: pl.DataFrame,
             adm_start = int(row["admission_start_ms"])
             adm_end = int(row["admission_end_ms"])
 
-            pat_id = int(row["patient_id"])
+            pat_id = int(str(row["patient_id"]).strip())
             shift_ms = (int(row["offset_ge_days"]) - int(row["offset_days"])) * MS_PER_DAY
 
             bucket = events_by_pat.get(pat_id)
@@ -382,6 +382,8 @@ def main():
                     help=f"phase-1 shard workers (max {MAX_WORKERS})")
     ap.add_argument("--limit-shards", type=int, default=0,
                     help="phase 1: process first N shards only (debug)")
+    ap.add_argument("--shard-glob", default="*.txt",
+                    help="phase 1: shard file pattern under Filtered_Lab_New (debug, e.g. '2015_1*.txt')")
     ap.add_argument("--entities", default="",
                     help="phase 2: comma-separated entity_ids (debug)")
     ap.add_argument("--phase", choices=["1", "2", "both"], default="both")
@@ -389,18 +391,22 @@ def main():
                     help="phase 2: do not skip entities with existing labs_events.npy")
     ap.add_argument("--redo-phase-1", action="store_true",
                     help="reprocess all shards even if per-shard parquet exists")
+    ap.add_argument("--dataset", default="ucsf", help="server_paths.yaml section: ucsf (CA cohort) | ucsf_all")
+    ap.add_argument("--link-parquet", default=None,
+                    help="entity->encounter table (default: valid_wave_window.parquet for ucsf, ehr_link.parquet for ucsf_all)")
     args = ap.parse_args()
 
     if args.workers > MAX_WORKERS:
         print(f"clamping workers {args.workers} -> {MAX_WORKERS}")
         args.workers = MAX_WORKERS
 
-    cfg = yaml.safe_load(Path(args.config).read_text())["ucsf"]
-    raw_ehr_dir = Path(cfg["raw_ehr_dir"])
+    cfg_all = yaml.safe_load(Path(args.config).read_text()); cfg = cfg_all[args.dataset]
+    raw_ehr_dir = Path(cfg.get("raw_ehr_dir") or cfg_all["ucsf"]["raw_ehr_dir"])
     output_dir = Path(cfg["output_dir"])
     intermediate_dir = Path(cfg["intermediate_dir"])
     intermediate_dir.mkdir(parents=True, exist_ok=True)
-    parquet = intermediate_dir / "valid_wave_window.parquet"
+    parquet = Path(args.link_parquet) if args.link_parquet else \
+        intermediate_dir / ("valid_wave_window.parquet" if args.dataset == "ucsf" else "ehr_link.parquet")
     shards_out_dir = intermediate_dir / "stage_d_labs_shards"
     combined_parquet = intermediate_dir / "stage_d_labs_raw.parquet"
     p1_status = intermediate_dir / "stage_d_labs_phase1_status.parquet"
@@ -426,14 +432,18 @@ def main():
             "offset_days", "offset_ge_days",
         ])
     )
-    print(f"entities (unique): {entities_df.height}", flush=True)
+    n_all = entities_df.height
+    entities_df = entities_df.filter(pl.col("patient_id").is_not_null() & pl.col("admission_start_ms").is_not_null())
+    print(f"entities (unique): {n_all}, linked to an encounter: {entities_df.height}", flush=True)
 
     if args.phase in ("1", "both"):
-        shard_paths = sorted((raw_ehr_dir / "Filtered_Lab_New").glob("*.txt"))
+        shard_paths = sorted((raw_ehr_dir / "Filtered_Lab_New").glob(args.shard_glob))
         if args.limit_shards:
             shard_paths = shard_paths[:args.limit_shards]
         print(f"shards: {len(shard_paths)}", flush=True)
-        patient_ids = entities_df["patient_id"].unique().to_list()
+        # the offset table stores Patient_ID as text; the shards are filtered on an Int64 cast -> compare as ints
+        patient_ids = sorted({int(str(x).strip()) for x in entities_df["patient_id"].unique().to_list()
+                              if x is not None and str(x).strip().lstrip("-").isdigit()})
         print(f"unique cohort patients: {len(patient_ids)}", flush=True)
         t_p1 = time.time()
         n_rows = run_phase_1(shard_paths, patient_ids, name_to_varid,

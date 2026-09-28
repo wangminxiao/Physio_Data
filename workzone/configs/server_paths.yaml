@@ -31,6 +31,7 @@ ucsf:
 # Separate store from `ucsf` (the CA-study cohort); entity ids overlap by design.
 ucsf_all:
   raw_waveform_dir: /mnt/localdata/storage/UCSF
+  raw_ehr_dir: /mnt/localdata/storage/UCSF/rdb_new          # labs / encounters for the EHR link (stage_a2_ehr_link.py)
   intermediate_dir: /mnt/localdata/storage/mxwang/Physio_Data/workzone/outputs/ucsf_all
   output_dir: /mnt/localdata100tb/physio_data/ucsf_all
   # cardiac-arrest study cohort (cases + study controls): its patients are held out of the pretrain TRAIN split

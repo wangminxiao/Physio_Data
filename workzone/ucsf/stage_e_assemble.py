@@ -208,16 +208,20 @@ def main():
                     help="comma-separated entity_ids (debug; overrides limit)")
     ap.add_argument("--no-resume", action="store_true",
                     help="reprocess entities even if layout already at v2")
+    ap.add_argument("--dataset", default="ucsf", help="server_paths.yaml section: ucsf | ucsf_all")
+    ap.add_argument("--link-parquet", default=None,
+                    help="entity table with admission bounds (default: valid_wave_window.parquet for ucsf, ehr_link.parquet for ucsf_all)")
     args = ap.parse_args()
 
     if args.workers > MAX_WORKERS:
         print(f"clamping workers {args.workers} -> {MAX_WORKERS}")
         args.workers = MAX_WORKERS
 
-    cfg = yaml.safe_load(Path(args.config).read_text())["ucsf"]
+    cfg = yaml.safe_load(Path(args.config).read_text())[args.dataset]
     output_dir = Path(cfg["output_dir"])
     intermediate_dir = Path(cfg["intermediate_dir"])
-    parquet = intermediate_dir / "valid_wave_window.parquet"
+    parquet = Path(args.link_parquet) if args.link_parquet else \
+        intermediate_dir / ("valid_wave_window.parquet" if args.dataset == "ucsf" else "ehr_link.parquet")
 
     print(f"output_dir = {output_dir}")
     print(f"parquet    = {parquet}")
@@ -226,6 +230,7 @@ def main():
     entities_df = (
         pl.read_parquet(parquet)
         .unique("entity_id", keep="first")
+        .filter(pl.col("admission_start_ms").is_not_null())
         .select(["entity_id",
                  "admission_start_ms", "admission_end_ms"])
     )

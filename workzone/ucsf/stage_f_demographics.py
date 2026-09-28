@@ -86,19 +86,25 @@ def load_encounter_table(raw_ehr_dir: Path,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(CONFIG_PATH))
+    ap.add_argument("--dataset", default="ucsf", help="server_paths.yaml section: ucsf | ucsf_all")
+    ap.add_argument("--link-parquet", default=None,
+                    help="entity->encounter table (default: valid_wave_window.parquet for ucsf, ehr_link.parquet for ucsf_all)")
     args = ap.parse_args()
 
-    cfg = yaml.safe_load(Path(args.config).read_text())["ucsf"]
-    raw_ehr_dir = Path(cfg["raw_ehr_dir"])
+    cfg_all = yaml.safe_load(Path(args.config).read_text()); cfg = cfg_all[args.dataset]
+    raw_ehr_dir = Path(cfg.get("raw_ehr_dir") or cfg_all["ucsf"]["raw_ehr_dir"])
     output_dir = Path(cfg["output_dir"])
     intermediate_dir = Path(cfg["intermediate_dir"])
-    parquet = intermediate_dir / "valid_wave_window.parquet"
+    parquet = Path(args.link_parquet) if args.link_parquet else \
+        intermediate_dir / ("valid_wave_window.parquet" if args.dataset == "ucsf" else "ehr_link.parquet")
 
     t0 = time.time()
     df = (
         pl.read_parquet(parquet)
         .unique("entity_id", keep="first")
     )
+    if "has_ca" not in df.columns:
+        df = df.with_columns(pl.lit(0).alias("has_ca"))
 
     # Keep entities that completed Stage B (have meta.json)
     universe = {
@@ -148,7 +154,10 @@ def main():
         for row in df.iter_rows(named=True):
             eid = row["entity_id"]
             enc_id = row.get("encounter_id")
-            info = enc_info.get(int(enc_id)) if enc_id is not None else None
+            try:
+                info = enc_info.get(int(enc_id)) if enc_id is not None else None
+            except (TypeError, ValueError):
+                info = None
             age = info["age"] if info else None
             admit_type = info["admit_type"] if info else None
             if age is None or age == "":
@@ -163,9 +172,9 @@ def main():
                 "",
                 "",
                 "" if admit_type is None else admit_type,
-                int(row["encounter_los_days"]),
-                int(row["admission_start_ms"]),
-                int(row["admission_end_ms"]),
+                "" if row.get("encounter_los_days") is None else int(row["encounter_los_days"]),
+                "" if row.get("admission_start_ms") is None else int(row["admission_start_ms"]),
+                "" if row.get("admission_end_ms") is None else int(row["admission_end_ms"]),
                 "" if ws is None else ws,
                 "" if we is None else we,
                 int(row["has_ca"]),
