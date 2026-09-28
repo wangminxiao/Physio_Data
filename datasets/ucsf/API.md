@@ -343,6 +343,47 @@ Location: `/mnt/localdata100tb/physio_data/ucsf_all/` (xhu40-n01 only; not backe
 `workzone/outputs/ucsf_all/verify_stage_{a,b,c,f}.json` in the clone. Optional copy to BeeGFS:
 `workzone/ucsf/slurm/ucsf_all_copy_to_projects.sbatch`.
 
+### EHR side of the all-raw store and NMI-parity tasks (2026-09-28)
+
+The all-raw store was built without EHR linkage. To give it the same downstream tasks as MIMIC-III (labs, cuff BP,
+monitor vitals, invasive ABP) the EHR side is attached by four more stages (`workzone/ucsf/slurm/ucsf_all_ehr.sbatch`,
+chain `link → d1 → d2 → e → demo → tasks → verify → copy`):
+
+| Stage | Script | Output |
+|---|---|---|
+| A2 | `stage_a2_ehr_link.py --dataset ucsf_all` | `ehr_link.parquet`: entity → `Encounter_ID`, `Patient_ID`, `offset` / `offset_GE`, admission window on the grid. Join on (`Patient_ID_GE`, `Wynton_folder`) against the 27,903-encounter offset table, patient-only fallback, several candidates → the encounter whose admission contains the wave start, else the nearest (same rule as the CA store). 41,062 / 41,448 Stage-A entities linked (99.1 %; 41,040 folder matches, 22 patient-only, 386 unlinked), admission contains the wave start for 39,004 |
+| D | `stage_d_labs.py --dataset ucsf_all` | `labs_events.npy` (17 registry labs from `Filtered_Lab_New`, `ehr_wall_to_grid_ms` clock rule, clipped to the admission) |
+| E | `stage_e_assemble.py --dataset ucsf_all` | `ehr_baseline / recent / events / future.npy` from the labs (no charted flowsheet vitals in this store; monitor numerics stay in `ehr_hf.npy`) |
+| F | `stage_f_demographics.py --dataset ucsf_all` | `demographics.csv` (age, admission type, LOS, admission/wave bounds, `has_ca`; UCSF tables carry no sex/ethnicity) |
+| tasks | `build_estimation_task.py` with `task_specs/{lab_est_full, lab6_any_min2, nbp_est_hf}.yaml` | see the mapping below |
+| gate | `verify_stage_de.py --dataset ucsf_all` | link ≥ 95 %, no Stage D/E errors, each NMI lab ≥ 1,000 events, labs identical to the CA-cohort store on shared entities (≥ 95 %), seg_idx / partition structure, plausibility |
+
+Task mapping to the MIMIC-III NMI set (`datasets/mimic3/API.md`):
+
+| MIMIC-III task (cohort → targets) | `ucsf_all` counterpart | Notes |
+|---|---|---|
+| `lab6_any_min2` → K, Ca, Na, Glu, Hgb, HCO3 (var 0,1,2,3,9,16) | `tasks/lab6_any_min2` (same spec: any of the 6 with ≥ 2 in-wave events, splits from `pretrain_splits.json`) | labs from `Filtered_Lab_New` via `ucsf_lab_common_names` |
+| `vital_est_full` → cuff NBPs/NBPd/NBPm (var 104–106, charted) | `tasks/nbp_est_hf` → var 157–159 (`nbp_events` = the monitor's own cuff cycles, true cuff times) | UCSF has no charted-flowsheet vitals in this store; the cuff readings themselves are the better label. Read them from `ehr_hf.npy` (var 157–159) |
+| `vital_est_full` cohort with hf targets HR/SpO2/RR (var 150–152) | `tasks/vital_est_hf` (targets 150–156, any) | already existed; same var ids, MIMIC-compatible `ehr_hf.npy` |
+| `abp_hf` → ABPs/ABPd/ABPm (var 153–155) | `tasks/abp_hf` (ABPm_hf ≥ 30 ticks) | already existed; built with the MIMIC `build_abp_hf_task.py` |
+| `lab_est_full` (19 labs) | `tasks/lab_est_full` (17 registry labs present at UCSF) | |
+
+Build of 2026-09-28 (jobs 50534–50541): 21,468 linked patients, 9.68 M lab rows kept from 4,054 shards, 38,182 entities with
+labs (229 linked entities without any), 12.55 M lab events, 4 partitions on 38,400 entities, `demographics.csv` 38,778 rows
+(367 without age). Labs on the 500 sampled entities shared with the CA-cohort store are identical (same tables, same clock
+rule). Task sizes (train / val / test):
+
+| Task | Entities | train / val / test |
+|---|---|---|
+| `lab_est_full` | 34,513 | 18,649 / 8,007 / 7,857 |
+| `lab6_any_min2` | 29,828 | 15,999 / 6,955 / 6,874 |
+| `nbp_est_hf` | 37,050 | 20,178 / 8,519 / 8,353 |
+| `vital_est_hf` (existing) | 37,916 | 20,644 / 8,716 / 8,556 |
+| `abp_hf` (existing) | 22,303 | 12,072 / 5,140 / 5,091 |
+
+Timestamps: labs use the specimen **collection** time (`Lab_Collection_Date/Time`); medication actions are not extracted
+for UCSF (the filtered tables hold orders only, no MAR — an action stage would have to use `Medication_Order_Start_Date/Time`).
+
 ### `vitals_hf.npy` — dense monitor numerics
 
 `float32 [N_seg, 15, n_var]`, C-contiguous, NaN = no reading. Slot `k` of segment `i`

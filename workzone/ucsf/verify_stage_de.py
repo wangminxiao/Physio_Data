@@ -55,14 +55,19 @@ def main():
     check("G1 >= 95 % of entities linked to an encounter", frac_linked >= 0.95, f"linked={linked.height}/{link.height} ({frac_linked:.3f})")
     check("G1 admission window contains the wave start for >= 80 % of linked entities", contains / max(1, linked.height) >= 0.8, f"{contains}/{linked.height}")
     info["link_rules"] = {r["link_rule"]: r["len"] for r in link.group_by("link_rule").len().to_dicts()}
-    linked_ids = set(linked["entity_id"].to_list())
+    # Stage A enumerates more wave cycles than Stage B keeps (short / invalid cycles): the D/E denominators are the
+    # linked entities that exist in the store
+    linked_all = set(linked["entity_id"].to_list())
+    linked_ids = {e for e in linked_all if (store / e / "meta.json").exists()}
+    info["n_linked_in_store"] = len(linked_ids); info["n_linked_without_stage_b"] = len(linked_all) - len(linked_ids)
+    print(f"  linked entities in the store: {len(linked_ids)} (Stage-A-only: {len(linked_all) - len(linked_ids)})", flush=True)
 
     # ---- G2
     p2 = inter / "stage_d_labs_phase2_status.parquet"
     if p2.exists():
         st = pl.read_parquet(p2); by = {r["status"]: r["len"] for r in st.group_by("status").len().to_dicts()}
         n_err = by.get("error", 0); n_ok = by.get("ok", 0) + by.get("ok_empty", 0) + by.get("already_done", 0)
-        check("G2 stage D: no errors, ok+ok_empty >= 98 % of linked", n_err == 0 and n_ok >= 0.98 * len(linked_ids), f"by_status={by} linked={len(linked_ids)}")
+        check("G2 stage D: no errors, ok+ok_empty >= 98 % of linked entities in the store", n_err == 0 and n_ok >= 0.98 * len(linked_ids), f"by_status={by} linked_in_store={len(linked_ids)}")
         tot = {v: 0 for v in LAB6}
         if "per_var_count" in st.columns:
             for s in st.filter(pl.col("status") == "ok")["per_var_count"].to_list():
@@ -79,7 +84,7 @@ def main():
     if pe.exists():
         se = pl.read_parquet(pe); by = {r["status"]: r["len"] for r in se.group_by("status").len().to_dicts()}
         n_ok = by.get("ok", 0) + by.get("already_done", 0)
-        check("G3 stage E: no errors, ok >= 98 % of linked", by.get("error", 0) == 0 and n_ok >= 0.98 * len(linked_ids), f"by_status={by}")
+        check("G3 stage E: no errors, ok >= 98 % of linked entities in the store", by.get("error", 0) == 0 and n_ok >= 0.98 * len(linked_ids), f"by_status={by} linked_in_store={len(linked_ids)}")
     else:
         check("G3 stage E status file present", False, str(pe))
 
