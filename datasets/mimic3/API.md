@@ -241,4 +241,4 @@ auto-encode to integer IDs 1..C (0 reserved for unknown/pad).
   `kidney_traj` 1,906/408/408 → 2,187/469/468 (4,813 / 3,124; 2,568 / 154 / 556). Cohorts grew because events that used to sit
   4–5 h before the wave window now fall inside it.
 * Only naive→epoch helper: `workzone/common/clock_utils.wall_ms` / `wall_ms_array`. Plan and evidence:
-  `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`.
+  `datasets/CLOCK_FIX_PLAN_MIMIC_MOVER.md`; independent raw-data audit (before/after, 300 entities): `datasets/mimic3/ALIGNMENT_AUDIT.md`.
