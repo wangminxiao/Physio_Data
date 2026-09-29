@@ -1,6 +1,6 @@
 #!/bin/bash
 # ucsf_all — pyPPG sidecars, companion of ucsf_all_pyppg.sbatch for the shared CPU nodes of the b.q partition
-# (node191/node192: 60 cores, node193: 28). Same extractor (v3), same entity list; the two arrays split the work by a COMMON
+# (CPU-only on any b.q node: node01-03/41/81 GPU nodes have 60-64 idle CPUs, node191-193 CPU nodes). Same extractor (v3), same entity list; the two arrays split the work by a COMMON
 # shard count so no entity is touched twice:
 #   NSHARDS=40  xhu40-n01 (ucsf_all_pyppg.sbatch)  --array=0-7     (8 shards, 32 cores each, one at a time)
 #               b.q       (this file)              --array=8-39    (32 shards, 28 cores each, 5 concurrent on node191/192/193)
@@ -8,7 +8,7 @@
 #   NSHARDS=40 FAST_JPG=1 sbatch --array=8-39 ../slurm/ucsf_all_pyppg_bq.sbatch
 #SBATCH --job-name=ucsf_all_pyppg_bq
 #SBATCH --partition=b.q
-#SBATCH --nodelist=node191,node192,node193
+# (no --nodelist: any b.q node; CPU only, no GPU requested)
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=28
