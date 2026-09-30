@@ -8,10 +8,10 @@
 #   NSHARDS=40 FAST_JPG=1 sbatch --array=8-39 ../slurm/ucsf_all_pyppg_bq.sbatch
 #SBATCH --job-name=ucsf_all_pyppg_bq
 #SBATCH --partition=b.q
-# (no --nodelist: any b.q node; CPU only, no GPU requested. 40 cores => at most ONE shard per 60/64-core GPU node, leaving >= 20 cores for GPU training jobs)
+# (no --nodelist: any b.q node; CPU only, no GPU requested. 44 cores => at most ONE shard per 60/64-core GPU node, leaving 16 (60-core) / 20 (64-core) cores for a GPU training job)
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=40
+#SBATCH --cpus-per-task=44
 #SBATCH --mem=96G
 #SBATCH --time=7-00:00:00
 #SBATCH --output=%x_%A_%a.out
