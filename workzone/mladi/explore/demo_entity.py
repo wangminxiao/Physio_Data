@@ -26,6 +26,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import clock  # noqa: E402  (workzone/mladi/clock.py: the MLADI time base)
+
 RAW = "/ocean/projects/med250003p/shared/mladi_extract_2023_waves"
 WAV = "/ocean/projects/med250003p/shared/pretrain_wav_v2"
 INTER = "/ocean/projects/med250003p/mwang11/Physio_Data/workzone/outputs/mladi"
@@ -133,9 +136,16 @@ def main():
     start_s = seg[:, 2]; n_seg = start_s.size
     S = {"base": base, "n_seg": int(n_seg)}
     with h5py.File(os.path.join(RAW, base + ".h5"), "r") as f:
-        o_ms, o_str, tz, tz_resolved = origin_ms(f)
-        S.update(time_origin=o_str[:4] + "-..", tz_stamped=tz, tz_resolved=tz_resolved)
-        time_ms = o_ms + np.round(start_s * 1000).astype(np.int64)
+        W, label = clock.parse_origin(json.loads(f.attrs[".meta"])["time_origin"])
+        disch_s = None
+        if "ehr/demographic" in f and "dischDate" in f["ehr/demographic"].dtype.names:
+            v_ = float(f["ehr/demographic"][0]["dischDate"]); disch_s = v_ if np.isfinite(v_) else None
+        grid = clock.Grid(W, start_s[0])
+        time_ms = grid.dwc(start_s, W)
+        ehr_shift_min = (clock.ehr_origin_wall(W, label, disch_s) - W).total_seconds() / 60
+        S.update(time_origin_year=W.year, tz_stamped=label, ehr_origin_shift_min=ehr_shift_min,
+                 raw_vs_grid_span_diff_min=float(((start_s[-1] - start_s[0]) * 1000 - (time_ms[-1] - time_ms[0])) / 60000))
+        o_ms = None
         assert np.all(np.diff(time_ms) > 0)
         # ---- waveforms on the mmap grid, no band-pass
         runs, r0 = [], 0
@@ -207,25 +217,25 @@ def main():
                 a_ = f["data/numerics/" + k][:]
                 t = a_["time"].astype(float); v = a_["value"].astype(float)
                 keep = np.r_[True, np.diff(v) != 0] & np.isfinite(v)
-                for tt, vv in zip(t[keep], v[keep]):
-                    nbp.append((o_ms + int(round(tt * 1000)), vid, vv))
+                for tt, vv in zip(grid.dwc(t[keep], W), v[keep]):
+                    nbp.append((int(tt), vid, vv))
         # ---- ehr
         events = []
         if "ehr/low_rate" in f:
             d = factor(f["ehr/low_rate"])
             for nm, t, v in zip(d["eventName"], d["date"], d["resultVal"]):
                 if nm in LOW_RATE and np.isfinite(num(v)) and np.isfinite(num(t)):
-                    events.append((o_ms + int(round(t * 1000)), LOW_RATE[nm], num(v)))
+                    events.append((int(grid.ehr(t, W, label, disch_s)[0]), LOW_RATE[nm], num(v)))
         if "ehr/lab_results" in f:
             d = factor(f["ehr/lab_results"])
             for nm, t, v in zip(d["eventDisp"], d["time"], d["resultVal"]):
                 if nm in LABS and np.isfinite(num(v)) and np.isfinite(num(t)):
-                    events.append((o_ms + int(round(t * 1000)), LABS[nm], num(v)))
+                    events.append((int(grid.ehr(t, W, label, disch_s)[0]), LABS[nm], num(v)))
         if "ehr/medications" in f:
             d = factor(f["ehr/medications"])
             for nm, t, v in zip(d["catalogDisp"], d["time"], d["dose"]):
                 if nm in MEDS and np.isfinite(num(t)):
-                    events.append((o_ms + int(round(t * 1000)), MEDS[nm], num(v)))
+                    events.append((int(grid.ehr(t, W, label, disch_s)[0]), MEDS[nm], num(v)))
         demo_age = None
         if "ehr/demographic" in f:
             d = factor(f["ehr/demographic"])
@@ -264,7 +274,7 @@ def main():
             for kk, a_, b_ in zip(u, i0, np.r_[i0[1:], k.size]):
                 s[kk] = np.median(v[a_:b_])
         return s
-    flat_t = (time_ms[:, None] + (np.arange(n_slot) * 1000)[None, :]).ravel()
+    flat_t = (time_ms[:, None] + (np.arange(n_slot) * 1000)[None, :]).ravel()   # slots sit on the grid
     mon = {vname: minute_series(flat_t, V[:, :, j].ravel()) for j, (_, vname, _) in enumerate(NUM)}
     mon["NBPs"] = None
     if nb.size:                       # cuff readings are sparse: each one stands for +-5 min around it
@@ -338,7 +348,7 @@ def main():
     ax.set_yticks(range(len(ids))); ax.set_yticklabels([names.get(v, str(v)) for v in ids], fontsize=7)
     ax.set_xlabel("hours from waveform start"); ax.set_title("lab results (black) and vasopressor administrations (red)", fontsize=10)
     al = "; ".join(f"{k}: best lag {v['best_lag_min']} min" for k, v in S["alignment"].items())
-    fig.suptitle(f"MLADI demo encounter (canonical, raw H5 -> 30-s grid of pretrain_wav_v2)\n{al}", fontsize=11, x=0.02, ha="left", y=0.995)
+    fig.suptitle(f"MLADI demo encounter (canonical, raw H5 -> 30-s grid of pretrain_wav_v2; clock rule of workzone/mladi/clock.py, EHR origin shift {ehr_shift_min:+.0f} min)\n{al}", fontsize=11, x=0.02, ha="left", y=0.995)
     fig.savefig(os.path.join(out, "demo.png"), dpi=100, bbox_inches="tight"); plt.close(fig)
     json.dump(S, open(os.path.join(out, "summary.json"), "w"), indent=1, default=str)
     log("summary " + json.dumps({k: v for k, v in S.items() if k not in ("base",)}, default=str)[:3000])
