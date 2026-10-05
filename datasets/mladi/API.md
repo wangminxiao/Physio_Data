@@ -85,6 +85,15 @@ pins the offset between the two clocks without physiology.
    `clock_risk` = the rule's error rate in their origin class (2016–19 0.5 %, 2020–23 4 %, 1800 25 %).
 
 Conversion: monitor `utc = NewYork(W + t)`; EHR `utc = NewYork(W_ehr + t)` (rule 3: `W as UTC + t`).
+
+5. **Runs, not rows.** DWC times are synthesized from sample counts, so inside a contiguous run of grid
+   rows (30 s apart, one block) raw elapsed time is real. The monitor grid places each run's FIRST row by
+   the wall rule and adds raw elapsed seconds (`clock.Grid.dwc_rows`). 253 entities (1.5 %) have a run
+   crossing a DST change: 66 at spring-forward with continuous raw time (a per-row wall conversion would go
+   backwards), 187 at fall-back (no backward step, no dropped data). Elsewhere the run rule equals the
+   per-row rule. These entities carry `meta.dst_crossing_runs` and `ehr_dst_note`: EHR events after the
+   change may be 1 h off. The NBP check cannot arbitrate this case, because charted vitals are monitor
+   validations and carry the monitor's own labels.
 **Entity grid (as `ucsf_all`)**: UTC-continuous, anchored at the wall clock of the first segment:
 `time_ms = wall_ms(first segment) + real elapsed ms`. No 1-h gap at spring-forward; the hour the device
 dropped at fall-back stays a real gap. Demo encounter after the rule: charted SBP == monitor NBP at lag 0
