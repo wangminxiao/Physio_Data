@@ -25,22 +25,22 @@ def one(p):
         with h5py.File(p, "r") as f:
             ck = Clock(json.loads(f.attrs[".meta"])["time_origin"])
             if ck.tz == "LMT" or "ehr/low_rate" not in f or "data/numerics/NBP.NBPs" not in f or "data/numerics/NBP.NBPd" not in f:
-                return None
+                return {"why": "no low_rate/NBP or LMT"}
             d = factor(f["ehr/low_rate"])
             name, t, v = d["eventName"], d["date"].astype(float), np.array([num(x) for x in d["resultVal"]])
             sb = (name == "Systolic BP") & np.isfinite(v) & np.isfinite(t)
             db = (name == "Diastolic BP") & np.isfinite(v) & np.isfinite(t)
             if sb.sum() < 6:
-                return None
+                return {"why": "< 6 charted SBP"}
             te = t[sb]; u = ck.ehr_utc(te)
             hits = [(T, k) for T, k in transitions(datetime.fromtimestamp(u.min(), UTC).year, datetime.fromtimestamp(u.max(), UTC).year)
                     if u.min() < T < u.max()]
             if not hits:
-                return None
+                return {"why": "no DST change inside the charted span"}
             T, kind = hits[0]
             ns, nd = f["data/numerics/NBP.NBPs"][:], f["data/numerics/NBP.NBPd"][:]
             if ns.shape != nd.shape:
-                return None
+                return {"why": "NBPs/NBPd lengths differ"}
             tn, vs, vd = ns["time"].astype(float), ns["value"].astype(float), nd["value"].astype(float)
             dmap = dict(zip(np.round(t[db], 0), v[db]))
             rows = []
@@ -53,7 +53,7 @@ def one(p):
                     j = np.argmin(np.abs(x - tn[m] - np.median(x - tn[m])))
                     rows.append(((ck.ehr0 + x - T) / 3600, x - tn[m][j]))
             if len(rows) < 4:
-                return None
+                return {"why": f"{len(rows)} matched pairs"}
             R = np.array(rows)
             gap = None
             if "data/waveforms/Pleth" in f:
@@ -75,7 +75,9 @@ def main():
     random.seed(2)
     pick = random.sample(files, min(int(os.environ.get("N_ENC", 4000)), len(files)))
     with Pool(int(os.environ.get("SLURM_CPUS_PER_TASK", 16))) as pool:
-        R = [r for r in pool.map(one, pick, chunksize=4) if r and "pairs" in r]
+        ALL = pool.map(one, pick, chunksize=4)
+    print("skipped: " + str(collections.Counter(r.get("why") or r.get("error", "")[:80] for r in ALL if r and "pairs" not in r).most_common(12)), flush=True)
+    R = [r for r in ALL if r and "pairs" in r]
     print(f"{len(R)} encounters with >= 4 exact NBP matches whose charted events span a DST change", flush=True)
     summ = collections.Counter()
     for r in R[:40]:
