@@ -6,7 +6,10 @@ only (`/ocean/projects/med250003p/shared/`); nothing leaves PSC except aggregate
 explicitly approved figures. Findings below were measured on PSC 2026-09-28 .. 2026-10-05
 (`workzone/mladi/explore/*.py`, research notes in `explore/README.md`).
 
-**Status: Step 0d draft for review. No extraction script is written until this file is approved.**
+**Status: reviewed 2026-10-05.** User decisions: (1) vitals_hf in **1-s slots**; (2) add the perfusion
+index (`165 PERF_hf`); (3) lab mapping by the Physio_Data conventions of the other cohorts (registry
+lists); (4) actions are their own data type -> `ehr_actions.npy` sidecar as MIMIC v2 / MOVER / MC-MED;
+(5) waveform-only entities included; (6) blood pressure from the 1-Hz numerics only (no ART/ABP waveform).
 
 ## Data Sources
 
@@ -111,8 +114,10 @@ matches), `corrected` (residual ±60 measured → applied), `inferred` (no match
 
 ## Dense sidecars (monitor numerics)
 
-`vitals_hf.npy` float32 `[N_seg, 15, n_var]`, **2-s slots** (same shape convention as `ucsf_all`; the
-1.024-s readings give ~2 per slot, last wins), NaN = none. Values filtered by registry `physio_min/max`.
+`vitals_hf.npy` float32 `[N_seg, 30, n_var]`, **1-s slots** (slot `k` of segment `i` covers
+`[time_ms[i] + k s, +1 s)`; the 1.024-s readings fill ~98 % of slots, one reading per slot, last wins if
+two), NaN = none. `meta.vitals_hf` records `slot_sec = 1`, `slots_per_seg = 30` -- `ucsf_all` uses 2-s
+slots, so readers take the slot size from meta. Values filtered by registry `physio_min/max`.
 
 | idx | var_id | name | source key(s), first available |
 |---|---|---|---|
@@ -126,9 +131,9 @@ matches), `corrected` (residual ±60 measured → applied), `inferred` (no match
 | 7 | 113 | PR_art | ART.Pulse → ABP.Pulse |
 | 8 | 160 | CVP_hf | CVP.CVPm |
 | 9 | 164 | PVCrate_hf | PVC.PVC |
-| 10 | *165* | *PERF_hf* (new) | Perf.Perf (perfusion index) |
+| 10 | 165 | PERF_hf (new, approved) | Perf.Perf (perfusion index) |
 
-`vitals_hf_abp_src.npy` uint8 `[N_seg, 15]`: 0 none, 1 ART, 2 ABP (lines never mixed in a slot).
+`vitals_hf_abp_src.npy` uint8 `[N_seg, 30]`: 0 none, 1 ART, 2 ABP (lines never mixed in a slot).
 `nbp_events.npy` (EHR_EVENT_DTYPE, var 157/158/159 = NBPs/d/m_hf): one event per cuff reading (value
 change), at the reading time. Stage G writes `ehr_hf.npy` (MIMIC-compatible pair-end convention of
 `mimic3/stage3b_extract_numerics.py`, var 150–159) for the phase-4 readers, as `ucsf_all` does.
@@ -144,27 +149,40 @@ Times through `clock.py` (EHR rule); values numeric only; units checked per row 
 
 | var | registry | MLADI analytes (encounters) |
 |---|---|---|
+Mapping follows what the registry already does for the other cohorts:
+- K, Na, glucose, lactate: central lab **plus** whole-blood / blood-gas / point-of-care results (MIMIC
+  50822/50824/50809/50813, UCSF POTASSIUMBLOOD / SODIUMWB / GLUCOSE METERDOWNLOAD, MC-MED POC lactate).
+- Calcium: **total** calcium only (mg/dL, range 4–15); ionized calcium (mmol/L) is not this variable.
+- Creatinine: central lab only (MIMIC 50912, UCSF, MC-MED) -- iSTAT creatinine not mapped.
+- Hemoglobin: laboratory plus calculated (UCSF HGB(CALCULATED)).
+- HCO3: chemistry total CO2 plus blood-gas bicarbonate (MC-MED CO2/POC:HCO3/HCO3, MOVER-Epic Carbon dioxide/Bicarbonate).
+- Blood gases: the registry variables are ARTERIAL; MLADI separates arterial and venous, so only arterial.
+
+| var | registry | MLADI analytes (encounters) |
+|---|---|---|
 | 0 | Potassium | K (11,748) · Potassium(K) Whole Blood (2,168) · Potassium iSTAT (1,684) · Potassium Level (877) |
-| 1 | Calcium (total, mg/dL) | Ca (11,670) · Calcium Level (1,088) — *ionized excluded* |
+| 1 | Calcium (total) | Ca (11,670) · Calcium Level (1,088) |
 | 2 | Sodium | Na (11,748) · Sodium(Na) Whole Blood (1,546) · Sodium Istat (1,684) · Sodium (Na) Level (591) |
 | 3 | Glucose | Glucose (11,698) · Glucose (bedside) (6,287) · Glucose POC (2,068) · Glucose iSTAT (1,684) · Glucose Level Whole Blood (1,586) · Glucose Whole Blood (1,564) · Glucose Level (1,525) |
-| 4 | Lactate | Lactate (5,986) · Lactate, Whole Blood (6,959) · Lactate Whole Blood (4,196) · Lactate Whole Blood (Syringe) (2,384) |
-| 5 | Creatinine | Cr (11,743) · Creatinine iSTAT (1,961) |
+| 4 | Lactate | Lactate, Whole Blood (6,959) · Lactate (5,986) · Lactate Whole Blood (4,196) · Lactate Whole Blood (Syringe) (2,384) |
+| 5 | Creatinine | Cr (11,743) |
 | 6 | Bilirubin | Bili, Total (10,182) |
 | 7 | Platelets | Platelets (11,757) |
 | 8 | WBC | WBC (11,753) |
-| 9 | Hemoglobin | Hgb (11,757) · Hemoglobin-Arterial (573) |
+| 9 | Hemoglobin | Hgb (11,757) · Calc. Hemoglobin iSTAT (1,684) · Hemoglobin-Arterial (573) |
 | 10 | INR | INR (10,213) |
 | 11 | BUN | BUN (11,747) |
 | 12 | Albumin | Albumin (10,247) |
 | 13 | Arterial_pH | pHa (4,912) |
-| 14 | paO2 | *arterial pO2 name to confirm in Stage D vocab* |
-| 15 | paCO2 | *arterial pCO2 name to confirm* |
-| 16 | HCO3 | CO2 (BMP, 11,748) · HCO3a (4,912) · HCO3 (2,046) — as MC-MED's mapping (CO2, POC:HCO3, HCO3) |
+| 14 | paO2 | PaO2 (4,912) · Arterial pO2 (POC) (341) |
+| 15 | paCO2 | PaCO2 (4,912) · Arterial pCO2 (POC) (341) |
+| 16 | HCO3 | CO2 (11,748) · HCO3a (4,912) · HCO3 (2,046) |
 | 17 | AST | AST/SGOT (10,174) |
 | 18 | ALT | ALT/SGPT (10,174) |
 
-Venous gases (pHv, HCO3v, Venous pO2/pCO2) are not mapped (no registry variable).
+Not mapped (no registry variable): venous gases (pHv, HCO3v, Venous pO2/pCO2), ionized calcium,
+iSTAT creatinine, urinalysis. Each row's decoded `resultUnit` is checked against the registry unit
+(mMol/L == mEq/L for K/Na; X10E+09/L == K/uL); any other unit is dropped and counted.
 
 ### Vitals, charted (var_id 100–199, `low_rate.eventName`)
 
@@ -177,28 +195,48 @@ Venous gases (pHv, HCO3v, Venous pO2/pCO2) are not mapped (no registry variable)
 | 104/105/106 | NBPs/d/m | Systolic BP / Diastolic BP / Mean blood pressure |
 | 108 | GCS_total | Glasgow Coma Score · Glascow Coma Score |
 | 110/111/112 | ABPs/d/m | Arterial Systolic Pr(essure) / Arterial Diastolic P(ressure) / Mean arterial pressu(re) |
+| 107 | CVP | Central Venous Press · Central Venous Pressure |
 | 117 | O2_flow | Oxygen per liter |
-| 116, 107 | EtCO2, CVP | *names to confirm in Stage D vocab* |
 
-### Actions (var_id 200–299)
+Temperature rows are unit-checked (°C kept, °F converted, "Temperature Conversi(on)" rows taken only with
+a temperature unit). End-tidal CO2 is not charted in `low_rate`; it exists only as monitor numerics
+(CO₂.etCO₂, ~1.6 % of files) and is not mapped in v1.
+
+### Actions (var_id 200–299) -> `ehr_actions.npy` sidecar
+
+Actions are their own data type in Physio_Data: a per-entity **`ehr_actions.npy`** sidecar (same dtype
+as `ehr_events`, same four-way time split by `seg_idx` sentinels), never written into `ehr_events.npy`
+-- the convention of `mimic3/stage3b_actions_v2.py`, `mover_combine/stage3b_actions.py`,
+`mcmed/stage3b_actions.py`. Value semantics shared with them: native dose / rate where the source gives
+one, `0.0` = stopped (when a stop is charted), `NaN` = "occurred, magnitude unknown"; var 200 (NE-
+equivalent aggregate) = NaN presence at each vasopressor administration, as MOVER / MC-MED, until a
+continuous rate exists. Drug -> var_id with the same matcher rules (systemic routes only; ophthalmic /
+nasal / inhaled / topical / flush excluded; lidocaine / bupivacaine and drug-in-vehicle piggybacks are not
+fluid actions).
 
 | var | registry | MLADI source |
 |---|---|---|
-| 203 | FiO2 (fraction) | low_rate "Oxygen % (FiO2)", "FIO2" (÷100) |
+| 200 | vasopressor_rate (NE-eq) | NaN presence at any 207–213 administration (v1) |
+| 201 / 202 | fluid rate / bolus | medications: Sodium Chloride 0.9 %, Lactated Ringers, Plasma-Lyte (IV) -- volumeDose mL |
+| 203 | FiO2 (fraction) | low_rate "Oxygen % (FiO2)", "FIO2" (÷ 100) |
 | 204 | PEEP | low_rate "Positive end expiratory pressure (PEEP)" |
-| 206 | urine_output (mL) | infusions_and_outputs name = "Urine Output", volume |
-| 207–213 | vasopressors | medications catalogDisp norepinephrine / epinephrine / phenylephrine / dopamine / vasopressin / dobutamine / ePHEDrine |
-| 215 | insulin | catalogDisp insulin regular / lispro / glargine / … |
-| 217 / 218 / 219 | K / Ca / bicarbonate replacement | potassium chloride / calcium chloride / sodium bicarbonate |
+| 205 | mechvent | low_rate ventilator status rows ("RRT Vent Status", "RRT Ventilator Type") -> 1 |
+| 206 | urine_output (mL) | infusions_and_outputs name "Urine Output", volume |
+| 207–213 | per-drug vasopressors | medications catalogDisp norepinephrine / epinephrine / phenylephrine / dopamine / vasopressin / dobutamine / ePHEDrine: charted dose (native unit) |
+| 214 | prbc_transfusion | infusions_and_outputs "Blood Products/Colloids" with a red-cell `detail` |
+| 215 | insulin | catalogDisp insulin regular / lispro / glargine / … (Unit(s)) |
+| 216 | dextrose_hi | dextrose 50 % / 10 % |
+| 217 / 218 / 219 / 220 | K / Ca / bicarbonate replacement, hypertonic saline | potassium chloride / calcium chloride (and gluconate) / sodium bicarbonate / NaCl 3 % |
 
-v1 stores each administration as an event with `value` = the charted `dose` when its `doseUnit`
-converts to the registry unit, else NaN (event marker). **Infusion RATES** (registry mcg/kg/min) need
-weight and the infusion stream — deferred to a post-stage (`tasks/`), not guessed here.
+MLADI medication `doseUnit` is an amount (mg, mcg, mL, Unit(s); rates only in ~0.5 % of encounters), so
+v1 has no continuous vasopressor rate. A later version can derive it from `infusions_and_outputs`
+"Continuous Infusions" (volume per charting interval x concentration parsed from `detail` / weight from
+low_rate "Dosing Weight (kg)") -- documented, not guessed in v1.
 
 ### Scores (300–399): none in v1.
 
 ### New variables (registry additions — need approval)
-- `165 PERF_hf` (perfusion index, unitless, source Perf.Perf, `source: dwc_numerics`).
+- `165 PERF_hf` (perfusion index, unitless, source Perf.Perf, `source: dwc_numerics`) -- **approved**.
 - Registry fields `mladi_*` (`mladi_lab_names`, `mladi_low_rate_names`, `mladi_med_names`,
   `mladi_numerics_keys`) carrying the mapping above, as for the other cohorts.
 
@@ -217,7 +255,7 @@ death from dischDisp) are task post-stages, not canonical fields.
 |---|---|
 | Segment | 30 s, **no overlap** (as UCSF / MC-MED; MIMIC uses 25-s stride) |
 | PLETH40 / II120 | 1200 / 3600 samples, float16, C-contiguous |
-| vitals_hf | 2-s slots, 15 per segment |
+| vitals_hf | 1-s slots, 30 per segment |
 | EHR trajectory | context 24 h, baseline cap 30 d, future cap 7 d (`physio_data/ehr_trajectory.py`) |
 | Entities | every HDF5 with Pleth and ≥ 1 `pretrain_wav_v2` row (≈ 16.4 k); EHR optional (`has_ehr`) — phase-2 pretraining uses waveform-only entities too |
 | Splits | `pretrain_splits.json` = `downstream_splits.json`: **e1 split kept** (patient-level 70/15/15, seed 42, 9,218 / 1,976 / 1,974 encounters); entities outside e1 take their patient's e1 split if it has one, else a patient-hash 70/15/15 (seed 42); no patient on two sides |
@@ -229,7 +267,8 @@ death from dischDisp) are task post-stages, not canonical fields.
 | A | `stage_a_inventory.py` | per-entity inventory (channels, rows, numerics keys, EHR tables, clock class, NBP-match clock check) → `inventory.parquet` |
 | B | `stage_b_wave.py` | PLETH40, II120, time_ms, meta.json (grid = mmap rows; raw; NaN for invalid) |
 | C | `stage_c_vitals_hf.py` | vitals_hf.npy, vitals_hf_abp_src.npy, nbp_events.npy |
-| D | `stage_d_ehr.py` | ehr_baseline / recent / events / future (labs, charted vitals, actions) |
+| D | `stage_d_ehr.py` | ehr_baseline / recent / events / future (labs, charted vitals) |
+| D2 | `stage_d2_actions.py` | ehr_actions.npy (actions, var 200–220) |
 | E | `stage_e_meta.py` | meta.json completed (clock, coverage, counts) |
 | F | `stage_f_manifest.py` | manifest.json, pretrain_splits.json, downstream_splits.json, demographics.csv |
 | G | `stage_g_ehr_hf.py` | ehr_hf.npy (MIMIC-compatible numerics events) |
@@ -244,6 +283,7 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
 | B | errors ≤ 1 %; shapes/dtypes/contiguity; N_seg == mmap rows; `time_ms` strictly increasing, 30-s steps inside blocks; 300-entity sample: band-passed rows vs mmap r ≥ 0.98; NaN fraction < 20 % |
 | C | sidecar shapes; HR_hf coverage median ≥ 0.8; NBP events in range; ECG-derived HR vs HR_hf corr ≥ 0.6 on 40 entities |
 | D | event dtype, sorted, `seg_idx` bounds / sentinels, var_id in registry, no event in two partitions; NBP residual check re-run on the written events |
+| D2 | `ehr_actions` dtype / sentinels / var_id ∈ 200–220; vasopressor share among ART encounters plausible; no action var in `ehr_events` |
 | F | splits disjoint by entity and patient; e1 assignments preserved; manifests consistent |
 
 ## Known Issues / Quirks
@@ -262,11 +302,12 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
 
 ## Output Specification
 `/ocean/projects/med250003p/shared/physio_data/mladi/{entity_id}/`: PLETH40.npy, II120.npy, time_ms.npy,
-ehr_baseline.npy, ehr_recent.npy, ehr_events.npy, ehr_future.npy, vitals_hf.npy,
+ehr_baseline.npy, ehr_recent.npy, ehr_events.npy, ehr_future.npy, ehr_actions.npy, vitals_hf.npy,
 vitals_hf_abp_src.npy, nbp_events.npy, ehr_hf.npy, meta.json; plus manifest.json, pretrain_splits.json,
 downstream_splits.json, demographics.csv, tasks/.
 
-**Storage**: PLETH40 + II120 ≈ 183 M segments × 9.6 kB ≈ **1.76 TB**; sidecars ≈ 0.12 TB; total ≈ 1.9 TB.
+**Storage**: PLETH40 + II120 ≈ 183 M segments × 9.6 kB ≈ **1.76 TB**; vitals_hf (1-s, 11 vars) ≈
+183 M × 30 × 11 × 4 B ≈ 0.24 TB; total ≈ 2.0 TB.
 Project free space 2.49 TiB → ≈ 0.6 TiB left. Retiring `pretrain_wav_v2` after the canonical store is
 verified (user decision) frees ≈ 1.76 TB.
 
