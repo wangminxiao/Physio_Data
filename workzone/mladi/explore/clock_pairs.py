@@ -39,16 +39,17 @@ def one(p):
                 return {"why": "no DST change inside the charted span"}
             T, kind = hits[0]
             ns, nd = f["data/numerics/NBP.NBPs"][:], f["data/numerics/NBP.NBPd"][:]
-            if ns.shape != nd.shape:
-                return {"why": "NBPs/NBPd lengths differ"}
-            tn, vs, vd = ns["time"].astype(float), ns["value"].astype(float), nd["value"].astype(float)
+            tn, vs = ns["time"].astype(float), ns["value"].astype(float)
+            # NBPd is its own series (lengths can differ): its value at each NBPs time, NaN if absent
+            dd_map = dict(zip(np.round(nd["time"].astype(float), 1), nd["value"].astype(float)))
+            vd = np.array([dd_map.get(x, np.nan) for x in np.round(tn, 1)])
             dmap = dict(zip(np.round(t[db], 0), v[db]))
             rows = []
             for x, a_ in zip(te, v[sb]):
                 b_ = dmap.get(round(x, 0))
                 if b_ is None:
                     continue
-                m = (np.abs(vs - a_) <= 0.5) & (np.abs(vd - b_) <= 0.5) & (np.abs(x - tn) <= 4 * 3600)
+                m = (np.abs(vs - a_) <= 0.5) & ((np.abs(vd - b_) <= 0.5) | np.isnan(vd)) & (np.abs(x - tn) <= 4 * 3600)
                 if m.any():
                     j = np.argmin(np.abs(x - tn[m] - np.median(x - tn[m])))
                     rows.append(((ck.ehr0 + x - T) / 3600, x - tn[m][j]))
