@@ -22,12 +22,13 @@ def main():
     ap.add_argument("--inv", default=os.path.join(C["intermediate_dir"], "stage_a", "inventory.jsonl"))
     ap.add_argument("--out", default=C["output_dir"]); ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--pretrain-wav-dir", default=C["pretrain_wav_dir"])
+    ap.add_argument("--sample-only", action="store_true", help="skip the completion check (trial outputs)")
     a = ap.parse_args()
     inc = [json.loads(l) for l in open(a.inv)]; inc = {r["entity_id"]: r for r in inc if r.get("included")}
     done = [e for e in inc if os.path.exists(os.path.join(a.out, e, "meta.json"))
             and json.load(open(os.path.join(a.out, e, "meta.json"))).get("stage_b", {}).get("done")]
     res, fails = {"n_included": len(inc), "n_done": len(done)}, []
-    if len(done) < 0.99 * len(inc): fails.append(f"done {len(done)} < 99% of {len(inc)}")
+    if len(done) < 0.99 * len(inc) and not a.sample_only: fails.append(f"done {len(done)} < 99% of {len(inc)}")
     random.seed(0)
     S = random.sample(done, min(a.n, len(done)))
     bp = {"PLETH40": butter(4, [0.5 / 20, 12.0 / 20], "band"), "II120": butter(4, [0.5 / 60, 50.0 / 60], "band")}
