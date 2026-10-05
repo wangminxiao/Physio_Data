@@ -68,6 +68,15 @@ def find(ds, t, lo=0):
     return lo
 
 
+def num(v):
+    """A charted value as float, or NaN: audata may hold resultVal as a factor (text like '120/80')."""
+    try:
+        x = float(v)
+        return x if np.isfinite(x) else float("nan")
+    except (TypeError, ValueError):
+        return float("nan")
+
+
 def factor(ds):
     a = ds[:]
     cm = json.loads(ds.attrs[".meta"]).get("columns", {}) if ".meta" in ds.attrs else {}
@@ -205,18 +214,18 @@ def main():
         if "ehr/low_rate" in f:
             d = factor(f["ehr/low_rate"])
             for nm, t, v in zip(d["eventName"], d["date"], d["resultVal"]):
-                if nm in LOW_RATE and np.isfinite(v):
-                    events.append((o_ms + int(round(t * 1000)), LOW_RATE[nm], float(v)))
+                if nm in LOW_RATE and np.isfinite(num(v)) and np.isfinite(num(t)):
+                    events.append((o_ms + int(round(t * 1000)), LOW_RATE[nm], num(v)))
         if "ehr/lab_results" in f:
             d = factor(f["ehr/lab_results"])
             for nm, t, v in zip(d["eventDisp"], d["time"], d["resultVal"]):
-                if nm in LABS and np.isfinite(v):
-                    events.append((o_ms + int(round(t * 1000)), LABS[nm], float(v)))
+                if nm in LABS and np.isfinite(num(v)) and np.isfinite(num(t)):
+                    events.append((o_ms + int(round(t * 1000)), LABS[nm], num(v)))
         if "ehr/medications" in f:
             d = factor(f["ehr/medications"])
             for nm, t, v in zip(d["catalogDisp"], d["time"], d["dose"]):
-                if nm in MEDS and np.isfinite(t):
-                    events.append((o_ms + int(round(t * 1000)), MEDS[nm], float(v) if np.isfinite(v) else np.nan))
+                if nm in MEDS and np.isfinite(num(t)):
+                    events.append((o_ms + int(round(t * 1000)), MEDS[nm], num(v)))
         demo_age = None
         if "ehr/demographic" in f:
             d = factor(f["ehr/demographic"])
