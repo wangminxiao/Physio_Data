@@ -14,8 +14,11 @@ datasets/mladi/API.md "Time base"):
     when the origin and the discharge lie on different sides of a DST change.  Checked against charted
     Systolic/Diastolic BP that equal the monitor's cuff reading to the mmHg: the rule predicts the
     observed charted-minus-monitor offset (0 / -60 / +60 min) in 96 % of 2,361 encounters.
-  * LMT (year 1800) origins, and the year-1990 ones: EHR seconds are elapsed from the origin read as
-    UTC (offset +240 / +300 min against the wall-clock monitor stream).
+  * LMT (year 1800) origins: EHR seconds are elapsed from the origin read as UTC (offset +240 / +300 min
+    against the wall-clock monitor stream) in ~75 % of the checkable files; the rest follow local time.
+    Year-1990 origins follow the general rule (checked: the UTC reading was off by -300 min in 58/60).
+  * Per encounter, Stage A measures the residual against exact charted-vs-monitor NBP matches and later
+    stages apply it when it is a known zone offset (+-60, +-240, +-296, +-300 min); see stage_a_inventory.
 
 The entity grid follows the UCSF store: UTC-CONTINUOUS, anchored at the wall clock of the first
 segment.  "wall ms" = a naive New York wall-clock datetime encoded as ms since 1970-01-01 as if UTC;
@@ -32,7 +35,7 @@ import numpy as np
 NY = ZoneInfo("America/New_York")
 MS_PER_HOUR = 3_600_000
 _EPOCH = datetime(1970, 1, 1)
-UTC_ORIGIN_YEARS = (1800, 1990)          # EHR seconds measured from the origin read as UTC
+UTC_ORIGIN_YEARS = (1800,)               # EHR seconds measured from the origin read as UTC (LMT origins)
 
 
 def parse_origin(time_origin: str):

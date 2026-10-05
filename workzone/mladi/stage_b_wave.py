@@ -137,7 +137,7 @@ def one(task):
         assert tms.size == n and np.all(np.diff(tms) > 0), "time_ms not strictly increasing"
         np.save(os.path.join(od, "time_ms.npy"), tms)
         meta = {k: row.get(k) for k in ("entity_id", "patient_id", "e1_split", "origin_year", "origin_label", "clock_rule",
-                                        "disch_s", "ehr_origin_shift_min", "ehr_extra_shift_min", "clock_confidence",
+                                        "disch_s", "ehr_origin_shift_min", "ehr_extra_shift_min", "clock_confidence", "clock_risk",
                                         "clock_check", "has_ehr", "ecg_filter", "lab_within_24h_frac", "lab_within_7d")}
         meta.update(source_dataset="mladi", n_seg=int(n), seg_duration_sec=30.0, seg_stride_sec=30.0,
                     channels={"PLETH40": {"fs": 40, "samples_per_seg": 1200, "unit": "DWC Pleth (raw)"},

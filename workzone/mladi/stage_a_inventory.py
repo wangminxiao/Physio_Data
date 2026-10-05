@@ -11,10 +11,12 @@ One row per raw HDF5 (= encounter = entity), written to <intermediate>/stage_a/i
   clock      origin year / label, clock_rule, discharge seconds, ehr_origin_shift_min (the rule of
              workzone/mladi/clock.py), and the CHECK: charted SBP/DBP vs monitor NBP exact matches after
              conversion -> residual offset (min), n matches, clock_confidence:
-               verified   residual within +-2 min on >= 3 matched readings
-               corrected  residual +-60 (+-2) on >= 3 -> ehr_extra_shift_min applied by later stages
+               verified   residual within +-5 min on >= 3 matched readings
+               corrected  residual within 5 min of a zone offset (+-60, +-240, +-296, +-300) on >= 3
+                          -> ehr_extra_shift_min, applied by later stages
                conflict   any other residual on >= 3
-               inferred   fewer than 3 matches (rule only)
+               inferred   fewer than 3 matches (rule only); clock_risk = the rule's error rate in the
+                          entity's origin class
   included   has Pleth and >= 1 grid row (the canonical store's entity set)
 
 Resumable: entities already in inventory.jsonl are skipped. Prints a running summary every 1000.
@@ -38,6 +40,9 @@ USED_NUMERICS = ["HR.HR", "SpO₂.SpO₂", "RR.RR", "SpO₂.Pulse", "Perf.Perf",
 EHR_TABLES = ["lab_results", "low_rate", "medications", "infusions_and_outputs", "diagnostic_codes",
               "demographic", "patient", "location", "csce", "culture_sensitivity"]
 DAY_MS = 86_400_000
+# Zone offsets a whole encounter's EHR clock can be off by (min): DST (+-60), UTC vs EDT / EST
+# (+-240 / +-300), UTC vs LMT (+-296). A measured residual near one of them is corrected.
+KNOWN_OFFSETS = (60, -60, 240, -240, 296, -296, 300, -300)
 
 
 def log(*a):
@@ -129,14 +134,19 @@ def one(path):
             cc = r["clock_check"]
             if cc["n_matches"] >= 3 and cc["residual_min"] is not None:
                 res = cc["residual_min"]
-                if abs(res) <= 2:
+                near = min(KNOWN_OFFSETS, key=lambda X: abs(res - X))
+                if abs(res) <= 5:
                     r["clock_confidence"], r["ehr_extra_shift_min"] = "verified", 0
-                elif abs(abs(res) - 60) <= 2:
-                    r["clock_confidence"], r["ehr_extra_shift_min"] = "corrected", -int(np.sign(res)) * 60
+                elif abs(res - near) <= 5:
+                    r["clock_confidence"], r["ehr_extra_shift_min"] = "corrected", -int(near)
                 else:
                     r["clock_confidence"], r["ehr_extra_shift_min"] = "conflict", 0
             else:
                 r["clock_confidence"], r["ehr_extra_shift_min"] = "inferred", 0
+            # estimated chance the rule is wrong for an entity that cannot be checked (from the
+            # checkable ones of its origin class, Stage A of 2026-10-05)
+            y = r["origin_year"]
+            r["clock_risk"] = 0.25 if y == 1800 else (0.04 if y >= 2020 else 0.005)
             # ---- lab coverage of the waveform span
             if ehr is not None and "lab_results" in ehr and ehr["lab_results"].shape[0]:
                 lt = ehr["lab_results"]["time"][:].astype(float); lt = lt[np.isfinite(lt)]
