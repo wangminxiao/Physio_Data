@@ -1,0 +1,274 @@
+# MLADI Dataset API
+
+Pitt MLADI: Philips IntelliVue bedside-monitor recordings exported by Data Warehouse Connect (DWC),
+one HDF5 per encounter with that encounter's EHR tables inside the same file. Lives on PSC Bridges-2
+only (`/ocean/projects/med250003p/shared/`); nothing leaves PSC except aggregate statistics and
+explicitly approved figures. Findings below were measured on PSC 2026-09-28 .. 2026-10-05
+(`workzone/mladi/explore/*.py`, research notes in `explore/README.md`).
+
+**Status: Step 0d draft for review. No extraction script is written until this file is approved.**
+
+## Data Sources
+
+### Waveform
+
+| Field | Value |
+|-------|-------|
+| Format | HDF5, **audata 1.1** (root `.meta` = `{audata_version, time_origin}`) |
+| Location | `/ocean/projects/med250003p/shared/mladi_extract_2023_waves/<base>.h5` (20,161 files, 26.7 TB) |
+| Channels | `/data/waveforms/<label>`: compound `(time f8, value f4)`; `.meta.dwc_meta` = {label, samplePeriod (ms), unitLabel, clipLow/High, minTime, maxTime, ECG low/highEdgeFrequency, …} |
+| Present | II 19,760 files · V 19,613 · Resp 19,522 · aVR 16,828 · **Pleth 16,707** · III 12,541 · I 9,044 · **ART 6,692** · MCL 4,054 · **ABP 1,899** · CVP 758 · ICP 669 · … |
+| Rates | Pleth / ART / ABP 125 Hz; II 500 Hz (250 Hz in ~0.7 %) |
+| Monitor numerics | `/data/numerics/<label.sub>` `(time, value)` at **1.024 s**: HR.HR, RR.RR, SpO₂.SpO₂, SpO₂.Pulse, Perf.Perf, PVC.PVC, HR.BeatToBeat, ST (ECG.I/II/III/V/aVx), NBP.NBPs/d/m/Pulse (per cuff reading), **ART.Systolic/Diastolic/Mean/Pulse (6,117 files)**, ABP.ABPs/d/m/Pulse (1,593), Temp.Temp (3,356), CVP.CVPm, ICP.ICPm, QT/QTc, CO₂.etCO₂, awRR, … |
+| Earlier derived set | `/ocean/projects/med250003p/shared/pretrain_wav_v2/`: `<base>_Pleth_40Hz_<n>_1200_mmap.npy`, `<base>_II_120Hz_<n>_3600_mmap.npy` (band-passed, float16), `<base>__meta.json` (`seg_list`), `<base>__numerics.npz`. 16,422 encounters, **183,074,986 thirty-second rows (1.5 M h)**. |
+
+### EHR — Clinical Tables (inside each HDF5, `/ehr/<table>`)
+
+Structured arrays; **integer columns are audata factors**: the per-file `levels` list sits in the
+table's `.meta` attribute (`columns.<col>.levels`), code = index, negative = missing. Decode per file.
+`resultVal` can itself be a factor (text such as `<0.5`); such rows are dropped from numeric variables.
+
+| Table | Files | Key columns | Notes |
+|---|---|---|---|
+| `lab_results` | ~11.8 k | time, orderedAs (panel), **eventDisp (analyte)**, resultVal, resultUnit, normalcy, validDate | 2,563 analytes; CBC/BMP in 11.7 k encounters |
+| `low_rate` | ~11.0 k | date, **eventName**, resultVal, resultUnit, resultStat | charted vitals & nursing items, 335 names |
+| `medications` | ~11.8 k | time, orderedAs, **catalogDisp**, dose, doseUnit, route, volumeDose | 1,084 drugs |
+| `infusions_and_outputs` | ~11.7 k | time, name, detail, volume, unit | Urine Output, Continuous Infusions, Oral Intake, … |
+| `diagnostic_codes` | ~11.8 k | time, type, codeType (ICD-10-CM; ICD-9-CM rare), code, seq | |
+| `demographic` | 19.9 k | race, age, sex, facility, unit, **regDate, dischDate**, ethnicity, encntrType, dischDisp | one row |
+| `patient` | 20.0 k | time, category, pacedMode, resuscitationStatus, clinicalUnit, gender, admitState | |
+| `location` | ~11.9 k | beginDate, endDate, facility, unit | 109 unit codes |
+| `csce` / `culture_sensitivity` | ~7.8 k | code status / orders | |
+
+EHR tables exist for ~57 % of the encounters that have Pleth (1,853 / 3,259 in a 4,000-file sample).
+
+### Patient ID Linkage
+
+```
+base       = YYYYMMDD_<encounterID>_<patientID>          (one HDF5 = one encounter)
+patient_id = last field of base                          (Physio_HNET build_mladi_labels.extract_patient_id)
+entity_id  = base
+```
+20,143 patients for 20,161 files; at most 2 encounters per patient. EHR is inside the encounter's own
+file, so no join is needed.
+
+### Time Format and Clock Rule (`workzone/mladi/clock.py`)
+
+Every audata time column is **seconds from the root `time_origin`** (`"2018-10-22 04:00:00.000000 EDT"`;
+zone label EDT / EST, or LMT on the year-1800 origins; origin years 1800 (772 files), 1990 (341),
+2016–2023 (the rest), visibly date-shifted).
+
+Verified on data (`clock_survey.py`, `clock_verify.py`, `clock_pairs.py`, `clock_model.py`): charted
+Systolic/Diastolic BP in `low_rate` equal the monitor's cuff NBP to the mmHg (nurses validate it), which
+pins the offset between the two clocks without physiology.
+
+1. **Both streams count local wall-clock seconds.** The raw Pleth clock jumps +3600 s at spring-forward
+   (18/18 files spanning one); at fall-back the repeated hour was dropped (no backward step, no duplicate
+   time, 21/21), i.e. one real hour is missing there.
+2. **Different origin walls.** Monitor (DWC waveforms, numerics): the stamped wall `W`. EHR: the same
+   origin instant rendered in the **DST state at discharge** (`demographic.dischDate`), so `W ± 1 h` when
+   origin and discharge lie on different sides of a DST change. Charted-minus-monitor NBP offset observed
+   0 / −60 / +60 min in 89 / 5 / 4 % of 2,361 encounters; the discharge rule predicts it in **96 %**
+   (≈95 % of the ±60 cases; the last EHR row is an equally good fallback, waveform start/end are not).
+   The offset is constant within an encounter, also across a DST change (98 crossing encounters).
+3. **Year-1800 (LMT) and year-1990 origins**: EHR seconds are elapsed from the origin read as UTC
+   (offset +240 / +300 min against the wall-clock monitor stream).
+
+Conversion: monitor `utc = NewYork(W + t)`; EHR `utc = NewYork(W_ehr + t)` (rule 3: `W as UTC + t`).
+**Entity grid (as `ucsf_all`)**: UTC-continuous, anchored at the wall clock of the first segment:
+`time_ms = wall_ms(first segment) + real elapsed ms`. No 1-h gap at spring-forward; the hour the device
+dropped at fall-back stays a real gap. Demo encounter after the rule: charted SBP == monitor NBP at lag 0
+(was −60 min before).
+
+**Per-entity validation** (Stage A): where charted SBP/DBP match monitor NBP exactly (≈ 60 % of EHR
+encounters), the residual offset after conversion is measured. `meta.json`:
+`clock_rule` ("dwc_wall/ehr_wall_disch" | "dwc_wall/ehr_utc_origin"), `ehr_origin_shift_min`
+(0/±60), `clock_check` {n_matches, residual_min}, `clock_confidence`: `verified` (residual 0 on ≥ 3
+matches), `corrected` (residual ±60 measured → applied), `inferred` (no matches; rule only), `conflict`
+(residual not in {0, ±60}).
+
+---
+
+## Waveform Channels to Extract
+
+| Source | Source rate | Target | Rate | samples/seg | Notes |
+|---|---|---|---|---|---|
+| Pleth | 125 Hz | **PLETH40** | 40 | 1200 | base channel; raw DWC units (≈ 0.25–0.75, autoscaled) |
+| II | 500 (250) Hz | **II120** | 120 | 3600 | mV; NaN-filled where II is absent |
+
+- **Grid = the `pretrain_wav_v2` rows** (`__meta.json` `seg_list`): canonical segment `i` == mmap row `i`
+  (30 s, no overlap; blocks split where both channels are absent > 5 s; rows kept only where Pleth is
+  non-flat). Existing label caches, PAT targets and the e1 split therefore index the same seconds.
+  Consecutive rows are processed as one stretch on the block's own sample grid (`start + n/fs`), then
+  `resample_poly` — **no band-pass** (canonical = raw). Check (demo): band-passing the canonical rows as
+  `data_preparing_v2` did reproduces the mmap rows, r p50 0.995 (Pleth) / 0.997 (II).
+- Invalid values: non-finite or |v| > 1e3 (Pleth sentinels ~ −2.7e8, −1.7e7) → NaN on the samples they
+  cover; interpolation never bridges them.
+- Not in v1: ART/ABP waveforms (ABP125 for 41 % of encounters ≈ 3.6 TB; storage, see below). ART/ABP
+  enter as 1-Hz numerics.
+- Physio_HNET readers of the current MLADI encoders add the `data_preparing_v2` band-pass at runtime
+  (Butterworth order 4, `filtfilt`: Pleth 0.5–12 Hz, II 0.5–50 Hz).
+
+## Dense sidecars (monitor numerics)
+
+`vitals_hf.npy` float32 `[N_seg, 15, n_var]`, **2-s slots** (same shape convention as `ucsf_all`; the
+1.024-s readings give ~2 per slot, last wins), NaN = none. Values filtered by registry `physio_min/max`.
+
+| idx | var_id | name | source key(s), first available |
+|---|---|---|---|
+| 0 | 150 | HR_hf | HR.HR |
+| 1 | 151 | SpO2_hf | SpO₂.SpO₂ |
+| 2 | 152 | RR_hf | RR.RR |
+| 3 | 153 | ABPs_hf | ART.Systolic → ABP.ABPs |
+| 4 | 154 | ABPd_hf | same line as the slot's systolic |
+| 5 | 155 | ABPm_hf | ART.Mean → ABP.ABPm |
+| 6 | 156 | PULSE_hf | SpO₂.Pulse |
+| 7 | 113 | PR_art | ART.Pulse → ABP.Pulse |
+| 8 | 160 | CVP_hf | CVP.CVPm |
+| 9 | 164 | PVCrate_hf | PVC.PVC |
+| 10 | *165* | *PERF_hf* (new) | Perf.Perf (perfusion index) |
+
+`vitals_hf_abp_src.npy` uint8 `[N_seg, 15]`: 0 none, 1 ART, 2 ABP (lines never mixed in a slot).
+`nbp_events.npy` (EHR_EVENT_DTYPE, var 157/158/159 = NBPs/d/m_hf): one event per cuff reading (value
+change), at the reading time. Stage G writes `ehr_hf.npy` (MIMIC-compatible pair-end convention of
+`mimic3/stage3b_extract_numerics.py`, var 150–159) for the phase-4 readers, as `ucsf_all` does.
+
+---
+
+## EHR Variables to Extract
+
+Times through `clock.py` (EHR rule); values numeric only; units checked per row against the decoded
+`resultUnit` (rows in another unit are converted when the rule is listed, else dropped and counted).
+
+### Labs (var_id 0–18, `lab_results.eventDisp`)
+
+| var | registry | MLADI analytes (encounters) |
+|---|---|---|
+| 0 | Potassium | K (11,748) · Potassium(K) Whole Blood (2,168) · Potassium iSTAT (1,684) · Potassium Level (877) |
+| 1 | Calcium (total, mg/dL) | Ca (11,670) · Calcium Level (1,088) — *ionized excluded* |
+| 2 | Sodium | Na (11,748) · Sodium(Na) Whole Blood (1,546) · Sodium Istat (1,684) · Sodium (Na) Level (591) |
+| 3 | Glucose | Glucose (11,698) · Glucose (bedside) (6,287) · Glucose POC (2,068) · Glucose iSTAT (1,684) · Glucose Level Whole Blood (1,586) · Glucose Whole Blood (1,564) · Glucose Level (1,525) |
+| 4 | Lactate | Lactate (5,986) · Lactate, Whole Blood (6,959) · Lactate Whole Blood (4,196) · Lactate Whole Blood (Syringe) (2,384) |
+| 5 | Creatinine | Cr (11,743) · Creatinine iSTAT (1,961) |
+| 6 | Bilirubin | Bili, Total (10,182) |
+| 7 | Platelets | Platelets (11,757) |
+| 8 | WBC | WBC (11,753) |
+| 9 | Hemoglobin | Hgb (11,757) · Hemoglobin-Arterial (573) |
+| 10 | INR | INR (10,213) |
+| 11 | BUN | BUN (11,747) |
+| 12 | Albumin | Albumin (10,247) |
+| 13 | Arterial_pH | pHa (4,912) |
+| 14 | paO2 | *arterial pO2 name to confirm in Stage D vocab* |
+| 15 | paCO2 | *arterial pCO2 name to confirm* |
+| 16 | HCO3 | CO2 (BMP, 11,748) · HCO3a (4,912) · HCO3 (2,046) — as MC-MED's mapping (CO2, POC:HCO3, HCO3) |
+| 17 | AST | AST/SGOT (10,174) |
+| 18 | ALT | ALT/SGPT (10,174) |
+
+Venous gases (pHv, HCO3v, Venous pO2/pCO2) are not mapped (no registry variable).
+
+### Vitals, charted (var_id 100–199, `low_rate.eventName`)
+
+| var | registry | MLADI names |
+|---|---|---|
+| 100 | HR | Pulse |
+| 101 | SpO2 | O2 Saturation |
+| 102 | RR | Respiratory Rate |
+| 103 | Temperature (°C) | Temperature Metric (°C); Temperature (unit-checked, F→C) |
+| 104/105/106 | NBPs/d/m | Systolic BP / Diastolic BP / Mean blood pressure |
+| 108 | GCS_total | Glasgow Coma Score · Glascow Coma Score |
+| 110/111/112 | ABPs/d/m | Arterial Systolic Pr(essure) / Arterial Diastolic P(ressure) / Mean arterial pressu(re) |
+| 117 | O2_flow | Oxygen per liter |
+| 116, 107 | EtCO2, CVP | *names to confirm in Stage D vocab* |
+
+### Actions (var_id 200–299)
+
+| var | registry | MLADI source |
+|---|---|---|
+| 203 | FiO2 (fraction) | low_rate "Oxygen % (FiO2)", "FIO2" (÷100) |
+| 204 | PEEP | low_rate "Positive end expiratory pressure (PEEP)" |
+| 206 | urine_output (mL) | infusions_and_outputs name = "Urine Output", volume |
+| 207–213 | vasopressors | medications catalogDisp norepinephrine / epinephrine / phenylephrine / dopamine / vasopressin / dobutamine / ePHEDrine |
+| 215 | insulin | catalogDisp insulin regular / lispro / glargine / … |
+| 217 / 218 / 219 | K / Ca / bicarbonate replacement | potassium chloride / calcium chloride / sodium bicarbonate |
+
+v1 stores each administration as an event with `value` = the charted `dose` when its `doseUnit`
+converts to the registry unit, else NaN (event marker). **Infusion RATES** (registry mcg/kg/min) need
+weight and the infusion stream — deferred to a post-stage (`tasks/`), not guessed here.
+
+### Scores (300–399): none in v1.
+
+### New variables (registry additions — need approval)
+- `165 PERF_hf` (perfusion index, unitless, source Perf.Perf, `source: dwc_numerics`).
+- Registry fields `mladi_*` (`mladi_lab_names`, `mladi_low_rate_names`, `mladi_med_names`,
+  `mladi_numerics_keys`) carrying the mapping above, as for the other cohorts.
+
+### Filtering Rules
+Registry `physio_min/max`; non-numeric values dropped (counted per variable in `meta.json`); exact
+duplicate (time, var, value) rows removed; events sorted by `time_ms`.
+
+## Demographics to Extract (`demographics.csv`, one row per entity)
+entity_id, patient_id, age, sex, race, ethnicity, encntrType, dischDisp (decoded strings), stay_days,
+admit-to-waveform days, clinicalUnit (first), has_ehr, has_art, e1_split. Outcomes (e.g. in-hospital
+death from dischDisp) are task post-stages, not canonical fields.
+
+## Processing Parameters
+
+| Parameter | Value |
+|---|---|
+| Segment | 30 s, **no overlap** (as UCSF / MC-MED; MIMIC uses 25-s stride) |
+| PLETH40 / II120 | 1200 / 3600 samples, float16, C-contiguous |
+| vitals_hf | 2-s slots, 15 per segment |
+| EHR trajectory | context 24 h, baseline cap 30 d, future cap 7 d (`physio_data/ehr_trajectory.py`) |
+| Entities | every HDF5 with Pleth and ≥ 1 `pretrain_wav_v2` row (≈ 16.4 k); EHR optional (`has_ehr`) — phase-2 pretraining uses waveform-only entities too |
+| Splits | `pretrain_splits.json` = `downstream_splits.json`: **e1 split kept** (patient-level 70/15/15, seed 42, 9,218 / 1,976 / 1,974 encounters); entities outside e1 take their patient's e1 split if it has one, else a patient-hash 70/15/15 (seed 42); no patient on two sides |
+
+## Pipeline (`workzone/mladi/`, PSC, `sbatch` on RM-shared, ≤ half a node, chained `afterok`)
+
+| Stage | Script | Output |
+|---|---|---|
+| A | `stage_a_inventory.py` | per-entity inventory (channels, rows, numerics keys, EHR tables, clock class, NBP-match clock check) → `inventory.parquet` |
+| B | `stage_b_wave.py` | PLETH40, II120, time_ms, meta.json (grid = mmap rows; raw; NaN for invalid) |
+| C | `stage_c_vitals_hf.py` | vitals_hf.npy, vitals_hf_abp_src.npy, nbp_events.npy |
+| D | `stage_d_ehr.py` | ehr_baseline / recent / events / future (labs, charted vitals, actions) |
+| E | `stage_e_meta.py` | meta.json completed (clock, coverage, counts) |
+| F | `stage_f_manifest.py` | manifest.json, pretrain_splits.json, downstream_splits.json, demographics.csv |
+| G | `stage_g_ehr_hf.py` | ehr_hf.npy (MIMIC-compatible numerics events) |
+| tasks | `workzone/common/build_estimation_task.py --spec task_specs/vital_est_hf.yaml`, then the `abp_hf` builder | `tasks/vital_est_hf`, `tasks/abp_hf` (ABPm_hf ≥ 30 ticks) — the files phase-4 reads |
+
+Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` gate.
+
+### Verification gates
+| Gate | Checks |
+|---|---|
+| A | entity count ≈ 16.4 k; clock classes; NBP-match residual 0 or ±60 corrected on ≥ 95 % of checkable entities |
+| B | errors ≤ 1 %; shapes/dtypes/contiguity; N_seg == mmap rows; `time_ms` strictly increasing, 30-s steps inside blocks; 300-entity sample: band-passed rows vs mmap r ≥ 0.98; NaN fraction < 20 % |
+| C | sidecar shapes; HR_hf coverage median ≥ 0.8; NBP events in range; ECG-derived HR vs HR_hf corr ≥ 0.6 on 40 entities |
+| D | event dtype, sorted, `seg_idx` bounds / sentinels, var_id in registry, no event in two partitions; NBP residual check re-run on the written events |
+| F | splits disjoint by entity and patient; e1 assignments preserved; manifests consistent |
+
+## Known Issues / Quirks
+1. Clock rule above (wall-clock seconds; EHR origin at the discharge DST state; 1800/1990 origins UTC);
+   at fall-back the monitor dropped one real hour.
+2. Pleth invalid-value sentinels; II absent in some Pleth files (NaN-filled).
+3. Labs lying > 7 days from the waveform while charted vitals cover it: 0.3 % (long stays, waveform
+   starting > 2 weeks after admission). Kept; per-entity lab coverage in `meta.json`.
+4. Hidden gaps: rows missing inside a block (Pleth flat) ~0.4 % of 5-min windows — the grid keeps them
+   out, `time_ms` shows the jump.
+5. ECG filter settings vary (highEdge 150 vs 40 Hz, lowEdge 0.05 vs 0.5 Hz, ~2.6 %): recorded per
+   entity (`meta.ecg_filter`).
+6. ECG→Pleth delay ~1.2 s with a Pleth re-sync sawtooth (Physio_HNET `model/hnet_wav/sawtooth.py`):
+   a property of the signals, not corrected in the store.
+7. Facility masked to a single value; `location.unit` coded (109 units).
+
+## Output Specification
+`/ocean/projects/med250003p/shared/physio_data/mladi/{entity_id}/`: PLETH40.npy, II120.npy, time_ms.npy,
+ehr_baseline.npy, ehr_recent.npy, ehr_events.npy, ehr_future.npy, vitals_hf.npy,
+vitals_hf_abp_src.npy, nbp_events.npy, ehr_hf.npy, meta.json; plus manifest.json, pretrain_splits.json,
+downstream_splits.json, demographics.csv, tasks/.
+
+**Storage**: PLETH40 + II120 ≈ 183 M segments × 9.6 kB ≈ **1.76 TB**; sidecars ≈ 0.12 TB; total ≈ 1.9 TB.
+Project free space 2.49 TiB → ≈ 0.6 TiB left. Retiring `pretrain_wav_v2` after the canonical store is
+verified (user decision) frees ≈ 1.76 TB.
+
+## References
+- Ruffolo et al. 2025, Physiol. Meas. 46:115006 (IntelliVue ECG–PPG delay and re-sync sawtooth).
