@@ -228,6 +228,16 @@ def main():
                     events.append((int(grid.ehr(t, W, label, disch_s)[0]), LOW_RATE[nm], num(v)))
         if "ehr/lab_results" in f:
             d = factor(f["ehr/lab_results"])
+            # diagnostics: which analytes, how many parse, where their times fall against the waveform span
+            lt = np.array([num(x) for x in d["time"]]); lv = np.array([num(x) for x in d["resultVal"]])
+            lg = grid.ehr(lt[np.isfinite(lt)], W, label, disch_s) if np.isfinite(lt).any() else np.zeros(0)
+            import collections as _c
+            S["lab_diag"] = {"rows": int(len(lt)), "finite_time": int(np.isfinite(lt).sum()), "finite_value": int(np.isfinite(lv).sum()),
+                             "top_names": _c.Counter(str(x) for x in d["eventDisp"]).most_common(12),
+                             "matched_names": int(sum(str(x) in LABS for x in d["eventDisp"])),
+                             "time_h_from_wave_start_p0_p50_p100": (np.percentile((lg - time_ms[0]) / 3.6e6, [0, 50, 100]).round(1).tolist() if lg.size else None),
+                             "wave_span_h": float((time_ms[-1] - time_ms[0]) / 3.6e6),
+                             "resultVal_dtype": str(f["ehr/lab_results"].dtype["resultVal"]) if "resultVal" in f["ehr/lab_results"].dtype.names else None}
             for nm, t, v in zip(d["eventDisp"], d["time"], d["resultVal"]):
                 if nm in LABS and np.isfinite(num(v)) and np.isfinite(num(t)):
                     events.append((int(grid.ehr(t, W, label, disch_s)[0]), LABS[nm], num(v)))
@@ -256,6 +266,7 @@ def main():
                           if k == "ehr_events" else sent[k])
         np.save(os.path.join(out, k + ".npy"), arr)
     S["ehr_counts"] = {k: int(v.size) for k, v in parts.items()}
+    S["ehr_var_counts"] = {k: {int(u): int((v["var_id"] == u).sum()) for u in np.unique(v["var_id"])} for k, v in parts.items()}
     np.save(os.path.join(out, "time_ms.npy"), time_ms)
     for k, v in arrays.items():
         np.save(os.path.join(out, k + ".npy"), np.ascontiguousarray(v))
