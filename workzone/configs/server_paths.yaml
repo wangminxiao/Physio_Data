@@ -46,3 +46,15 @@ mover_epic:
   output_dir: /mnt/localdata100tb/physio_data/mover_epic
 mover_combine:
   output_dir: /mnt/localdata100tb/physio_data/mover_combine
+
+# MLADI (Pitt, Philips IntelliVue DWC exports) -- lives on PSC Bridges-2 only (DUA: the data never
+# leaves PSC). Raw = one HDF5 per encounter (waveforms + data/numerics + /ehr tables).
+# pretrain_wav_dir holds the earlier 30-s mmaps whose __meta.json seg_list is the segment grid the
+# canonical store reuses (segment i = mmap row i), so label caches / PAT targets / the e1 split keep
+# indexing the same seconds.
+mladi:
+  raw_h5_dir: /ocean/projects/med250003p/shared/mladi_extract_2023_waves
+  pretrain_wav_dir: /ocean/projects/med250003p/shared/pretrain_wav_v2
+  e1_split: /ocean/projects/med250003p/shared/data_cache/e1_mladi/mladi_encounter_index.json
+  intermediate_dir: /ocean/projects/med250003p/mwang11/Physio_Data/workzone/outputs/mladi
+  output_dir: /ocean/projects/med250003p/shared/physio_data/mladi
