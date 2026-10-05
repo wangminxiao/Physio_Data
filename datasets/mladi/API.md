@@ -308,7 +308,7 @@ downstream_splits.json, demographics.csv, tasks/.
 
 **Storage**: PLETH40 + II120 ≈ 183 M segments × 9.6 kB ≈ **1.76 TB**; vitals_hf (1-s, 11 vars) ≈
 183 M × 30 × 11 × 4 B ≈ 0.24 TB; total ≈ 2.0 TB.
-Project free space 2.49 TiB → ≈ 0.6 TiB left. Retiring `pretrain_wav_v2` after the canonical store is
+Project free space 2.49 TiB → ≈ 0.6 TiB left after ≈ 2.0 TB. Retiring `pretrain_wav_v2` after the canonical store is
 verified (user decision) frees ≈ 1.76 TB.
 
 ## References
