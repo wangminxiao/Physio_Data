@@ -133,7 +133,7 @@ def one(task):
                 os.replace(os.path.join(od, name + ".npy.tmp"), os.path.join(od, name + ".npy"))
                 stats[name] = {"present": True, "fs_src": fs_src, "nan_frac": nan_n / float(n * L)}
         grid = clock.Grid(W, st[0])
-        tms = grid.dwc(st, W).astype(np.int64)
+        tms = grid.dwc_rows(st, blk, W).astype(np.int64)
         assert tms.size == n and np.all(np.diff(tms) > 0), "time_ms not strictly increasing"
         np.save(os.path.join(od, "time_ms.npy"), tms)
         meta = {k: row.get(k) for k in ("entity_id", "patient_id", "e1_split", "origin_year", "origin_label", "clock_rule",
@@ -144,7 +144,7 @@ def one(task):
                               "II120": {"fs": 120, "samples_per_seg": 3600, "unit": "mV"}},
                     grid_source="pretrain_wav_v2 __meta.json seg_list (segment i == mmap row i)",
                     time_base="UTC-continuous grid anchored at the New York wall clock of the first segment",
-                    time_rule="workzone/mladi/clock.py (monitor: wall clock from the stamped origin)",
+                    time_rule="workzone/mladi/clock.py Grid.dwc_rows (run start by the monitor wall rule, raw elapsed within a run)",
                     n_runs=len(runs), n_blocks=int(len(set(blk.tolist()))),
                     stage_b={"done": True, "stats": stats, "seconds": round(time.time() - t_start, 1),
                              "band_pass": None})

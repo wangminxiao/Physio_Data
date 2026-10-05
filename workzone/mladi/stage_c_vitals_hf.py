@@ -142,7 +142,7 @@ def one(od):
                     continue
                 o = np.argsort(r[0], kind="stable"); t, v = r[0][o], r[1][o]
                 chg = np.r_[True, np.diff(v) != 0]
-                te = grid.dwc(t[chg], W); ve = v[chg]
+                te, _ = clock.raw_to_grid(t[chg], st, tms, W, grid); ve = v[chg]
                 si = np.searchsorted(tms, te, side="right") - 1
                 inw = (si >= 0) & (te < tms[-1] + 30_000)
                 for a, b, c in zip(te[inw], si[inw], ve[inw]):

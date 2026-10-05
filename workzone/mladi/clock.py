@@ -113,3 +113,37 @@ class Grid:
 
     def ehr(self, t_s, W: datetime, label: str, disch_s: float | None) -> np.ndarray:
         return self.from_utc(ehr_to_utc_ms(t_s, W, label, disch_s))
+
+    def dwc_rows(self, st_s, blocks, W: datetime) -> np.ndarray:
+        """Grid ms of segment starts (raw seconds, sorted) by RUNS: a run = consecutive rows 30 s apart in
+        one block. Its first row is placed by the wall rule; later rows add raw elapsed seconds, because DWC
+        times are synthesized from sample counts and the raw clock does not re-anchor inside a continuous
+        stretch (66 runs cross spring-forward with continuous raw time; at fall-back the raw clock neither
+        steps back nor drops data). Identical to `dwc` for runs that do not cross a DST change."""
+        st_s = np.asarray(st_s, float); blocks = np.asarray(blocks)
+        utc = np.empty(st_s.size, np.int64)
+        for a, b in runs(st_s, blocks):
+            u0 = int(dwc_to_utc_ms(st_s[a], W)[0])
+            utc[a:b] = u0 + np.round((st_s[a:b] - st_s[a]) * 1000).astype(np.int64)
+        return self.from_utc(utc)
+
+
+def runs(st_s, blocks):
+    """[(a, b)) index ranges of consecutive rows 30 s apart in one block."""
+    out, r0 = [], 0
+    for i in range(1, len(st_s) + 1):
+        if i == len(st_s) or abs(st_s[i] - st_s[i - 1] - 30.0) > 1e-3 or blocks[i] != blocks[i - 1]:
+            out.append((r0, i)); r0 = i
+    return out
+
+
+def raw_to_grid(t_s, st_s, time_ms, W: datetime, grid: "Grid") -> tuple[np.ndarray, np.ndarray]:
+    """Monitor-stream times (raw s) -> grid ms through the row map: inside a segment, the row's grid
+    time + raw offset (consistent with the waveform); in gaps, the wall rule. Returns (grid_ms, row index
+    at or before, -1 if none)."""
+    t_s = np.asarray(t_s, float)
+    i = np.searchsorted(st_s, t_s, side="right") - 1
+    inside = (i >= 0) & (t_s - st_s[np.clip(i, 0, None)] < 30.0)
+    g = np.where(inside, time_ms[np.clip(i, 0, None)] + np.round((t_s - st_s[np.clip(i, 0, None)]) * 1000).astype(np.int64),
+                 grid.dwc(t_s, W) if t_s.size else np.zeros(0, np.int64))
+    return g.astype(np.int64), i
