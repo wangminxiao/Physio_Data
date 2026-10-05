@@ -74,8 +74,15 @@ pins the offset between the two clocks without physiology.
    0 / −60 / +60 min in 89 / 5 / 4 % of 2,361 encounters; the discharge rule predicts it in **96 %**
    (≈95 % of the ±60 cases; the last EHR row is an equally good fallback, waveform start/end are not).
    The offset is constant within an encounter, also across a DST change (98 crossing encounters).
-3. **Year-1800 (LMT) and year-1990 origins**: EHR seconds are elapsed from the origin read as UTC
-   (offset +240 / +300 min against the wall-clock monitor stream).
+3. **Year-1800 (LMT) origins**: EHR seconds are elapsed from the origin read as UTC (offset +240 / +300
+   min against the wall-clock monitor stream) in ~75 % of the checkable files. Year-1990 origins follow
+   rule 2 (reading them as UTC was off by −300 min in 58 of 60).
+4. **Per-entity correction (Stage A, all 16,422 entities)**: with ≥ 3 exact NBP matches (7,580 entities)
+   the residual after rules 1–3 is 0 (±5 min) in 7,462 → `verified`; within 5 min of a zone offset
+   (±60 DST, ±240 / ±300 UTC vs EDT / EST, ±296 UTC vs LMT) in 112 → `corrected` with the measured shift
+   (`ehr_extra_shift_min`); anything else in 6 (10–18 min, charting delay) → `conflict`, no shift.
+   Entities that cannot be checked (8,842; 7,157 of them have no EHR) are `inferred` and carry
+   `clock_risk` = the rule's error rate in their origin class (2016–19 0.5 %, 2020–23 4 %, 1800 25 %).
 
 Conversion: monitor `utc = NewYork(W + t)`; EHR `utc = NewYork(W_ehr + t)` (rule 3: `W as UTC + t`).
 **Entity grid (as `ucsf_all`)**: UTC-continuous, anchored at the wall clock of the first segment:
@@ -86,9 +93,8 @@ dropped at fall-back stays a real gap. Demo encounter after the rule: charted SB
 **Per-entity validation** (Stage A): where charted SBP/DBP match monitor NBP exactly (≈ 60 % of EHR
 encounters), the residual offset after conversion is measured. `meta.json`:
 `clock_rule` ("dwc_wall/ehr_wall_disch" | "dwc_wall/ehr_utc_origin"), `ehr_origin_shift_min`
-(0/±60), `clock_check` {n_matches, residual_min}, `clock_confidence`: `verified` (residual 0 on ≥ 3
-matches), `corrected` (residual ±60 measured → applied), `inferred` (no matches; rule only), `conflict`
-(residual not in {0, ±60}).
+(0/±60), `clock_check` {n_matches, n_charted, residual_min}, `clock_confidence` (verified / corrected /
+conflict / inferred, rule 4), `ehr_extra_shift_min`, `clock_risk`.
 
 ---
 
