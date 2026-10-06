@@ -30,7 +30,7 @@ import stage_c3_pleth_timing as C3  # noqa: E402
 from common import cfg  # noqa: E402
 
 T0 = time.time()
-VERSION = "mladi-c4-1"
+VERSION = "mladi-c4-2"
 R_ART_MS = 184.0
 FS = 40
 REFINE_HALF_S = 3.0          # look for the drop within +-3 s of C3's reset
