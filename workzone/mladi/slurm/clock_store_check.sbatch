@@ -14,4 +14,4 @@ cd /jet/home/mwang11/Physio_Data
 module purge; module load anaconda3
 set +u; source "$(conda info --base)/etc/profile.d/conda.sh"
 source activate /ocean/projects/med250003p/mwang11/envs/wav_hnet; set -u
-python -u workzone/mladi/explore/clock_store_check.py --n "${N:-300}"
+python -u workzone/mladi/explore/clock_store_check.py --n "${N:-300}" --only "${ONLY:-}"

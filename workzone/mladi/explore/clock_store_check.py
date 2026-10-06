@@ -13,6 +13,7 @@ from common import cfg  # noqa: E402
 
 C = cfg()
 ap = argparse.ArgumentParser(); ap.add_argument("--out", default=C["output_dir"]); ap.add_argument("--n", type=int, default=400)
+ap.add_argument("--only", default="", help="only entities whose meta.ehr_clock.confidence is this")
 a = ap.parse_args()
 ents = [d for d in os.listdir(a.out) if os.path.exists(os.path.join(a.out, d, "ehr_events.npy"))]
 random.seed(1); random.shuffle(ents)
@@ -21,6 +22,8 @@ for e in ents:
     if len(rows) >= a.n:
         break
     d = os.path.join(a.out, e); m = json.load(open(os.path.join(d, "meta.json")))
+    if a.only and (m.get("ehr_clock") or {}).get("confidence") != a.only:
+        continue
     ev = np.load(os.path.join(d, "ehr_events.npy")); nb = np.load(os.path.join(d, "nbp_events.npy"))
     s = ev[ev["var_id"] == 104]; k = nb[nb["var_id"] == 157]
     if s.size < 5 or k.size < 5:
@@ -37,9 +40,20 @@ for e in ents:
         f_mode = float(np.mean([np.any(np.abs(z - mode) <= 1.5) for z in dts]))
     f0 = float(np.mean([np.any(np.abs(z) <= 1.5) for z in dts]))
     f1 = float(np.mean([np.any(np.abs(z) <= 1.0) for z in dts]))
+    # top-3 modes with their shares, and when (fraction of the stay) each mode's matches occur
+    modes = collections.Counter(np.round(allz).astype(int).tolist()).most_common(8) if allz.size else []
+    top = []
+    for mo, _ in modes:
+        hit = np.array([np.any(np.abs(z - mo) <= 1.5) for z in dts])
+        if hit.any() and all(abs(mo - q[0]) > 2 for q in top):
+            pos = (s["time_ms"][hit] - s["time_ms"][0]) / max(1, s["time_ms"][-1] - s["time_ms"][0])
+            top.append((mo, round(float(hit.mean()), 2), round(float(pos.min()), 2), round(float(pos.max()), 2)))
+        if len(top) == 3:
+            break
     r = {"e": e[:12], "cc": m.get("clock_confidence"), "res_A": (m.get("clock_check") or {}).get("residual_min"),
          "shift": m.get("ehr_extra_shift_min"), "dst": bool(m.get("dst_crossing_runs")), "cont": m.get("runs_continued_after_dst", 0),
-         "n": int(s.size), "mode": mode, "f_mode": round(f_mode, 2), "f0": round(f0, 2), "f1": round(f1, 2), "rule": m.get("clock_rule")}
+         "n": int(s.size), "mode": mode, "f_mode": round(f_mode, 2), "f0": round(f0, 2), "f1": round(f1, 2), "rule": m.get("clock_rule"), "oy": m.get("origin_year"),
+         "top_modes(mode,share,first,last)": top}
     rows.append(r); print(json.dumps(r), flush=True)
 print("== summary by clock_confidence")
 for cc in sorted({r["cc"] for r in rows}):
