@@ -6,9 +6,10 @@
               physio_data.ehr_trajectory.validate_partition; actions var_id in 200-220 with
               seg_idx in [0, n_seg); EHR values inside the registry physio range
   coverage    has_ehr entities with >= 1 in-waveform event: >= 70 %
-  clock       charted SBP (104) vs monitor NBP (157) on the stored grid, per entity the share of
-              charted SBP with an NBP within 60 s and 1 mmHg; median >= 0.8 for verified, reported for
-              corrected / inferred
+  clock       on the WRITTEN events: charted SBP (104) vs monitor NBP (157), every pair with |dv| <= 0.5 within
+              6 h, dt binned to 1 min -> per-entity mode. Entities that Stage D verified or corrected need
+              |mode| <= 1 min in >= 95 %. The share of charted SBP matched at the mode is reported only
+              (manual / non-monitor readings lower it without any clock error).
   plausible   pooled medians of the main labs and vitals inside clinical bands (catches unit or mapping
               mistakes)
 """
@@ -73,18 +74,26 @@ def main():
                 vals[v] += ev["value"][ev["var_id"] == v].tolist()
             s = ev[ev["var_id"] == 104]; nb = np.load(os.path.join(d, "nbp_events.npy")); nb = nb[nb["var_id"] == 157]
             if s.size >= 5 and nb.size:
-                j = np.searchsorted(nb["time_ms"], s["time_ms"])
-                hit = []
-                for t_, v_, jj in zip(s["time_ms"], s["value"], j):
-                    c = nb[max(0, jj - 3): jj + 3]
-                    hit.append(bool(np.any((np.abs(c["time_ms"] - t_) <= 60_000) & (np.abs(c["value"] - v_) <= 1))))
-                clk[metas[e].get("clock_confidence", "?")].append(float(np.mean(hit)))
+                dts = []
+                for t_, v_ in zip(s["time_ms"], s["value"]):
+                    z = (t_ - nb["time_ms"][np.abs(nb["value"] - v_) <= 0.5]) / 60000.0
+                    dts.append(z[np.abs(z) <= 360])
+                if any(len(z) for z in dts):
+                    mode = collections.Counter(np.round(np.concatenate(dts)).astype(int).tolist()).most_common(1)[0][0]
+                    share = float(np.mean([np.any(np.abs(z - mode) <= 1.5) for z in dts]))
+                    clk[(metas[e].get("ehr_clock") or {}).get("confidence", "?")].append((mode, share))
         except Exception as ex:
             probs.append(f"{e[:8]} {type(ex).__name__}: {ex}")
     res.update(sample=len(S), n_problems=len(probs), problems=probs[:10])
     if len(probs) > 0.01 * max(1, len(S)): fails.append(f"{len(probs)} problem entities")
-    res["clock_nbp_match"] = {k: {"n": len(v), "median": float(np.median(v)), "p10": float(np.percentile(v, 10))} for k, v in clk.items()}
-    if clk.get("verified") and np.median(clk["verified"]) < 0.8: fails.append(f"verified clock match median {np.median(clk['verified']):.2f} < 0.8")
+    res["clock_written"] = {k: {"n": len(v), "mode_counts": collections.Counter(m for m, _ in v).most_common(5),
+                                "share_at_mode_median": float(np.median([x for _, x in v]))} for k, v in clk.items()}
+    ok_cls = [m for k in ("verified", "corrected") for m, _ in clk.get(k, [])]
+    f_ok = float(np.mean([abs(m) <= 1 for m in ok_cls])) if ok_cls else None
+    res["clock_mode_within_1min"] = f_ok
+    if f_ok is not None and f_ok < 0.95: fails.append(f"written clock mode within 1 min in {f_ok:.2f} < 0.95 of verified/corrected")
+    res["ehr_clock_confidence"] = dict(collections.Counter((metas[d].get("ehr_clock") or {}).get("confidence") for d in done))
+    res["ehr_clock_shift_min"] = dict(collections.Counter((metas[d].get("ehr_clock") or {}).get("shift_min") for d in done).most_common(12))
     med = {}
     for v, (lo, hi) in BANDS.items():
         if len(vals[v]) >= 50:

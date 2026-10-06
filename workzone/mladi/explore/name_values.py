@@ -16,7 +16,7 @@ ap.add_argument("--table", default="low_rate"); ap.add_argument("--name-col", de
 ap.add_argument("--val-cols", default="resultVal,resultUnit"); ap.add_argument("--names", required=True)
 ap.add_argument("--files", type=int, default=400); ap.add_argument("--seed", type=int, default=0)
 a = ap.parse_args()
-pat = re.compile(a.names, re.I); vc = a.val_cols.split(",")
+pat = re.compile(a.names, re.I); vc = re.split(r"[,:]", a.val_cols)
 cnt = collections.Counter(); par = collections.Counter(); top = collections.defaultdict(collections.Counter)
 unit = collections.defaultdict(collections.Counter); nf = 0
 import random

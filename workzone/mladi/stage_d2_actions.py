@@ -2,7 +2,7 @@
 """MLADI Stage D2: actions -> ehr_actions.npy per entity (var 200-220; MIMIC stage3b_actions_v2 / MOVER /
 MC-MED convention: a sidecar with the EHR event dtype, never written into ehr_events.npy).
 
-Sources (times through the same EHR clock as Stage D):
+Sources (times through the same EHR clock as Stage D, incl. its measured shift meta.ehr_clock.shift_min):
   medications        catalogDisp (orderedAs as fallback) -> ehr_map.drug_to_var; non-systemic routes
                      dropped; value = ehr_map.action_value (exact unit conversions only, else NaN =
                      "given, magnitude unknown"; vasopressors are NaN: MLADI charts amounts, the registry
@@ -24,7 +24,7 @@ import ehr_map as M  # noqa: E402
 from common import cfg, factor, num, EHR_EVENT_DTYPE  # noqa: E402
 
 T0 = time.time()
-VERSION = "mladi-d2-1"
+VERSION = "mladi-d2-2"
 VASO = set(range(207, 214))
 _WAV, _RAW = None, None
 
@@ -53,7 +53,9 @@ def one(od):
             W, label = clock.parse_origin(json.loads(f.attrs[".meta"])["time_origin"])
             grid = clock.Grid(W, st0)
             disch = meta.get("disch_s"); disch = float(disch) if disch not in (None, "None") else None
-            shift_ms = int(round(float(meta.get("ehr_extra_shift_min") or 0) * 60000))
+            if "ehr_clock" not in meta:
+                raise RuntimeError("run Stage D first (meta.ehr_clock holds the EHR shift)")
+            shift_ms = int(round(float(meta["ehr_clock"]["shift_min"]) * 60000))
             ehr = f.get("ehr")
             if ehr is not None and "medications" in ehr and ehr["medications"].shape[0]:
                 d = factor(ehr["medications"]); n = len(d["time"])
