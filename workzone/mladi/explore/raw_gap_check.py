@@ -62,7 +62,15 @@ def describe(per, t, v, hours):
         out["small_gap_ms_p50"] = round(float(np.median(dt[small] - per)) * 1000, 1)
         st = t[:-1][small]
         out["small_gap_interval_s_p50"] = round(float(np.median(np.diff(st))), 1) if st.size > 2 else None
-    out["dt_nonpos"] = int((dt <= 0).sum()); out["dt_off_nominal_small"] = int(((np.abs(dt - per) >= 1e-6) & (dt > 0) & (dt <= 1.5 * per)).sum())
+    out["dt_nonpos"] = int((dt <= 0).sum())
+    off = (np.abs(dt - per) >= 1e-6) & (dt > 0) & (dt <= 1.5 * per)
+    out["dt_off_nominal_small"] = int(off.sum())
+    if off.any():
+        dv = (dt[off] - per) * 1000.0
+        out["off_dev_ms_p10_p50_p90"] = [round(float(np.percentile(dv, q)), 3) for q in (10, 50, 90)]
+        out["off_interval_s_p50"] = round(float(np.median(np.diff(t[:-1][off]))), 3) if off.sum() > 2 else None
+        # net drift absorbed by these steps, ppm of elapsed time
+        out["off_net_ppm"] = round(float(dv.sum() / 1000.0 / max(1e-9, t[-1] - t[0]) * 1e6), 1)
     out["large_gaps"] = int((dt > 2.0).sum())
     for name, m in (("nan", ~np.isfinite(v)), ("invalid", np.isfinite(v) & (np.abs(v) > 1e3))):
         r = runs(m)
@@ -99,7 +107,8 @@ for e in ents:
                     pool[f"{key}.{k}"].append(v)
     # store NaN runs (interior, <= 1 s) over the same rows -> raw cause
     tms = np.load(os.path.join(od, "time_ms.npy")); P = np.load(os.path.join(od, "PLETH40.npy"), mmap_mode="r")
-    rows = np.flatnonzero((tms / 1000.0 >= t0 - 1) & (tms / 1000.0 < t1))
+    raw_st = np.array([s_[2] for s_ in seg], float)            # store row i <-> seg_list[i] (raw seconds)
+    rows = np.flatnonzero((raw_st >= t0 - 1) & (raw_st < t1))
     if "Pleth" in R and rows.size:
         per, tt, vv = R["Pleth"]
         # contiguous row stretches
@@ -107,7 +116,7 @@ for e in ents:
         for k in range(cut.size - 1):
             rr = rows[cut[k]:cut[k + 1]]
             x = np.asarray(P[rr[0]:rr[-1] + 1], np.float32).reshape(-1)
-            g0 = tms[rr[0]] / 1000.0
+            g0 = raw_st[rr[0]]
             for s0, s1 in runs(np.isnan(x)):
                 if s0 == 0 or s1 == x.size or (s1 - s0) > 40:
                     continue
