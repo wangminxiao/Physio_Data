@@ -294,6 +294,7 @@ death from dischDisp) are task post-stages, not canonical fields.
 | A | `stage_a_inventory.py` | per-entity inventory (channels, rows, numerics keys, EHR tables, clock class, NBP-match clock check) → `inventory.parquet` |
 | B | `stage_b_wave.py` | PLETH40, II120, time_ms, meta.json (grid = mmap rows; raw; NaN for invalid) |
 | C | `stage_c_vitals_hf.py` | vitals_hf.npy, vitals_hf_abp_src.npy, nbp_events.npy |
+| C3 | `stage_c3_pleth_timing.py` + `verify_stage_c3.py` | pleth_timing.npy, pleth_timing_runs.npy, pleth_resets.npy; pleth_timing_summary.json (D_global) |
 | C2 | `stage_c2_nbp_twins.py` | twin NBP copies (known issue 8): nbp_events emptied, nbp_events_twins.npy, meta.nbp_twins |
 | D | `stage_d_ehr.py` | ehr_baseline / recent / events / future (labs, charted vitals) |
 | D2 | `stage_d2_actions.py` | ehr_actions.npy (actions, var 200–220) |
@@ -324,8 +325,14 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
    out, `time_ms` shows the jump.
 5. ECG filter settings vary (highEdge 150 vs 40 Hz, lowEdge 0.05 vs 0.5 Hz, ~2.6 %): recorded per
    entity (`meta.ecg_filter`).
-6. ECG→Pleth delay ~1.2 s with a Pleth re-sync sawtooth (Physio_HNET `model/hnet_wav/sawtooth.py`):
-   a property of the signals, not corrected in the store.
+6. ECG→Pleth delay ~1.2 s with a Pleth re-sync sawtooth: a property of the signals; the waveforms are NOT
+   shifted. Stage C3 estimates it on every record (`pleth_timing.npy`, `pleth_timing_runs.npy`,
+   `pleth_resets.npy`, `meta.pleth_timing`; cohort constant in `pleth_timing_summary.json`): device part at time
+   t = `D_global_ms` + saw(t), the rest of the measured R→foot delay is physiological. A reader that wants
+   ECG-aligned Pleth shifts it by the device part only. Detector, pairing and sawtooth model are those of
+   Physio_HNET (`scripts/dev/mladi_pat_verify.py`, `model/hnet_wav/beat_align.py`, `sawtooth.py`), ported
+   in `workzone/mladi/pleth_timing_lib.py`; on a synthetic record with a known sawtooth the fit is within
+   1-3 ms (SD) of the truth.
 7. Facility masked to a single value; `location.unit` coded (109 units).
 8. **Twin NBP copies (2020+ files, ~3-4 % of entities).** Every cuff reading (s, d, pulse) of the monitor NBP
    stream reappears 240 or 300 min apart; waveforms and the other numerics are not duplicated
@@ -339,8 +346,9 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
 ## Output Specification
 `/ocean/projects/med250003p/shared/physio_data/mladi/{entity_id}/`: PLETH40.npy, II120.npy, time_ms.npy,
 ehr_baseline.npy, ehr_recent.npy, ehr_events.npy, ehr_future.npy, ehr_actions.npy, vitals_hf.npy,
-vitals_hf_abp_src.npy, nbp_events.npy, ehr_hf.npy, meta.json; plus manifest.json, pretrain_splits.json,
-downstream_splits.json, demographics.csv, tasks/.
+vitals_hf_abp_src.npy, nbp_events.npy, ehr_hf.npy, pleth_timing.npy, pleth_timing_runs.npy, pleth_resets.npy,
+meta.json (+ nbp_events_twins.npy where known issue 8 applies); plus manifest.json, pretrain_splits.json,
+downstream_splits.json, demographics.csv, pleth_timing_summary.json, tasks/.
 
 **Storage**: PLETH40 + II120 ≈ 183 M segments × 9.6 kB ≈ **1.76 TB**; vitals_hf (1-s, 11 vars) ≈
 183 M × 30 × 11 × 4 B ≈ 0.24 TB; total ≈ 2.0 TB.
