@@ -13,7 +13,8 @@ Device delay at stamped time s (grid ms): delta(s) = D_device + saw(s - D_device
 Each stamped sample gets a content time c = s - delta(s), increasing (at a reset it jumps ~29 ms ahead: the
 monitor dropped those samples); the aligned trace is the cubic spline through (c, value) evaluated on the grid,
 per contiguous run and per finite stretch (NaN stays NaN; the last ~D_device of a run has no content -> NaN).
-PLETH40 itself is not touched.
+PLETH40 itself is not touched. pleth_aligned_resets.npy keeps the refined resets (layout of pleth_resets.npy), so
+readers can map raw-PLETH40 positions (e.g. fiducial labels) onto the aligned trace with exactly this delta.
 
     python workzone/mladi/stage_c4_pleth_aligned.py --limit 5 --workers 4 [--shard i/n]
 """
@@ -100,6 +101,7 @@ def one(od):
         rt = np.load(os.path.join(od, "pleth_timing_runs.npy")); rs_all = np.load(os.path.join(od, "pleth_resets.npy"))
         D = _D / 1000.0
         out = np.full((n, 1200), np.nan, np.float32)
+        refined_all = rs_all.astype(np.int64).copy()            # same layout as pleth_resets.npy (runs' reset0 / n_resets)
         n_ok_runs = n_res = n_moved = 0; segs_saw = 0
         prior = (meta["pleth_timing"].get("initial_offset_ms") or 1200.0) / 1000.0
         for r in rt:
@@ -110,16 +112,22 @@ def one(od):
             if r["ok"] and resets.size:
                 t, d, prior = C3.paired_delays(E, P, tms, a, b, prior)
                 resets, moved, nr = refine_resets(t, d, resets, ramp, period)
+                refined_all[r["reset0"]: r["reset0"] + r["n_resets"]] = np.round(resets * 1000.0).astype(np.int64)
                 n_ok_runs += 1; n_res += nr; n_moved += moved; segs_saw += b - a
                 delta_fn = (lambda s, rs=resets, ra=ramp, pe=period: D + L.eval_sawtooth(s - D, rs, ra, pe))
             else:
                 delta_fn = (lambda s: np.full_like(s, D))
             out[a:b] = warp_run(P, tms, a, b, delta_fn)
+        np.save(os.path.join(od, "pleth_aligned_resets.npy"), refined_all)
         tmp = os.path.join(od, "PLETH40_aligned.tmp.npy")
         np.save(tmp, out.astype(np.float16)); os.replace(tmp, os.path.join(od, "PLETH40_aligned.npy"))
         nan_raw = float(np.isnan(np.asarray(P, np.float32)).mean()) if n else 0.0
         meta["pleth_aligned"] = {
-            "version": VERSION, "file": "PLETH40_aligned.npy", "D_device_ms": round(_D, 2), "R_ART_ms": R_ART_MS,
+            "version": VERSION, "file": "PLETH40_aligned.npy", "resets_file": "pleth_aligned_resets.npy",
+            "D_device_ms": round(_D, 2), "R_ART_ms": R_ART_MS,
+            "delay_model": "delta(s) = D_device + (run ok and n_resets > 0: eval_sawtooth(s - D_device, that run's slice of "
+                           "pleth_aligned_resets.npy, ramp_ms_per_min / 60000, period_s) else 0), s in grid seconds; a raw "
+                           "sample stamped s sits at s - delta(s) in PLETH40_aligned",
             "segments_with_sawtooth_removed_frac": segs_saw / n if n else 0.0, "n_runs_sawtooth": n_ok_runs,
             "n_resets": int(n_res), "n_resets_refined": int(n_moved),
             "nan_frac_raw": nan_raw, "nan_frac_aligned": float(np.isnan(out).mean()) if n else 0.0,
