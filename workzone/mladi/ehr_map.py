@@ -54,12 +54,24 @@ VITALS = {
 VITAL_NAME = {n: v for v, names in VITALS.items() for n in names}
 
 # ---- actions from low_rate
-FIO2_NAMES = {"Oxygen % (FiO2)", "FIO2"}
-PEEP_NAMES = {"Positive end expiratory pressure (PEEP)"}
-VENT_NAMES = {"RRT Vent Status", "RRT Ventilator Type", "RRT Tidal Volume Set", "RRT Machine Rate", "RRT Total Rate"}
+# names and values from the value census (explore/name_values.py, 1,500 random files, 2026-10-06)
+FIO2_NAMES = {"Oxygen % (FiO2)", "FiO2 - vent", "FIO2"}            # %, divided by 100 ("FIO2" is mostly text)
+PEEP_NAMES = {"Positive end expiratory pressure (PEEP)", "Positive end expirat", "RRT PEEP or CPAP"}   # cmH2O
+# mechanical ventilation (205 = 1): an invasive mode charted, or a set tidal volume. "RRT Vent Status" carries no
+# value and "RRT Ventilator Type" includes non-invasive machines (V60, Trilogy), so neither is used.
+VENT_MODE_NAMES = {"RRT Mode", "Ventilator mode"}
+VENT_SET_NAMES = {"RRT Tidal Volume Set", "Tidal volume - set"}
+INVASIVE_MODE = re.compile(r"AC/|A/C|PRVC|VC\+|\bVC\b|SIMV|volume control|pressure control|APRV|pressure support|\bPC\b", re.I)
+NONINVASIVE_MODE = re.compile(r"bipap|avaps|cpap|niv|high flow|spont timed|spontaneous", re.I)
+ERROR_STATUS = {"In Error"}
 
 NONSYSTEMIC_ROUTES = re.compile(r"eye|ophth|nostril|nasal|aerosol|inhal|topical|swish|mucous|transdermal|"
                                 r"irrig|otic|ear|vagin|clotted catheter|nerve block", re.I)
+
+
+def invasive_mode(v) -> bool:
+    t = "" if v is None else str(v)
+    return bool(INVASIVE_MODE.search(t)) and not NONINVASIVE_MODE.search(t)
 
 
 def unit_norm(u) -> str | None:
@@ -125,7 +137,9 @@ def drug_to_var(name: str) -> int | None:
 def action_value(vid: int, dose, unit, volume=None, volume_unit=None) -> float:
     from common import num
     d = num(dose); u = (str(unit) if unit is not None else "").strip().lower()
-    if vid in range(207, 214):                 # registry rates; MLADI charts amounts -> presence
+    if vid == 213:                             # ephedrine: the registry unit is an amount (mg)
+        return d if u == "mg" else float("nan")
+    if vid in range(207, 213):                 # registry rates (mcg/kg/min, units/hr); MLADI charts amounts -> presence
         return float("nan")
     if vid == 215:
         return d if u.startswith("unit") else float("nan")

@@ -83,6 +83,16 @@ pins the offset between the two clocks without physiology.
    (`ehr_extra_shift_min`); anything else in 6 (10–18 min, charting delay) → `conflict`, no shift.
    Entities that cannot be checked (8,842; 7,157 of them have no EHR) are `inferred` and carry
    `clock_risk` = the rule's error rate in their origin class (2016–19 0.5 %, 2020–23 4 %, 1800 25 %).
+   **Stage D re-measures the residual on the final grid** (after rule 5, against the written
+   `nbp_events`) and applies it exactly (`meta.ehr_clock`; `clock_confidence` / `ehr_extra_shift_min` updated,
+   Stage A's kept as `*_stage_a`): |residual| ≤ 1 min → verified; ≥ 3 matches explaining ≥ 30 % of charted
+   SBP → corrected by the measured minutes; else conflict, no shift. Snapping to a known zone offset was
+   wrong for a 2019 group whose residual is −56 min (and +4 min in some "verified" ones): the monitor
+   clock there runs 4 min off, which the exact shift absorbs. 2026-10-06 pilot: corrected entities matched
+   at 0.05 with the snapped shift, the mode moves to 0 with the exact one.
+6. **Rule 5 extension (2026-10-06):** a run that the wall rule would place before the previous run ended (the
+   raw clock kept counting through a DST change and was not re-anchored after a gap) continues from the
+   previous run in elapsed time (`meta.runs_continued_after_dst`).
 
 Conversion: monitor `utc = NewYork(W + t)`; EHR `utc = NewYork(W_ehr + t)` (rule 3: `W as UTC + t`).
 
@@ -233,15 +243,17 @@ fluid actions).
 |---|---|---|
 | 200 | vasopressor_rate (NE-eq) | NaN presence at any 207–213 administration (v1) |
 | 201 / 202 | fluid rate / bolus | medications: Sodium Chloride 0.9 %, Lactated Ringers, Plasma-Lyte (IV) -- volumeDose mL |
-| 203 | FiO2 (fraction) | low_rate "Oxygen % (FiO2)", "FIO2" (÷ 100) |
-| 204 | PEEP | low_rate "Positive end expiratory pressure (PEEP)" |
-| 205 | mechvent | low_rate ventilator status rows ("RRT Vent Status", "RRT Ventilator Type") -> 1 |
+| 203 | FiO2 (fraction) | low_rate "Oxygen % (FiO2)", "FiO2 - vent", "FIO2" (÷ 100; "FIO2" is mostly text) |
+| 204 | PEEP | low_rate "Positive end expiratory pressure (PEEP)", "Positive end expirat", "RRT PEEP or CPAP" (cmH2O) |
+| 205 | mechvent | low_rate "RRT Mode" / "Ventilator mode" with an invasive mode (AC, PRVC, SIMV, VC, PC, APRV, pressure support; not BiPAP / AVAPS / CPAP), or "RRT Tidal Volume Set" / "Tidal volume - set" > 0 -> 1. ("RRT Vent Status" has no value; "RRT Ventilator Type" includes non-invasive machines such as V60 / Trilogy; value census 2026-10-06) |
 | 206 | urine_output (mL) | infusions_and_outputs name "Urine Output", volume |
-| 207–213 | per-drug vasopressors | medications catalogDisp norepinephrine / epinephrine / phenylephrine / dopamine / vasopressin / dobutamine / ePHEDrine: charted dose (native unit) |
+| 207–213 | per-drug vasopressors | medications catalogDisp norepinephrine / epinephrine / phenylephrine / dopamine / vasopressin / dobutamine / ePHEDrine. 207–212: NaN = given (the registry units are rates, MLADI charts amounts); 213 ephedrine: mg (registry unit) |
 | 214 | prbc_transfusion | infusions_and_outputs "Blood Products/Colloids" with a red-cell `detail` |
 | 215 | insulin | catalogDisp insulin regular / lispro / glargine / … (Unit(s)) |
 | 216 | dextrose_hi | dextrose 50 % / 10 % |
 | 217 / 218 / 219 / 220 | K / Ca / bicarbonate replacement, hypertonic saline | potassium chloride / calcium chloride (and gluconate) / sodium bicarbonate / NaCl 3 % |
+
+Rows whose `resultStat` is "In Error" are dropped (labs, charted vitals, actions).
 
 MLADI medication `doseUnit` is an amount (mg, mcg, mL, Unit(s); rates only in ~0.5 % of encounters), so
 v1 has no continuous vasopressor rate. A later version can derive it from `infusions_and_outputs`

@@ -5,8 +5,9 @@ MC-MED convention: a sidecar with the EHR event dtype, never written into ehr_ev
 Sources (times through the same EHR clock as Stage D, incl. its measured shift meta.ehr_clock.shift_min):
   medications        catalogDisp (orderedAs as fallback) -> ehr_map.drug_to_var; non-systemic routes
                      dropped; value = ehr_map.action_value (exact unit conversions only, else NaN =
-                     "given, magnitude unknown"; vasopressors are NaN: MLADI charts amounts, the registry
-                     variables are rates). Each vasopressor administration also adds var 200 = NaN.
+                     "given, magnitude unknown"; vasopressors 207-212 are NaN: MLADI charts amounts, the
+                     registry variables are rates; ephedrine 213 is mg as in the registry). Each vasopressor
+                     administration also adds var 200 = NaN.
   low_rate           FiO2 (203, % -> fraction), PEEP (204), ventilator rows (205 = 1)
   infusions_outputs  Urine Output (206, mL); Blood Products/Colloids with a red-cell detail (214, NaN)
 Kept: events inside the waveform span ([time_ms[0], time_ms[-1] + 30 s]); seg_idx = the segment at or
@@ -24,7 +25,7 @@ import ehr_map as M  # noqa: E402
 from common import cfg, factor, num, EHR_EVENT_DTYPE  # noqa: E402
 
 T0 = time.time()
-VERSION = "mladi-d2-2"
+VERSION = "mladi-d2-3"
 VASO = set(range(207, 214))
 _WAV, _RAW = None, None
 
@@ -74,10 +75,11 @@ def one(od):
                     if vid in VASO:
                         raw.append((tt, 200, float("nan")))
             if ehr is not None and "low_rate" in ehr and ehr["low_rate"].shape[0]:
-                d = factor(ehr["low_rate"])
-                for nm, t, v in zip(d["eventName"], d["date"], d["resultVal"]):
+                d = factor(ehr["low_rate"]); n = len(d["date"])
+                stat = d.get("resultStat", np.full(n, None, object))
+                for nm, t, v, st_ in zip(d["eventName"], d["date"], d["resultVal"], stat):
                     tt = num(t)
-                    if not np.isfinite(tt):
+                    if not np.isfinite(tt) or st_ in M.ERROR_STATUS:
                         continue
                     if nm in M.FIO2_NAMES:
                         x = num(v)
@@ -89,8 +91,13 @@ def one(od):
                         x = num(v)
                         if np.isfinite(x) and 0 <= x <= 40:
                             raw.append((tt, 204, x))
-                    elif nm in M.VENT_NAMES:
-                        raw.append((tt, 205, 1.0))
+                    elif nm in M.VENT_MODE_NAMES:
+                        if M.invasive_mode(v):
+                            raw.append((tt, 205, 1.0))
+                    elif nm in M.VENT_SET_NAMES:
+                        x = num(v)
+                        if np.isfinite(x) and x > 0:
+                            raw.append((tt, 205, 1.0))
             if ehr is not None and "infusions_and_outputs" in ehr and ehr["infusions_and_outputs"].shape[0]:
                 d = factor(ehr["infusions_and_outputs"]); n = len(d["time"])
                 det = d.get("detail", np.full(n, None, object)); un = d.get("unit", np.full(n, None, object))
@@ -125,8 +132,8 @@ def one(od):
                                "n_outside_window": n_out,
                                "value_semantics": "native dose where the unit converts exactly (insulin units, KCl / bicarbonate mEq, "
                                                   "calcium g, dextrose g, bolus mL, FiO2 fraction, PEEP cmH2O, urine mL, vent 1); "
-                                                  "NaN = given, magnitude unknown (vasopressors 207-213 and aggregate 200: MLADI charts "
-                                                  "amounts, not rates)"}
+                                                  "ephedrine mg; NaN = given, magnitude unknown (vasopressors 207-212 and aggregate 200: "
+                                                  "MLADI charts amounts, the registry variables are rates)"}
         json.dump(meta, open(mp + ".tmp", "w"), indent=1, default=str); os.replace(mp + ".tmp", mp)
         return {"entity_id": eid, "n": int(arr.size)}
     except Exception as ex:

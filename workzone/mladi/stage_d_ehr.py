@@ -7,7 +7,7 @@ plus a per-entity shift measured HERE on the final grid: charted SBP/DBP vs the 
 charted SBP -> corrected by the exact residual (not snapped to a known offset: a 2019 group sits at -56 / +4 min);
 else conflict, shift 0. Without charted SBP or NBP the Stage A shift is kept (inferred). Then split by
 physio_data.ehr_trajectory.split_events with the admission (regDate) and discharge (dischDate) as episode
-bounds. Values numeric only; labs unit-checked (ehr_map.unit_ok), temperatures to deg C, registry
+bounds. Rows with resultStat 'In Error' dropped; values numeric only; labs unit-checked (ehr_map.unit_ok), temperatures to deg C, registry
 physio_min / physio_max; exact duplicates removed. Entities without EHR get four empty files.
 
 meta.json += ehr {version, n_baseline, n_recent, n_events, n_future, per-var counts in events, dropped
@@ -31,7 +31,7 @@ from common import cfg, factor, num, nbp_offset, EHR_EVENT_DTYPE  # noqa: E402
 from physio_data.ehr_trajectory import split_events, ALL_FNAMES  # noqa: E402
 
 T0 = time.time()
-VERSION = "mladi-d2"
+VERSION = "mladi-d3"
 _RNG, _WAV, _RAW = {}, None, None
 
 
@@ -119,10 +119,13 @@ def one(od):
             if ehr is not None and "lab_results" in ehr and ehr["lab_results"].shape[0]:
                 d = factor(ehr["lab_results"]); names = d["eventDisp"]
                 units = d.get("resultUnit", np.full(len(names), None, object))
-                for nm, t, v, u in zip(names, d["time"], d["resultVal"], units):
+                stat = d.get("resultStat", np.full(len(names), None, object))
+                for nm, t, v, u, st_ in zip(names, d["time"], d["resultVal"], units, stat):
                     vid = M.LAB_NAME.get(nm)
                     if vid is None:
                         continue
+                    if st_ in M.ERROR_STATUS:
+                        drops[f"{vid}:in_error"] += 1; continue
                     x, tt = num(v), num(t)
                     if not (np.isfinite(x) and np.isfinite(tt)):
                         drops[f"{vid}:nonnumeric"] += 1; continue
@@ -134,10 +137,13 @@ def one(od):
             if ehr is not None and "low_rate" in ehr and ehr["low_rate"].shape[0]:
                 d = factor(ehr["low_rate"]); names = d["eventName"]
                 units = d.get("resultUnit", np.full(len(names), None, object))
-                for nm, t, v, u in zip(names, d["date"], d["resultVal"], units):
+                stat = d.get("resultStat", np.full(len(names), None, object))
+                for nm, t, v, u, st_ in zip(names, d["date"], d["resultVal"], units, stat):
                     vid = M.VITAL_NAME.get(nm)
                     if vid is None:
                         continue
+                    if st_ in M.ERROR_STATUS:
+                        drops[f"{vid}:in_error"] += 1; continue
                     x, tt = num(v), num(t)
                     if not (np.isfinite(x) and np.isfinite(tt)):
                         drops[f"{vid}:nonnumeric"] += 1; continue
