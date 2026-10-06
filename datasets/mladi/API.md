@@ -295,6 +295,7 @@ death from dischDisp) are task post-stages, not canonical fields.
 | B | `stage_b_wave.py` | PLETH40, II120, time_ms, meta.json (grid = mmap rows; raw; NaN for invalid) |
 | C | `stage_c_vitals_hf.py` | vitals_hf.npy, vitals_hf_abp_src.npy, nbp_events.npy |
 | C3 | `stage_c3_pleth_timing.py` + `verify_stage_c3.py` | pleth_timing.npy, pleth_timing_runs.npy, pleth_resets.npy; pleth_timing_summary.json (D_global) |
+| C4 | `stage_c4_pleth_aligned.py` + `verify_stage_c4.py` | PLETH40_aligned.npy (device delay + sawtooth removed), meta.pleth_aligned |
 | C2 | `stage_c2_nbp_twins.py` | twin NBP copies (known issue 8): nbp_events emptied, nbp_events_twins.npy, meta.nbp_twins |
 | D | `stage_d_ehr.py` | ehr_baseline / recent / events / future (labs, charted vitals) |
 | D2 | `stage_d2_actions.py` | ehr_actions.npy (actions, var 200–220) |
@@ -325,8 +326,15 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
    out, `time_ms` shows the jump.
 5. ECG filter settings vary (highEdge 150 vs 40 Hz, lowEdge 0.05 vs 0.5 Hz, ~2.6 %): recorded per
    entity (`meta.ecg_filter`).
-6. ECG→Pleth delay ~1.2 s with a Pleth re-sync sawtooth: a property of the signals; the waveforms are NOT
-   shifted. Stage C3 estimates it on every record (`pleth_timing.npy`, `pleth_timing_runs.npy`,
+6. ECG→Pleth delay ~1.2 s with a Pleth re-sync sawtooth. PLETH40 keeps it (monitor timing); Stage C4 writes
+   `PLETH40_aligned.npy` with the DEVICE part removed (user decision 2026-10-06: models learn ECG↔PPG timing
+   from the waveforms, so the input keeps physiological PAT and loses the device parts; all monitors are
+   Philips, so one constant): content time c = s − (D_device + saw(s − D_device)), D_device = D_global − 184 ms
+   (median R → radial-artery foot; the arterial line has no device delay), saw = the run's C3 sawtooth with
+   resets refined to between two beats; cubic spline through (c, PLETH40) per run and finite stretch, on the
+   same grid; the last ~1 s of each run is NaN. On the aligned trace the R → foot delay sits at ~0.18 s and
+   the sawtooth is gone (synthetic check: level shift = D_device within 0.1 ms, refit finds no reset, beat
+   template r 0.99999). Stage C3 estimates it on every record (`pleth_timing.npy`, `pleth_timing_runs.npy`,
    `pleth_resets.npy`, `meta.pleth_timing`; cohort constant in `pleth_timing_summary.json`): device part at time
    t = `D_global_ms` + saw(t), the rest of the measured R→foot delay is physiological. A reader that wants
    ECG-aligned Pleth shifts it by the device part only. Detector, pairing and sawtooth model are those of
@@ -351,13 +359,15 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
 `/ocean/projects/med250003p/shared/physio_data/mladi/{entity_id}/`: PLETH40.npy, II120.npy, time_ms.npy,
 ehr_baseline.npy, ehr_recent.npy, ehr_events.npy, ehr_future.npy, ehr_actions.npy, vitals_hf.npy,
 vitals_hf_abp_src.npy, nbp_events.npy, ehr_hf.npy, pleth_timing.npy, pleth_timing_runs.npy, pleth_resets.npy,
+PLETH40_aligned.npy,
 meta.json (+ nbp_events_twins.npy where known issue 8 applies); plus manifest.json, pretrain_splits.json,
 downstream_splits.json, demographics.csv, pleth_timing_summary.json, tasks/.
 
 **Storage**: PLETH40 + II120 ≈ 183 M segments × 9.6 kB ≈ **1.76 TB**; vitals_hf (1-s, 11 vars) ≈
 183 M × 30 × 11 × 4 B ≈ 0.24 TB; total ≈ 2.0 TB.
-Project free space 2.49 TiB → ≈ 0.6 TiB left after ≈ 2.0 TB. Retiring `pretrain_wav_v2` after the canonical store is
-verified (user decision) frees ≈ 1.76 TB.
+PLETH40_aligned adds 183 M × 2.4 kB ≈ 0.44 TB. `pretrain_wav_v2` was retired on 2026-10-06 after reader parity
+(Physio_HNET data/wave_source.py): its mmaps (1.76 TB) and __numerics.npz (0.36 TB) were deleted; the
+__meta.json files (seg_list, read by Stages B / D / D2) remain.
 
 ## References
 - Ruffolo et al. 2025, Physiol. Meas. 46:115006 (IntelliVue ECG–PPG delay and re-sync sawtooth).
