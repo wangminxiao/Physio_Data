@@ -346,6 +346,16 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
    inter-beat-interval signature without a 1.2 s prior, accepts 0.6-3.0 s, applies only fits in the
    IntelliVue pattern (period 50-90 s, ramp 15-45 ms/min), and Gate C3 reports levels by unit.
 7. Facility masked to a single value; `location.unit` coded (109 units).
+9. **Lost ~256 ms packets in the waveforms (explore/raw_gap_check.py, gap_content_check.py, 2026-10-06).** The raw
+   time axis steps forward by 264 ms (Pleth, 33 samples) / 258 ms (II) about 3 times an hour (0-15 / h by entity),
+   at the same instant in Pleth, II and ART. The signal there is really missing, not a stamp re-sync over
+   continuous samples: the R-R / foot-foot interval across a step is normal by timestamp (median +31 / +44 ms,
+   typical -3..+15) and ~256 ms short by sample count. The store marks these stretches NaN (Stage B: raw time
+   gap > 2.5 periods); about a quarter of 5-min windows contain one. pretrain_wav_v2 bridged them linearly, so
+   Physio_HNET's reader (data/wave_source.py) bridges interior NaN up to 1 s for the encoders trained on it.
+   Separately, every 5.12 s each channel's time column takes a fixed small step (Pleth +0.066 ms, net +12.8 ppm;
+   II net about -46 ppm): the per-channel rate correction is carried in the time axis, and no NaN is inserted for it.
+   Raw values carry no NaN and no invalid codes in the 30 entities checked.
 8. **Twin NBP copies (2020+ files, ~3-4 % of entities).** Every cuff reading (s, d, pulse) of the monitor NBP
    stream reappears 240 or 300 min apart; waveforms and the other numerics are not duplicated
    (`explore/dup_check.py`, `nbp_twins_raw.py`). The real copy cannot be told reliably (cuff pulse vs HR
