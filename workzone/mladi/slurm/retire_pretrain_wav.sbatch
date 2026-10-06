@@ -14,6 +14,7 @@
 #   MODE=delete     remove *_mmap.npy only (1.76 TB), and only if $VERIFIED_FLAG exists (written after the
 #                   Physio_HNET reader parity: same windows from mmap and store). __meta.json (seg_list, read by
 #                   Stages B/D/D2) and __numerics.npz stay where they are, so nothing needs archiving.
+#   MODE=delete_numerics  remove *__numerics.npz (0.36 TB; superseded by vitals_hf / nbp_events / ehr_hf)
 set -euo pipefail
 SRC=/ocean/projects/med250003p/shared/pretrain_wav_v2
 VERIFIED_FLAG=${VERIFIED_FLAG:-/ocean/projects/med250003p/mwang11/Physio_Data/workzone/outputs/mladi/READER_PARITY_OK}
@@ -31,6 +32,12 @@ case "$MODE" in
     [[ -f "$VERIFIED_FLAG" ]] || { echo "no reader parity flag $VERIFIED_FLAG"; exit 1; }
     n=$(find "$SRC" -maxdepth 1 -type f -name "*_mmap.npy" | wc -l); echo "deleting $n mmap files"
     find "$SRC" -maxdepth 1 -type f -name "*_mmap.npy" -delete
+    echo "left: $(find "$SRC" -maxdepth 1 -type f | wc -l) files ($(find "$SRC" -maxdepth 1 -name "*__meta.json" | wc -l) __meta.json)" ;;
+  delete_numerics)
+    # __numerics.npz: early per-encounter monitor numerics (Physio_HNET extract_mladi_numerics.py), superseded by
+    # the store's vitals_hf / nbp_events / ehr_hf; read only by data-building scripts whose caches already exist
+    n=$(find "$SRC" -maxdepth 1 -type f -name "*__numerics.npz" | wc -l); echo "deleting $n __numerics.npz files"
+    find "$SRC" -maxdepth 1 -type f -name "*__numerics.npz" -delete
     echo "left: $(find "$SRC" -maxdepth 1 -type f | wc -l) files ($(find "$SRC" -maxdepth 1 -name "*__meta.json" | wc -l) __meta.json)" ;;
   *) echo "MODE?"; exit 2 ;;
 esac
