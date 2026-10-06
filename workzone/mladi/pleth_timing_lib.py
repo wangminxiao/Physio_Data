@@ -6,9 +6,10 @@ Ported from Physio_HNET (kept identical in method so the store and the model sid
   estimate_offset, pair_nearest <- model/hnet_wav/beat_align.py
   fit_sawtooth, eval_sawtooth   <- model/hnet_wav/sawtooth.py
 R = signed extreme of the 0.5-40 Hz ECG within +-40 ms of the 5-20 Hz energy peak (parabola); Pleth foot =
-intersecting tangent at the steepest upstroke (10 Hz low-pass). The ECG -> Pleth delay (~1.2 s) exceeds one
-inter-beat interval, so beats are paired through the sharpest peak of all R-to-foot differences (with a prior),
-then nearest within 120 ms. Between resets r_k the device part of the delay is
+intersecting tangent at the steepest upstroke (10 Hz low-pass). The ECG -> Pleth delay (~1.2 s on ICU
+IntelliVue, ~2.1 s on other hardware in another cohort) exceeds one inter-beat interval, so beats are paired
+through the sharpest peak of all R-to-foot differences, the beat ambiguity resolved per entity by the
+inter-beat-interval signature (ibi_check), then nearest within 120 ms. Between resets r_k the device part of the delay is
 saw(t) = a (t - r_k) - a P / 2 (zero-mean over a cycle).
 """
 from __future__ import annotations
@@ -151,6 +152,23 @@ def pair_nearest(t_ecg, t_ppg, offset: float, tol: float = 0.15):
     ok = np.abs(f[j] - tgt) <= tol
     idx[ok] = order[j[ok]]; res[ok] = f[j[ok]] - tgt[ok]
     return idx, res
+
+
+def ibi_check(tr, tf, D, rr_med, tol=0.12):
+    """corr(dRR, dPP) for pairings shifted by j beats around offset D (j = -2..2): the true correspondence
+    reproduces the beat-to-beat interval changes (scripts/dev/mladi_pat_verify.py)."""
+    out = {}
+    for j in (-2, -1, 0, 1, 2):
+        idx, _ = pair_nearest(tr, tf, D + j * rr_med, tol=tol)
+        a = idx[:-1]; b = idx[1:]
+        ok = (a >= 0) & (b >= 0) & (np.diff(tr) < 2.0)
+        if ok.sum() < 30:
+            continue
+        rr = np.diff(tr)[ok]; pp = (tf[b[ok]] - tf[a[ok]])
+        x, y = np.diff(rr), np.diff(pp)
+        if x.size > 20 and x.std() > 0 and y.std() > 0:
+            out[j] = float(np.corrcoef(x, y)[0, 1])
+    return out
 
 
 # ------------------------------------------------------------------ sawtooth (sawtooth.py)

@@ -332,7 +332,11 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
    ECG-aligned Pleth shifts it by the device part only. Detector, pairing and sawtooth model are those of
    Physio_HNET (`scripts/dev/mladi_pat_verify.py`, `model/hnet_wav/beat_align.py`, `sawtooth.py`), ported
    in `workzone/mladi/pleth_timing_lib.py`; on a synthetic record with a known sawtooth the fit is within
-   1-3 ms (SD) of the truth.
+   1-3 ms (SD) of the truth. The delay is on the Pleth path only (R -> ART foot ~184 ms is physiological)
+   and depends on the hardware: another IntelliVue cohort shows ~1.19 s on ICU monitors and ~2.1 s on
+   other units' hardware, with a different sawtooth there. C3 therefore picks each entity's offset by the
+   inter-beat-interval signature without a 1.2 s prior, accepts 0.6-3.0 s, applies only fits in the
+   IntelliVue pattern (period 50-90 s, ramp 15-45 ms/min), and Gate C3 reports levels by unit.
 7. Facility masked to a single value; `location.unit` coded (109 units).
 8. **Twin NBP copies (2020+ files, ~3-4 % of entities).** Every cuff reading (s, d, pulse) of the monitor NBP
    stream reappears 240 or 300 min apart; waveforms and the other numerics are not duplicated
