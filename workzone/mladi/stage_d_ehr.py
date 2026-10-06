@@ -31,7 +31,7 @@ from common import cfg, factor, num, nbp_offset, EHR_EVENT_DTYPE  # noqa: E402
 from physio_data.ehr_trajectory import split_events, ALL_FNAMES  # noqa: E402
 
 T0 = time.time()
-VERSION = "mladi-d3"
+VERSION = "mladi-d4"
 _RNG, _WAV, _RAW = {}, None, None
 
 
@@ -59,6 +59,11 @@ def measure_shift(ev, to_grid, od, meta):
     a_shift = float(meta.get("ehr_extra_shift_min_stage_a", meta.get("ehr_extra_shift_min")) or 0)
     out = {"residual_min": None, "n_matches": 0, "n_charted": 0, "shift_min": a_shift, "confidence": "inferred",
            "method": "common.nbp_offset on the final grid (charted 104/105 vs nbp_events 157/158)"}
+    if (meta.get("nbp_twins") or {}).get("flag"):
+        # Stage A measured these against twin NBP copies (residual 240/300 is the copy lag, not a clock offset);
+        # charted pulse vs monitor HR puts their EHR clock at 0 (explore/ehr_vital_offset.py, 25 of 30)
+        out.update(shift_min=0.0, confidence="inferred", note="nbp_twins: Stage A shift not used")
+        return out
     sb = [(t, x) for t, v, x in ev if v == 104]
     nb_p = os.path.join(od, "nbp_events.npy")
     if not sb or not os.path.exists(nb_p):

@@ -294,6 +294,7 @@ death from dischDisp) are task post-stages, not canonical fields.
 | A | `stage_a_inventory.py` | per-entity inventory (channels, rows, numerics keys, EHR tables, clock class, NBP-match clock check) → `inventory.parquet` |
 | B | `stage_b_wave.py` | PLETH40, II120, time_ms, meta.json (grid = mmap rows; raw; NaN for invalid) |
 | C | `stage_c_vitals_hf.py` | vitals_hf.npy, vitals_hf_abp_src.npy, nbp_events.npy |
+| C2 | `stage_c2_nbp_twins.py` | twin NBP copies (known issue 8): nbp_events emptied, nbp_events_twins.npy, meta.nbp_twins |
 | D | `stage_d_ehr.py` | ehr_baseline / recent / events / future (labs, charted vitals) |
 | D2 | `stage_d2_actions.py` | ehr_actions.npy (actions, var 200–220) |
 | E | `stage_e_meta.py` | meta.json completed (clock, coverage, counts) |
@@ -326,6 +327,14 @@ Every stage: `--limit 5` first, resumable per entity, a `verify_stage_<x>.py` ga
 6. ECG→Pleth delay ~1.2 s with a Pleth re-sync sawtooth (Physio_HNET `model/hnet_wav/sawtooth.py`):
    a property of the signals, not corrected in the store.
 7. Facility masked to a single value; `location.unit` coded (109 units).
+8. **Twin NBP copies (2020+ files, ~3-4 % of entities).** Every cuff reading (s, d, pulse) of the monitor NBP
+   stream reappears 240 or 300 min apart; waveforms and the other numerics are not duplicated
+   (`explore/dup_check.py`, `nbp_twins_raw.py`). The real copy cannot be told reliably (cuff pulse vs HR
+   leans to the earlier one, 425:250 with 1,110 undecided; the EHR clock from charted pulse vs monitor HR
+   is 0 in 25 of 30, which favours the copy at charting time). Stage C2 removes ALL monitor NBP events of a
+   flagged entity (kept in `nbp_events_twins.npy`, `meta.nbp_twins`), and Stage D does not use Stage A's
+   shift for it (Stage A measured the copy lag). Charted SBP/DBP of these entities may include
+   validations of a copy. An arterial-line arbiter (NBP vs ART systolic at each copy) can recover them later.
 
 ## Output Specification
 `/ocean/projects/med250003p/shared/physio_data/mladi/{entity_id}/`: PLETH40.npy, II120.npy, time_ms.npy,

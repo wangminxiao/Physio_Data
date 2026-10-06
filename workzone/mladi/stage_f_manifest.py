@@ -74,7 +74,7 @@ def one(eid):
     entry = {"entity_id": eid, "patient_id": meta.get("patient_id"), "e1_split": meta.get("e1_split"), "n_seg": n,
              "source_dataset": "mladi", "time_base": "utc_continuous", "has_ehr": bool(meta.get("has_ehr")), "has_art": has_art,
              "clock_confidence": meta.get("clock_confidence"), "clock_risk": meta.get("clock_risk"),
-             "dst_crossing_runs": meta.get("dst_crossing_runs"),
+             "dst_crossing_runs": meta.get("dst_crossing_runs"), "nbp_twins": bool((meta.get("nbp_twins") or {}).get("flag")),
              "n_baseline": meta.get("ehr", {}).get("n_baseline"), "n_recent": meta.get("ehr", {}).get("n_recent"),
              "n_events": meta.get("ehr", {}).get("n_events"), "n_future": meta.get("ehr", {}).get("n_future"),
              "n_actions": meta.get("ehr_actions", {}).get("n"), "n_ehr_hf": meta.get("ehr_hf", {}).get("n_events"),

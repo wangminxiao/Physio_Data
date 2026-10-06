@@ -25,7 +25,7 @@ import ehr_map as M  # noqa: E402
 from common import cfg, factor, num, EHR_EVENT_DTYPE  # noqa: E402
 
 T0 = time.time()
-VERSION = "mladi-d2-3"
+VERSION = "mladi-d2-4"
 VASO = set(range(207, 214))
 _WAV, _RAW = None, None
 
