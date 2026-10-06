@@ -11,12 +11,12 @@
 #SBATCH --error=/jet/home/mwang11/Physio_Data/workzone/logs/mladi_retire-%j.out
 # Retire pretrain_wav_v2 (superseded by the canonical store; segment i == mmap row i).
 #   MODE=inventory  counts / sizes / owners by file type (read-only)
-#   MODE=archive    copy every file that is NOT a *_mmap.npy (seg_list __meta.json etc.) to $ARCH (read-only on the source)
-#   MODE=delete     remove *_mmap.npy only, and only if $ARCH/ARCHIVE_OK exists and $VERIFIED_FLAG exists
+#   MODE=delete     remove *_mmap.npy only (1.76 TB), and only if $VERIFIED_FLAG exists (written after the
+#                   Physio_HNET reader parity: same windows from mmap and store). __meta.json (seg_list, read by
+#                   Stages B/D/D2) and __numerics.npz stay where they are, so nothing needs archiving.
 set -euo pipefail
 SRC=/ocean/projects/med250003p/shared/pretrain_wav_v2
-ARCH=/ocean/projects/med250003p/mwang11/Physio_Data/workzone/outputs/mladi/pretrain_wav_v2_meta
-VERIFIED_FLAG=${VERIFIED_FLAG:-$ARCH/READER_PARITY_OK}
+VERIFIED_FLAG=${VERIFIED_FLAG:-/ocean/projects/med250003p/mwang11/Physio_Data/workzone/outputs/mladi/READER_PARITY_OK}
 echo "[$(date)] mode=${MODE:?} src=$SRC"
 case "$MODE" in
   inventory)
@@ -25,20 +25,13 @@ case "$MODE" in
         n[t]++; s[t] += $2; o[$1]++ } END {
         for (k in n) printf "%-6s files %8d  size %.3f TB\n", k, n[k], s[k] / 1e12;
         for (u in o) printf "owner %s %d\n", u, o[u] }'
-    find "$SRC" -maxdepth 1 -type f ! -name "*_mmap.npy" ! -name "*__meta.json" -printf "%f\n" | head -20
-    find "$SRC" -mindepth 1 -maxdepth 1 -type d -printf "dir %f\n" | head ;;
-  archive)
-    mkdir -p "$ARCH"
-    rsync -rlt --no-g --exclude "*_mmap.npy" "$SRC/" "$ARCH/"
-    n_src=$(find "$SRC" -maxdepth 1 -type f ! -name "*_mmap.npy" | wc -l); n_arc=$(find "$ARCH" -maxdepth 1 -type f ! -name "ARCHIVE_OK" ! -name "READER_PARITY_OK" | wc -l)
-    echo "non-mmap files: source $n_src, archive $n_arc"
-    if [[ "$n_src" == "$n_arc" ]]; then date > "$ARCH/ARCHIVE_OK"; echo ARCHIVE_OK; else echo "ARCHIVE MISMATCH"; exit 1; fi ;;
+    find "$SRC" -maxdepth 1 -type f ! -name "*_mmap.npy" ! -name "*__meta.json" -printf "%f\n" | sed -n 1,20p
+    find "$SRC" -mindepth 1 -maxdepth 1 -type d -printf "dir %f\n" | sed -n 1,10p ;;
   delete)
-    [[ -f "$ARCH/ARCHIVE_OK" ]] || { echo "no ARCHIVE_OK"; exit 1; }
     [[ -f "$VERIFIED_FLAG" ]] || { echo "no reader parity flag $VERIFIED_FLAG"; exit 1; }
     n=$(find "$SRC" -maxdepth 1 -type f -name "*_mmap.npy" | wc -l); echo "deleting $n mmap files"
     find "$SRC" -maxdepth 1 -type f -name "*_mmap.npy" -delete
-    echo "left: $(find "$SRC" -maxdepth 1 -type f | wc -l) files" ;;
+    echo "left: $(find "$SRC" -maxdepth 1 -type f | wc -l) files ($(find "$SRC" -maxdepth 1 -name "*__meta.json" | wc -l) __meta.json)" ;;
   *) echo "MODE?"; exit 2 ;;
 esac
 echo "[$(date)] done"
