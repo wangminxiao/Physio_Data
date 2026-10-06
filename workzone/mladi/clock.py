@@ -122,9 +122,17 @@ class Grid:
         steps back nor drops data). Identical to `dwc` for runs that do not cross a DST change."""
         st_s = np.asarray(st_s, float); blocks = np.asarray(blocks)
         utc = np.empty(st_s.size, np.int64)
+        prev = None                                   # (raw s, utc ms) of the previous run's last row
+        self.n_continued = 0
         for a, b in runs(st_s, blocks):
             u0 = int(dwc_to_utc_ms(st_s[a], W)[0])
+            if prev is not None and u0 <= prev[1]:
+                # The wall rule would place this run before the previous one ended: the raw clock was not
+                # re-anchored after a DST change (it kept counting through it), so continue in elapsed time.
+                u0 = prev[1] + int(round((st_s[a] - prev[0]) * 1000))
+                self.n_continued += 1
             utc[a:b] = u0 + np.round((st_s[a:b] - st_s[a]) * 1000).astype(np.int64)
+            prev = (st_s[b - 1], int(utc[b - 1]))
         return self.from_utc(utc)
 
 
